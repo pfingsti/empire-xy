@@ -27,7 +27,7 @@ const bname=(D,ep)=>{const n=D.names||[];for(let i=Math.min(ep,n.length-1);i>=0;
 const uname=(U,ep)=>{const n=U.names||[];for(let i=Math.min(ep,n.length-1);i>=0;i--)if(n[i])return n[i];return U.label};
 const PCOL=['#4a8ae8','#d4473c'];
 const PCOL_DK=['#2b5aa8','#8f2a23'];
-const SLOTKEYS=['Q','W','E','R','T','A','S','D','F','G','Y','X','C','V','B','U','I','O','P','J'];
+const SLOTKEYS=['Q','W','E','R','T','A','S','D','F','G','Y','X','C','V','B','U','I','O','M','J','K','L'];
 
 const UNITS=XY.units, BLD=XY.buildings, RESDEF=XY.nodes, TECHS=XY.techs;
 const DIFF=[
@@ -1667,7 +1667,7 @@ function updateTop(){
   const pl=players[0];
   for(const r of RES){const el=$('#r-'+r),v=Math.floor(pl.res[r]);if(el.textContent!=v)el.textContent=v;
     const ir=incomeRate(pl,r),ie=$('#i-'+r);if(ie){const t=ir>0?'+'+ir+'/min':'';if(ie.textContent!==t)ie.textContent=t}}
-  const gd=pl.goods,ge=$('#r-goods');if(ge&&gd){const on=gd.wheat+gd.ore+gd.tools>0;ge.hidden=!on;if(on){const t='Weizen '+Math.floor(gd.wheat)+' · Erz '+Math.floor(gd.ore)+' · Werkzeug '+Math.floor(gd.tools);if(ge.textContent!==t){ge.textContent=t;ge.title='Waren aus deinen Produktionsketten. Werkzeug beschleunigt alle Arbeiter um '+Math.round(((pl.toolMul||1)-1)*100)+' %.'}}}
+  const gd=pl.goods,ge=$('#r-goods');if(ge&&gd){const L=[['wheat','Weizen'],['flour','Mehl'],['planks','Bretter'],['blocks','Quader'],['ore','Erz'],['tools','Werkzeug']].filter(([k])=>(gd[k]||0)>=1),on=L.length>0;ge.hidden=!on;if(on){const t=L.map(([k,n])=>n+' '+Math.floor(gd[k])).join(' · ');if(ge.textContent!==t){ge.textContent=t;ge.title='Waren aus deinen Produktionsketten. Werkzeug beschleunigt alle Arbeiter um '+Math.round(((pl.toolMul||1)-1)*100)+' %.'}}}
   const md=$('#r-mood');if(md){const m=Math.round(pl.mood??50),t=m+'';if(md.textContent!==t){md.textContent=t;md.style.color=m>=65?'var(--ok)':m<35?'var(--danger)':'';md.parentNode.title='Beliebtheit '+m+' von 100: '+(pl.moodWhy||'')+' Sammeltempo '+Math.round((pl.moodMul||1)*100)+' %.'}}
   const p=$('#r-pop'),pv=pl.pop+'/'+pl.cap;if(p.textContent!==pv){p.textContent=pv;p.style.color=pl.pop>=pl.cap?'var(--danger)':''}
   const tc=ents.find(e=>e.owner===0&&e.kind==='bld'&&e.queue.some(q=>q.ep));

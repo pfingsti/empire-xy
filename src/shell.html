@@ -29,6 +29,7 @@ button:focus-visible{outline:2px solid var(--bronze-hi);outline-offset:1px}
 #epochName{font-family:var(--f-display);font-size:15px;color:var(--bronze-hi);letter-spacing:.03em}
 #top .inc{font-size:10px;color:var(--ok);margin-left:3px;font-variant-numeric:tabular-nums;opacity:.85}
 @media (max-width:1350px){#top .inc,#r-goods{display:none}}
+#r-goods{font-size:11px;line-height:1.15;max-width:140px;white-space:normal;opacity:.9}
 #researchHud{position:absolute;top:52px;right:10px;z-index:5;display:flex;flex-direction:column;gap:4px;min-width:190px;pointer-events:none}
 #researchHud .rq{background:rgba(20,16,10,.82);border:1px solid var(--line);border-radius:4px;padding:4px 7px;font-size:12px;display:grid;grid-template-columns:1fr auto;gap:2px 8px}
 #researchHud em{font-style:normal;color:var(--muted);font-variant-numeric:tabular-nums}
@@ -170,7 +171,7 @@ label.opt{font-size:14px;padding:5px 12px}
     <span class="res" title="Stein"><span class="ico"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M2.5 15.5 4.5 7.5 9 4l6 2.5 2.5 7-3 2.5z" fill="#7e868d"/><path d="M4.5 7.5 9 4l6 2.5-4.5 3z" fill="#c7cdd2"/><path d="M10.5 9.5 15 6.5l2.5 7-3 2.5z" fill="#5d646a"/></svg></span><span id="r-stone">0</span><small class="inc" id="i-stone"></small></span>
     <span class="res" title="Gold"><span class="ico"><svg viewBox="0 0 20 20" aria-hidden="true"><ellipse cx="10" cy="15" rx="7" ry="2.6" fill="#a8801f"/><ellipse cx="10" cy="13.6" rx="7" ry="2.6" fill="#e8c650"/><ellipse cx="10" cy="10.6" rx="6" ry="2.3" fill="#a8801f"/><ellipse cx="10" cy="9.4" rx="6" ry="2.3" fill="#f2d46a"/><ellipse cx="10.5" cy="6.6" rx="4.6" ry="1.9" fill="#a8801f"/><ellipse cx="10.5" cy="5.5" rx="4.6" ry="1.9" fill="#f7e08a"/></svg></span><span id="r-gold">0</span><small class="inc" id="i-gold"></small></span>
     <span class="res" title="Beliebtheit"><span class="ico"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7.5" fill="#e9be72"/><circle cx="7.4" cy="8.3" r="1.1" fill="#3a2a1a"/><circle cx="12.6" cy="8.3" r="1.1" fill="#3a2a1a"/><path d="M6.6 11.8q3.4 3.2 6.8 0" stroke="#3a2a1a" stroke-width="1.4" fill="none" stroke-linecap="round"/></svg></span><span id="r-mood">50</span></span>
-    <span class="res" id="r-goods" title="Waren: Weizen, Erz, Werkzeug" hidden></span>
+    <span class="res" id="r-goods" title="Waren aus deinen Produktionsketten" hidden></span>
     <span class="res" title="Bevölkerung"><span class="ico"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="5.5" r="3.2" fill="#d6ab7f"/><path d="M4 17.5c0-4 2.6-7 6-7s6 3 6 7z" fill="#4a8ae8"/></svg></span><span id="r-pop">0/0</span></span>
     <span id="epochBox"><span id="epochName">Steinzeit</span><span id="epochBar"><b></b></span></span>
     <span class="spacer"></span>
