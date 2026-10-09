@@ -438,7 +438,7 @@ function enemyNear(u,radius,wantBld){
 // ================= combat =================
 function damage(t,dmg,src){
   if(t.dead)return;
-  t.hp-=dmg;
+  t.hp-=dmg;if(visibleEnt(t))sfx(dmg>20?'boom':'hit');
   fx.push({x:center(t).x+(rng()-.5)*.4,y:center(t).y+(rng()-.5)*.4,t:0,k:'hit'});
   if(t.owner===0&&gameT-lastAlarm>20&&src){lastAlarm=gameT;toast('Wir werden angegriffen!','warn');ping=center(t);pingT=3}
   if(t.kind==='unit'&&src&&!src.dead&&src.owner!==t.owner){
@@ -1465,7 +1465,21 @@ function renderMini(){
 
 // ================= UI =================
 let uiDirty=true,uiKey='',uiT=0;
+// ---- Klang: synthetische Platzhalter-Effekte (WebAudio), Ein/Aus über die Taste „Ton“
+let actx=null,soundOn=true;try{soundOn=localStorage.getItem('empire-xy.ton')!=='0'}catch(e){}
+const sfxLast={};
+function sfx(k){
+  if(!soundOn)return;const now=performance.now();if(now-(sfxLast[k]||0)<({hit:90,shot:120,boom:150}[k]||60))return;sfxLast[k]=now;
+  try{if(!actx)actx=new (window.AudioContext||window.webkitAudioContext)();if(actx.state==='suspended')actx.resume();}catch(e){return}
+  const t=actx.currentTime,o=actx.createOscillator(),g=actx.createGain();o.connect(g);g.connect(actx.destination);
+  const env=(a,d,v)=>{g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(v,t+a);g.gain.exponentialRampToValueAtTime(.0001,t+a+d)};
+  const P={click:['triangle',660,520,.005,.06,.05],good:['sine',523,784,.01,.35,.08],warn:['square',220,180,.01,.3,.04],
+    hit:['square',140,70,.002,.08,.03],shot:['triangle',900,300,.002,.09,.025],boom:['sawtooth',90,30,.005,.35,.07],
+    epoch:['sine',392,784,.02,.9,.09]}[k];if(!P)return;
+  o.type=P[0];o.frequency.setValueAtTime(P[1],t);o.frequency.exponentialRampToValueAtTime(P[2],t+P[3]+P[4]);env(P[3],P[4],P[5]);o.start(t);o.stop(t+P[3]+P[4]+.05);
+}
 function toast(msg,kind){
+  if(kind==='good')sfx(/Willkommen in der/.test(msg)?'epoch':'good');else if(kind==='warn')sfx('warn');
   const el=document.createElement('div');el.className='toast'+(kind?' '+kind:'');el.textContent=msg;
   const box=$('#toasts');box.appendChild(el);while(box.children.length>5)box.firstChild.remove();
   setTimeout(()=>{el.style.opacity='0';setTimeout(()=>el.remove(),700)},5200);
@@ -1533,7 +1547,7 @@ function buildCmds(){
     if(!c){b.style.visibility='hidden';b.tabIndex=-1;box.appendChild(b);continue}
     b.innerHTML=`<kbd>${SLOTKEYS[i]||''}</kbd><span class="n">${c.label}</span><span class="c">${c.cost?costHTML(c.cost):''}</span>`;
     b.disabled=!!c.dis&&!c.short;if(c.short)b.classList.add('short');if(c.tech)b.classList.add('tech');if(c.on)b.classList.add('on');
-    b.addEventListener('click',()=>{if(c.need&&c.dis){toast(c.need,'warn');return}if(c.short&&c.dis){toast('Nicht genug Rohstoffe.','warn');return}c.act()});
+    b.addEventListener('click',()=>{if(c.need&&c.dis){toast(c.need,'warn');return}if(c.short&&c.dis){toast('Nicht genug Rohstoffe.','warn');return}sfx('click');c.act()});
     b.addEventListener('pointerenter',ev=>showTip(c,b));b.addEventListener('pointerleave',hideTip);
     box.appendChild(b);c.el=b;
   }
@@ -1771,7 +1785,7 @@ window.addEventListener('keydown',e=>{
   if(k===' '){if(sel[0]){const c=center(sel[0]);centerOn(c.x,c.y)}e.preventDefault();return}
   let up=k.toUpperCase();if(up==='Z')up='Y';
   const i=SLOTKEYS.indexOf(up);
-  if(i>=0&&curCmds[i]){const c=curCmds[i];if(c.need&&c.dis){toast(c.need,'warn');return}if(c.dis){toast('Nicht genug Rohstoffe.','warn');return}c.act()}
+  if(i>=0&&curCmds[i]){const c=curCmds[i];if(c.need&&c.dis){toast(c.need,'warn');return}if(c.dis){toast('Nicht genug Rohstoffe.','warn');return}sfx('click');c.act()}
 });
 let lastGroup=null,lastGroupT=0,idleIx=0,zoomT=0,zoomAt=null;const camV={x:0,y:0};
 window.addEventListener('keyup',e=>keys.delete(e.key));
@@ -1821,6 +1835,7 @@ $('#btnBuild').onclick=()=>{
 };
 function togglePause(){paused=!paused;$('#btnPause').textContent=paused?'Weiter':'Pause'}
 $('#btnPause').onclick=()=>{if(started&&!over)togglePause()};
+$('#btnSound').textContent=soundOn?'Ton an':'Ton aus';$('#btnSound').onclick=()=>{soundOn=!soundOn;try{localStorage.setItem('empire-xy.ton',soundOn?'1':'0')}catch(e){}$('#btnSound').textContent=soundOn?'Ton an':'Ton aus';sfx('click')};
 
 // ================= main loop =================
 let last=performance.now(),acc=0;
