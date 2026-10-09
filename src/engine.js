@@ -48,7 +48,7 @@ function makeNoise(scale){
 }
 
 // ================= state =================
-let ents,byId,nextId,block,terr,vis,exp,proj,fx,players,gameT,sel,bases,diff,aiS,over,paused=false,started=false;
+let ents,byId,nextId,block,gate,terr,vis,exp,proj,fx,players,gameT,sel,bases,diff,aiS,over,paused=false,started=false;
 let stats;
 const terrC=document.createElement('canvas'), terrMini=document.createElement('canvas'), fogC=document.createElement('canvas');
 fogC.width=W;fogC.height=H;const fogX=fogC.getContext('2d'),fogImg=fogX.createImageData(W,H);
@@ -185,7 +185,7 @@ function newPlayer(i,ai){return{i,ai,techs:{},fx:{gather:{},atk:{},hp:{},speed:{
 function newGame(d,seed){
   syncRegistry();
   rng=mulberry32(seed);diff=d;curSeed=seed;
-  ents=[];byId=new Map();nextId=1;block=new Int32Array(W*H);terr=new Uint8Array(W*H);vis=new Uint8Array(W*H);exp=new Uint8Array(W*H);
+  ents=[];byId=new Map();nextId=1;block=new Int32Array(W*H);gate=new Uint8Array(W*H);terr=new Uint8Array(W*H);vis=new Uint8Array(W*H);exp=new Uint8Array(W*H);
   proj=[];fx=[];sel=[];gameT=0;over=false;placing=null;aMode=false;groups={};
   players=[newPlayer(0,false),newPlayer(1,true)];
   genMap();renderTerrain();
@@ -214,7 +214,7 @@ function spawnUnit(p,type,x,y){
 function placeBld(p,type,x,y,done){
   const d=BLD[type];
   const b=addEnt({kind:'bld',type,owner:p,x,y,size:d.size,built:!!done,prog:done?1:0,hp:done?Math.round(d.hp*(1+players[p].fx.bldHp)):1,maxhp:Math.round(d.hp*(1+players[p].fx.bldHp)),queue:[],rally:null,cd:0,seen:p===0});
-  if(!d.walk)for(let yy=y;yy<y+d.size;yy++)for(let xx=x;xx<x+d.size;xx++){block[idx(xx,yy)]=b.id}
+  if(!d.walk)for(let yy=y;yy<y+d.size;yy++)for(let xx=x;xx<x+d.size;xx++){block[idx(xx,yy)]=b.id;if(d.gate)gate[idx(xx,yy)]=p+1}
   // push units out of the footprint
   for(const u of ents)if(u.kind==='unit'&&!d.walk&&u.x>=x&&u.x<x+d.size&&u.y>=y&&u.y<y+d.size){const s=freeAround(b);if(s){u.x=s.x+.5;u.y=s.y+.5;u.path=null}}
   return b;
@@ -272,7 +272,9 @@ const hp_i=[],hp_f=[];
 function hpush(i,f){hp_i.push(i);hp_f.push(f);let c=hp_i.length-1;while(c>0){const p=(c-1)>>1;if(hp_f[p]<=hp_f[c])break;[hp_i[p],hp_i[c]]=[hp_i[c],hp_i[p]];[hp_f[p],hp_f[c]]=[hp_f[c],hp_f[p]];c=p}}
 function hpop(){const top=hp_i[0],li=hp_i.pop(),lf=hp_f.pop();if(hp_i.length){hp_i[0]=li;hp_f[0]=lf;let c=0;for(;;){const l=c*2+1,r=l+1;let m=c;if(l<hp_i.length&&hp_f[l]<hp_f[m])m=l;if(r<hp_i.length&&hp_f[r]<hp_f[m])m=r;if(m===c)break;[hp_i[m],hp_i[c]]=[hp_i[c],hp_i[m]];[hp_f[m],hp_f[c]]=[hp_f[c],hp_f[m]];c=m}}return top}
 const DIRS=[[1,0,1],[-1,0,1],[0,1,1],[0,-1,1],[1,1,1.414],[1,-1,1.414],[-1,1,1.414],[-1,-1,1.414]];
-const pass=(x,y)=>inb(x,y)&&block[idx(x,y)]===0;
+// Tore: für den Besitzer begehbar, für alle anderen Mauer. passOwner = wer gerade läuft
+let passOwner=-1;
+const pass=(x,y)=>{if(!inb(x,y))return false;const i=idx(x,y),b=block[i];return b===0||(b>0&&gate[i]===passOwner+1&&passOwner>=0)};
 function findPath(sx,sy,goal,hx,hy,maxN){
   gen++;hp_i.length=0;hp_f.length=0;
   const s=idx(sx,sy);gS[s]=0;stamp[s]=gen;from[s]=-1;
@@ -315,11 +317,13 @@ function smoothPath(u,path){
   return out;
 }
 function pathToPoint(u,tx,ty){
+  passOwner=u.owner;
   const gx=Math.floor(tx),gy=Math.floor(ty);const ok=pass(gx,gy);
   u.path=smoothPath(u,findPath(Math.floor(u.x),Math.floor(u.y),(x,y)=>ok?(x===gx&&y===gy):Math.abs(x-gx)<=1&&Math.abs(y-gy)<=1,gx,gy));
   u.goal=ok?{x:tx,y:ty}:null;
 }
 function pathToEnt(u,t){
+  passOwner=u.owner;
   const c=center(t);
   let goal;
   if(t.kind==='unit'){const gx=Math.floor(t.x),gy=Math.floor(t.y);goal=(x,y)=>Math.abs(x-gx)<=1&&Math.abs(y-gy)<=1}
@@ -339,7 +343,7 @@ function drive(u,dx,dy,dt){
 function follow(u,dt){
   if(u.path&&u.path.length){
     const ni=u.path[0];
-    if(block[ni]!==0){u.path=null;u.pathCD=0;return false}
+    if(!pass(ni%W,ni/W|0)){u.path=null;u.pathCD=0;return false}
     let tx=ni%W+.5,ty=(ni/W|0)+.5;
     if(u.path.length===1&&u.goal){tx=u.goal.x;ty=u.goal.y}
     const dx=tx-u.x,dy=ty-u.y,d=Math.hypot(dx,dy),sp=drive(u,dx,dy,dt);
@@ -443,7 +447,7 @@ let lastAlarm=-99,ping=null,pingT=0;
 function kill(e,src){
   e.dead=true;
   if(e.kind==='bld'){
-    if(!BLD[e.type].walk)for(let y=e.y;y<e.y+e.size;y++)for(let x=e.x;x<e.x+e.size;x++)if(block[idx(x,y)]===e.id)block[idx(x,y)]=0;
+    if(!BLD[e.type].walk)for(let y=e.y;y<e.y+e.size;y++)for(let x=e.x;x<e.x+e.size;x++)if(block[idx(x,y)]===e.id){block[idx(x,y)]=0;gate[idx(x,y)]=0}
     for(const q of e.queue)if(q.u&&!q.started)refund(e.owner,UNITS[q.u].cost);
     if(e.queue.some(q=>q.ep))players[e.owner].advancing=false;
     for(let k=0;k<6;k++)fx.push({x:e.x+rng()*e.size,y:e.y+rng()*e.size,t:-k*.1,k:'smoke'});
@@ -481,6 +485,7 @@ function attackTick(u,t,dt,st){
 
 // ================= unit update =================
 function updUnit(u,dt){
+  passOwner=u.owner;
   const st=uStat(u);u.cd-=dt;u.swing=Math.max(0,(u.swing||0)-dt);if(!u.moving)u.v=Math.max(.3,(u.v||.3)-dt*3);u.moving=false;u.scan-=dt;
   const o=u.order;
   switch(o.t){
@@ -695,7 +700,7 @@ function separate(){
           tryNudge(u,-nx*push*wu,-ny*push*wu);tryNudge(v,nx*push*wv,ny*push*wv)}}}
   }
 }
-function tryNudge(u,dx,dy){const nx=u.x+dx,ny=u.y+dy;if(pass(nx|0,ny|0)){u.x=nx;u.y=ny}}
+function tryNudge(u,dx,dy){const nx=u.x+dx,ny=u.y+dy;passOwner=u.owner;if(pass(nx|0,ny|0)){u.x=nx;u.y=ny}}
 
 // ================= visibility =================
 let visT=0;
@@ -1223,7 +1228,12 @@ function humanoid(g,u,ep,pc,dk){
   }
   g.lineCap='butt';
 }
+// Einheiten größer zeichnen (AoE-artige Figuren), schwere Typen etwas wuchtiger
 function drawUnit(g,u){
+  const UD=UNITS[u.type],k=(UD.scale||1.32)*Math.sqrt((UD.r||.3)/.3),x=u.x*T,y=u.y*T;
+  g.save();g.translate(x,y);g.scale(k,k);g.translate(-x,-y);drawUnitRaw(g,u);g.restore();
+}
+function drawUnitRaw(g,u){
   const UD=UNITS[u.type];
   const x=u.x*T,y=u.y*T,pc=PCOL[u.owner],dk=PCOL_DK[u.owner],ep=VIS(players[u.owner].epoch),a=u.ang;
   g.fillStyle='rgba(8,14,6,.32)';g.beginPath();g.ellipse(x+3,y+u.r*T*.7,u.r*T*1.1,u.r*T*.5,0,0,7);g.fill();
@@ -1806,12 +1816,12 @@ function readSave(){try{const d=JSON.parse(localStorage.getItem(SAVE_KEY));retur
 function clearSave(){try{localStorage.removeItem(SAVE_KEY)}catch(e){}}
 function loadGame(d){
   syncRegistry();rng=mulberry32(d.seed);curSeed=d.seed;diff=d.diff;epStart=d.epStart||0;epEnd=d.epEnd!==undefined?d.epEnd:99;
-  terr=Uint8Array.from(d.terr);exp=Uint8Array.from(d.exp);vis=new Uint8Array(W*H);block=new Int32Array(W*H);
+  terr=Uint8Array.from(d.terr);exp=Uint8Array.from(d.exp);vis=new Uint8Array(W*H);block=new Int32Array(W*H);gate=new Uint8Array(W*H);
   for(let i=0;i<W*H;i++)if(terr[i]===1)block[i]=-1;
   ents=d.ents.filter(e=>e.kind==='res'?RESDEF[e.type]:e.kind==='unit'?UNITS[e.type]:BLD[e.type]);byId=new Map();
   for(const e of ents){byId.set(e.id,e);
     if(e.kind==='res')block[idx(e.x,e.y)]=e.id;
-    else if(e.kind==='bld'&&!BLD[e.type].walk)for(let y=e.y;y<e.y+e.size;y++)for(let x=e.x;x<e.x+e.size;x++)block[idx(x,y)]=e.id;
+    else if(e.kind==='bld'&&!BLD[e.type].walk)for(let y=e.y;y<e.y+e.size;y++)for(let x=e.x;x<e.x+e.size;x++){block[idx(x,y)]=e.id;if(BLD[e.type].gate)gate[idx(x,y)]=e.owner+1}
     if(e.kind==='unit')e.path=null;
     if(e.kind==='bld')e.queue=e.queue.filter(q=>q.ep||(q.tech&&TECHS[q.tech])||(q.u&&UNITS[q.u]));}
   nextId=d.nextId;bases=d.bases;aiS=d.aiS;players=d.players;gameT=d.gameT;
@@ -1859,5 +1869,5 @@ function autoPlayer(){ // lets the player side be run by the same AI for soak te
   try{aiThink()}finally{window.__ai0=aiS;aiS=a;for(const e of ents)swap(e);players=save;players[0].i=0;players[1].i=1;bases=b}
 }
 window.__ex={start:(d,s)=>{newGame(d,s);started=true},step:n=>{for(let i=0;i<n&&!over;i++)step(DT)},get:()=>({t:gameT,over,players,ents})};
-window.__spawn=(p,t,x,y)=>spawnUnit(p,t,x,y);
+window.__spawn=(p,t,x,y)=>spawnUnit(p,t,x,y);window.__place=(p,t,x,y)=>placeBld(p,t,x,y,true);window.__move=(u,x,y)=>cmdMove([u],x,y,false);
 })();

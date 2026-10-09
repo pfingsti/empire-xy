@@ -2,8 +2,22 @@
 // Bis zur Bronzezeit Holzpalisade, ab der Eisenzeit Steinmauer mit Zinnen, ab dem Industriezeitalter Beton.
 EmpireXY.register({
   id:'kern-festung',name:'Kern: Festungsbau',version:'1.0.0',core:true,
-  description:'Mauern zum Ziehen, die mit jeder Epoche massiver werden.',
+  description:'Mauern zum Ziehen und Torhäuser, die mit jeder Epoche massiver werden.',
   buildings:{
+    gate:{name:'Torhaus',size:1,hp:1100,cost:{stone:40,wood:20},time:14,sight:4,gate:true,slot:11,
+      desc:'Tor in der Mauer: eigene Einheiten gehen durch, Feinde nicht. Zuerst das Tor setzen, dann die Mauer darüber ziehen.',
+      draw(g,b,a){
+        const {x,y,s,ep,pc}=a,wood=ep<3,conc=ep>=7,front=wood?'#6b4a2a':conc?'#a9adae':a.wall,h=wood?24:30,top=y+s-h-6;
+        g.fillStyle='rgba(0,0,0,.3)';g.fillRect(x+3,y+s-4,s,6);
+        // Türme links und rechts
+        for(const tx of [x-3,x+s-6]){g.fillStyle=a.shade(front,-20);g.fillRect(tx,top-4,9,h+6);g.fillStyle=a.shade(front,12);g.fillRect(tx,top-6,9,4);
+          if(!wood&&!conc){g.fillStyle=a.shade(front,4);g.fillRect(tx,top-9,3,3);g.fillRect(tx+6,top-9,3,3)}}
+        g.fillStyle=front;g.fillRect(x+4,top+2,s-8,h);
+        // Torbogen
+        const open=b.open>0;g.fillStyle=open?'#1b1610':'#4a3018';g.beginPath();g.moveTo(x+8,y+s-4);g.lineTo(x+8,top+14);g.arc(x+s/2,top+14,s/2-8,Math.PI,0);g.lineTo(x+s-8,y+s-4);g.fill();
+        if(!open){g.strokeStyle='#2a1b0d';g.lineWidth=1;g.beginPath();for(let i=x+10;i<x+s-8;i+=3){g.moveTo(i,top+10);g.lineTo(i,y+s-4)}g.stroke()}
+        g.fillStyle=pc;g.fillRect(x+s/2-1,top-14,2,10);g.beginPath();g.moveTo(x+s/2+1,top-14);g.lineTo(x+s/2+8,top-11);g.lineTo(x+s/2+1,top-8);g.fill();
+      }},
     wall:{name:'Mauer',size:1,hp:600,cost:{stone:8},time:5,sight:2,line:true,slot:10,
       desc:'Ziehen zum Bauen: Startpunkt klicken, Maus halten und loslassen. Kostet pro Feld.',
       draw(g,b,a){
@@ -29,5 +43,9 @@ EmpireXY.register({
           g.fillStyle=pc;g.fillRect(x+s/2-2,top+9,4,3);
         }
       }},
+  },
+  hooks:{
+    // Tor öffnet sich, wenn eigene Einheiten in der Nähe sind
+    tick(api,dt){for(const b of api.ents){if(b.type!=='gate'||b.dead)continue;b.open=api.ents.some(u=>u.kind==='unit'&&!u.dead&&u.owner===b.owner&&Math.abs(u.x-b.x-.5)<1.6&&Math.abs(u.y-b.y-.5)<1.6)?1:0}},
   },
 });
