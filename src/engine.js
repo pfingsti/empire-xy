@@ -289,9 +289,28 @@ function findPath(sx,sy,goal,hx,hy,maxN){
   while(c!==-1&&c!==s){path.push(c);c=from[c]}
   path.reverse();return path;
 }
+// line of sight for a unit of radius r between two points (no corner cutting through blocked tiles)
+function clearLine(ax,ay,bx,by,r){
+  const dx=bx-ax,dy=by-ay,L=Math.hypot(dx,dy);if(L<.01)return true;
+  const nx=-dy/L*r,ny=dx/L*r,n=Math.ceil(L/.2);
+  for(let i=1;i<=n;i++){const x=ax+dx*i/n,y=ay+dy*i/n;
+    if(!pass(Math.floor(x),Math.floor(y))||!pass(Math.floor(x+nx),Math.floor(y+ny))||!pass(Math.floor(x-nx),Math.floor(y-ny)))return false}
+  return true;
+}
+// string-pulling: drop waypoints that can be skipped in a straight line
+function smoothPath(u,path){
+  if(path.length<3)return path;
+  const out=[],c=i=>({x:path[i]%W+.5,y:(path[i]/W|0)+.5});let cx=u.x,cy=u.y,i=0;
+  while(i<path.length){
+    let j=Math.min(path.length-1,i+14);
+    while(j>i){const p=c(j);if(clearLine(cx,cy,p.x,p.y,u.r*.9))break;j--}
+    out.push(path[j]);const p=c(j);cx=p.x;cy=p.y;i=j+1;
+  }
+  return out;
+}
 function pathToPoint(u,tx,ty){
   const gx=Math.floor(tx),gy=Math.floor(ty);const ok=pass(gx,gy);
-  u.path=findPath(Math.floor(u.x),Math.floor(u.y),(x,y)=>ok?(x===gx&&y===gy):Math.abs(x-gx)<=1&&Math.abs(y-gy)<=1,gx,gy);
+  u.path=smoothPath(u,findPath(Math.floor(u.x),Math.floor(u.y),(x,y)=>ok?(x===gx&&y===gy):Math.abs(x-gx)<=1&&Math.abs(y-gy)<=1,gx,gy));
   u.goal=ok?{x:tx,y:ty}:null;
 }
 function pathToEnt(u,t){
@@ -299,28 +318,38 @@ function pathToEnt(u,t){
   let goal;
   if(t.kind==='unit'){const gx=Math.floor(t.x),gy=Math.floor(t.y);goal=(x,y)=>Math.abs(x-gx)<=1&&Math.abs(y-gy)<=1}
   else goal=(x,y)=>x>=t.x-1&&x<=t.x+t.size&&y>=t.y-1&&y<=t.y+t.size;
-  u.path=findPath(Math.floor(u.x),Math.floor(u.y),goal,Math.floor(c.x),Math.floor(c.y));
+  u.path=smoothPath(u,findPath(Math.floor(u.x),Math.floor(u.y),goal,Math.floor(c.x),Math.floor(c.y)));
   u.goal=null;u.pathFor=t.id;
 }
 // returns true when path is finished
+// turn toward the heading and accelerate; returns the distance this unit may travel this tick
+function drive(u,dx,dy,dt){
+  const want=Math.atan2(dy,dx);let diff=want-u.ang;while(diff>Math.PI)diff-=Math.PI*2;while(diff<-Math.PI)diff+=Math.PI*2;
+  const heavy=u.type==='cavalry'||u.type==='siege'||UNITS[u.type].pop>1;
+  const turn=(heavy?5:11)*dt;u.ang+=Math.max(-turn,Math.min(turn,diff));
+  u.v=Math.min(1,(u.v||.3)+dt*(heavy?1.6:3.5));
+  return uStat(u).speed*dt*u.v*Math.max(.25,Math.cos(Math.min(Math.PI/2,Math.abs(diff))));
+}
 function follow(u,dt){
-  const sp=uStat(u).speed*dt;
   if(u.path&&u.path.length){
     const ni=u.path[0];
     if(block[ni]!==0){u.path=null;u.pathCD=0;return false}
     let tx=ni%W+.5,ty=(ni/W|0)+.5;
     if(u.path.length===1&&u.goal){tx=u.goal.x;ty=u.goal.y}
-    const dx=tx-u.x,dy=ty-u.y,d=Math.hypot(dx,dy);
-    if(d<=sp||(u.path.length>1&&d<.42)){if(d<=sp){u.x=tx;u.y=ty}u.path.shift()}else{u.x+=dx/d*sp;u.y+=dy/d*sp;u.ang=Math.atan2(dy,dx)}
+    const dx=tx-u.x,dy=ty-u.y,d=Math.hypot(dx,dy),sp=drive(u,dx,dy,dt);
+    if(d<=sp||(u.path.length>1&&d<.42)){if(d<=sp){u.x=tx;u.y=ty}u.path.shift()}
+    else{const nx=u.x+dx/d*sp,ny=u.y+dy/d*sp;
+      if(!pass(Math.floor(nx),Math.floor(ny))&&pass(Math.floor(u.x),Math.floor(u.y))){u.path=null;u.pathCD=0;return false}
+      u.x=nx;u.y=ny}
     u.moving=true;
     return !u.path.length;
   }
   return true;
 }
 function steer(u,tx,ty,dt){
-  const sp=uStat(u).speed*dt,dx=tx-u.x,dy=ty-u.y,d=Math.hypot(dx,dy);if(d<.01)return;
+  const dx=tx-u.x,dy=ty-u.y,d=Math.hypot(dx,dy);if(d<.01)return;const sp=drive(u,dx,dy,dt);
   const nx=u.x+dx/d*Math.min(sp,d),ny=u.y+dy/d*Math.min(sp,d);
-  if(pass(Math.floor(nx),Math.floor(ny))||!pass(Math.floor(u.x),Math.floor(u.y))){u.x=nx;u.y=ny;u.ang=Math.atan2(dy,dx);u.moving=true}
+  if(pass(Math.floor(nx),Math.floor(ny))||!pass(Math.floor(u.x),Math.floor(u.y))){u.x=nx;u.y=ny;u.moving=true}
 }
 // move unit toward entity t; handles repathing
 function approach(u,t,dt){
@@ -418,17 +447,26 @@ function kill(e,src){
   if(e.owner>=0&&e.kind!=='res'){players[e.owner].st.lost++;if(src&&src.owner>=0)players[src.owner].st.killed++}
   recalcPop();
 }
+function hitDmg(ut,atk,t){
+  const D=UNITS[ut]||{};let dmg=atk;
+  if(t.kind==='unit'){if(D.bonus&&D.bonus[t.type])dmg*=D.bonus[t.type];if(D.vsUnit)dmg*=D.vsUnit}
+  else dmg*=D.vsBld||(ut==='worker'?.3:.35);
+  return dmg;
+}
 function attackTick(u,t,dt,st){
   const d=distEnt(u,t);
   if(d<=st.range+.05){
     u.path=null;const c=center(t);u.ang=Math.atan2(c.y-u.y,c.x-u.x);
     if(u.cd<=0){
       u.cd=st.rate;u.swing=.25;
-      let dmg=st.atk;const D=UNITS[u.type];
-      if(t.kind==='unit'){if(D.bonus&&D.bonus[t.type])dmg*=D.bonus[t.type];if(D.vsUnit)dmg*=D.vsUnit}
-      else{dmg*=D.vsBld||(u.type==='worker'?.3:.35)}
-      if(D.proj)proj.push({x:u.x,y:u.y,tid:t.id,dmg,src:u.id,k:D.proj===2?'ball':'arrow',ep:players[u.owner].epoch,sp:D.proj===2?7:13,arc:Math.hypot(c.x-u.x,c.y-u.y)});
-      else damage(t,dmg,u);
+      const D=UNITS[u.type],ep=players[u.owner].epoch;
+      if(D.proj===2){ // ballistic shell: flies to where the target is now, splash on impact
+        const sx=(rng()-.5)*.5,sy=(rng()-.5)*.5;
+        proj.push({x:u.x,y:u.y,ground:true,tx:c.x+sx,ty:c.y+sy,tid:t.id,atk:st.atk,ut:u.type,owner:u.owner,src:u.id,k:'ball',ep,sp:7,arc:Math.hypot(c.x-u.x,c.y-u.y)});
+      }else if(D.proj){
+        const miss=t.kind==='unit'&&t.moving&&rng()<(ep>=3?.08:.18);
+        proj.push({x:u.x,y:u.y,tid:t.id,dmg:hitDmg(u.type,st.atk,t),miss,src:u.id,k:'arrow',ep,sp:13,arc:Math.hypot(c.x-u.x,c.y-u.y)});
+      }else damage(t,hitDmg(u.type,st.atk,t),u);
     }
     return true;
   }
@@ -437,7 +475,7 @@ function attackTick(u,t,dt,st){
 
 // ================= unit update =================
 function updUnit(u,dt){
-  const st=uStat(u);u.cd-=dt;u.swing=Math.max(0,(u.swing||0)-dt);u.moving=false;u.scan-=dt;
+  const st=uStat(u);u.cd-=dt;u.swing=Math.max(0,(u.swing||0)-dt);if(!u.moving)u.v=Math.max(.3,(u.v||.3)-dt*3);u.moving=false;u.scan-=dt;
   const o=u.order;
   switch(o.t){
     case 'idle':{
@@ -613,16 +651,27 @@ function cancelQ(b,i){
 // ================= projectiles & fx =================
 function updProj(dt){
   for(const p of proj){
+    if(p.ground){
+      const dx=p.tx-p.x,dy=p.ty-p.y,d=Math.hypot(dx,dy),s=p.sp*dt;p.ang=Math.atan2(dy,dx);
+      if(d>s){p.x+=dx/d*s;p.y+=dy/d*s;continue}
+      p.done=true;fx.push({x:p.tx,y:p.ty,t:0,k:'boom'});const src=byId.get(p.src)||null;
+      for(const e of ents){ // splash damage, falls off toward the edge
+        if(e.dead||e.owner<0||e.owner===p.owner||e.kind==='res')continue;
+        let dd;if(e.kind==='unit')dd=Math.hypot(e.x-p.tx,e.y-p.ty)-e.r;else{const cx=Math.max(e.x,Math.min(p.tx,e.x+e.size)),cy=Math.max(e.y,Math.min(p.ty,e.y+e.size));dd=Math.hypot(cx-p.tx,cy-p.ty)}
+        if(dd<.9)damage(e,hitDmg(p.ut,p.atk,e)*(1-.5*Math.max(0,dd)/.9),src);
+      }
+      continue;
+    }
     const t=byId.get(p.tid);
     if(!alive(t)){p.done=true;continue}
     const c=center(t),dx=c.x-p.x,dy=c.y-p.y,d=Math.hypot(dx,dy),s=p.sp*dt;
     p.ang=Math.atan2(dy,dx);
-    if(d<=s+.15){p.done=true;damage(t,p.dmg,byId.get(p.src)||null);if(p.k==='ball')fx.push({x:c.x,y:c.y,t:0,k:'boom'})}
+    if(d<=s+.15){p.done=true;if(p.miss)fx.push({x:c.x+(rng()-.5)*.8,y:c.y+(rng()-.5)*.8,t:0,k:'stuck',a:p.ang});else damage(t,p.dmg,byId.get(p.src)||null)}
     else{p.x+=dx/d*s;p.y+=dy/d*s}
   }
   proj=proj.filter(p=>!p.done);
   for(const f of fx)f.t+=dt;
-  fx=fx.filter(f=>f.t<(f.k==='smoke'?1.6:f.k==='die'?1.2:.4));
+  fx=fx.filter(f=>f.t<(f.k==='smoke'?1.6:f.k==='die'?1.2:f.k==='stuck'?4:.4));
 }
 
 // ================= separation =================
@@ -1282,7 +1331,7 @@ function render(){
   // projectiles (arc above their ground shadow)
   for(const p of proj){
     if(!vis[idx(p.x|0,p.y|0)])continue;
-    const tg=byId.get(p.tid),tc=tg?center(tg):p,rem=Math.hypot(tc.x-p.x,tc.y-p.y),prog=Math.max(0,Math.min(1,1-rem/Math.max(.01,p.arc)));
+    const tg=byId.get(p.tid),tc=p.ground?{x:p.tx,y:p.ty}:tg?center(tg):p,rem=Math.hypot(tc.x-p.x,tc.y-p.y),prog=Math.max(0,Math.min(1,1-rem/Math.max(.01,p.arc)));
     const lift=Math.sin(prog*Math.PI)*Math.min(p.arc,8)*T*(p.k==='ball'?.22:.12);
     ctx.fillStyle='rgba(0,0,0,.25)';ctx.beginPath();ctx.ellipse(p.x*T,p.y*T,2.5,1.2,0,0,7);ctx.fill();
     const x=p.x*T,y=p.y*T-lift+4;
@@ -1297,6 +1346,7 @@ function render(){
     if(f.k==='hit'){ctx.fillStyle=`rgba(255,230,180,${1-f.t/.4})`;ctx.beginPath();ctx.arc(x,y,2+f.t*10,0,7);ctx.fill()}
     else if(f.k==='boom'){ctx.fillStyle=`rgba(255,160,60,${1-f.t/.4})`;ctx.beginPath();ctx.arc(x,y,4+f.t*30,0,7);ctx.fill()}
     else if(f.k==='smoke'){ctx.fillStyle=`rgba(60,60,60,${.6*(1-f.t/1.6)})`;ctx.beginPath();ctx.arc(x,y-f.t*14,6+f.t*10,0,7);ctx.fill()}
+    else if(f.k==='stuck'){ctx.strokeStyle=`rgba(230,220,190,${1-f.t/4})`;ctx.lineWidth=1.2;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x-Math.cos(f.a)*5,y-Math.sin(f.a)*5-3);ctx.stroke();ctx.lineWidth=1}
     else if(f.k==='die'){ctx.fillStyle=`rgba(90,20,20,${.6*(1-f.t/1.2)})`;ctx.beginPath();ctx.ellipse(x,y+3,8,4,0,0,7);ctx.fill()}
   }
   // drifting cloud shadows
