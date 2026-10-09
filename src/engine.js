@@ -9,10 +9,11 @@ const XY=window.EmpireXY;
 const RES=XY.resources.list, RES_DE=XY.resources.label, RES_COL=XY.resources.color;
 const EPOCHS=[],EPOCH_COST=[],EPOCH_TIME=[],ROOF=[],ROOF_HI=[],WALL=[];
 const MAXEP=()=>EPOCHS.length-1;
+const TIER=[];const VIS=ep=>TIER[ep]!==undefined?TIER[ep]:Math.min(4,ep);
 function syncRegistry(){
   XY.build();
   for(const a of [EPOCHS,EPOCH_COST,EPOCH_TIME,ROOF,ROOF_HI,WALL])a.length=0;
-  XY.epochs.forEach((e,i)=>{EPOCHS.push(e.name);EPOCH_COST.push(i?e.cost:null);EPOCH_TIME.push(e.time||0);ROOF.push(e.roof||'#777');ROOF_HI.push(e.roofHi||e.roof||'#999');WALL.push(e.wall||'#999')});
+  XY.epochs.forEach((e,i)=>{EPOCHS.push(e.name);EPOCH_COST.push(i?e.cost:null);EPOCH_TIME.push(e.time||0);ROOF.push(e.roof||'#777');ROOF_HI.push(e.roofHi||e.roof||'#999');WALL.push(e.wall||'#999');TIER.push(e.tier!==undefined?e.tier:Math.min(4,i))});
   let slot=0;const used=new Set(Object.values(BLD).map(d=>d.slot).filter(x=>x!==undefined));
   for(const t in BLD)if(BLD[t].slot===undefined){while(used.has(slot)||slot===13||slot===14)slot++;BLD[t].slot=slot;used.add(slot)}
   trainCache={};SPR.clear();
@@ -199,7 +200,7 @@ function newGame(d,seed){
 }
 
 // ================= entities =================
-function uStat(u){const d=UNITS[u.type],pl=players[u.owner],f=pl.fx,t=u.type,e=pl.epoch,m=1+.3*e;return{hp:Math.round(d.hp*m*(1+(f.hp[t]||0))),atk:d.atk*m*(1+(f.atk[t]||0)),range:d.range+(f.range[t]||0),rate:d.rate,speed:d.speed*(1+.03*e)*(1+(f.speed[t]||0)),sight:d.sight}}
+function uStat(u){const d=UNITS[u.type],pl=players[u.owner],f=pl.fx,t=u.type,e=pl.epoch,m=1+.17*e;return{hp:Math.round(d.hp*m*(1+(f.hp[t]||0))),atk:d.atk*m*(1+(f.atk[t]||0)),range:d.range+(f.range[t]||0),rate:d.rate,speed:d.speed*(1+.03*e)*(1+(f.speed[t]||0)),sight:d.sight}}
 function spawnUnit(p,type,x,y){
   const d=UNITS[type];
   const u=addEnt({kind:'unit',type,owner:p,x,y,r:d.r,hp:0,cd:0,ang:p?Math.PI*.75:-Math.PI*.25,order:{t:'idle'},path:null,pathCD:0,carry:0,ct:null,scan:rng()*.5,anim:rng()*6});
@@ -464,7 +465,7 @@ function attackTick(u,t,dt,st){
         const sx=(rng()-.5)*.5,sy=(rng()-.5)*.5;
         proj.push({x:u.x,y:u.y,ground:true,tx:c.x+sx,ty:c.y+sy,tid:t.id,atk:st.atk,ut:u.type,owner:u.owner,src:u.id,k:'ball',ep,sp:7,arc:Math.hypot(c.x-u.x,c.y-u.y)});
       }else if(D.proj){
-        const miss=t.kind==='unit'&&t.moving&&rng()<(ep>=3?.08:.18);
+        const miss=t.kind==='unit'&&t.moving&&rng()<(ep>=5?.08:.18);
         proj.push({x:u.x,y:u.y,tid:t.id,dmg:hitDmg(u.type,st.atk,t),miss,src:u.id,k:'arrow',ep,sp:13,arc:Math.hypot(c.x-u.x,c.y-u.y)});
       }else damage(t,hitDmg(u.type,st.atk,t),u);
     }
@@ -516,7 +517,7 @@ function updUnit(u,dt){
       if(u.carry>=10+players[u.owner].fx.carry){order(u,{t:'return',resume:o});break}
       if(distEnt(u,r)<=.5){
         u.path=null;const c=center(r);u.ang=Math.atan2(c.y-u.y,c.x-u.x);
-        const rate={wood:.85,food:r.kind==='bld'?.6:.95,stone:.65,gold:.65}[o.rt]*(1+.1*players[u.owner].epoch)*(1+(players[u.owner].fx.gather[o.rt]||0))*(u.owner===1?DIFF[diff].gather:1);
+        const rate={wood:.85,food:r.kind==='bld'?.6:.95,stone:.65,gold:.65}[o.rt]*(1+.06*players[u.owner].epoch)*(1+(players[u.owner].fx.gather[o.rt]||0))*(u.owner===1?DIFF[diff].gather:1);
         const amt=Math.min(rate*dt,r.kind==='res'?r.amount:99);
         u.carry+=amt;u.ct=o.rt;u.working=true;
         if(r.kind==='res'){r.amount-=amt;if(r.amount<=0.001)kill(r)}
@@ -572,7 +573,7 @@ function updBld(b,dt){
     if(b.cd<=0){
       let best=null,bd=D.range;
       for(const e of ents){if(e.kind!=='unit'||e.dead||e.owner===b.owner)continue;const c=center(b),d=Math.hypot(e.x-c.x,e.y-c.y)-b.size/2;if(d<bd){bd=d;best=e}}
-      if(best){b.cd=D.rate;const c=center(b);proj.push({x:c.x,y:c.y-.6,tid:best.id,dmg:D.atk*(1+.25*pl.epoch)*(1+pl.fx.bldAtk),src:b.id,k:'arrow',ep:pl.epoch,sp:14,arc:bd})}
+      if(best){b.cd=D.rate;const c=center(b);proj.push({x:c.x,y:c.y-.6,tid:best.id,dmg:D.atk*(1+.14*pl.epoch)*(1+pl.fx.bldAtk),src:b.id,k:'arrow',ep:pl.epoch,sp:14,arc:bd})}
     }
   }
   const q=b.queue[0];if(!q)return;
@@ -761,7 +762,7 @@ function aiThink(){
   // --- assign idle workers
   const desired={food:.4,wood:.3,gold:.18+.03*ep,stone:.1+.02*ep};
   if(saving){const e=EPOCH_COST[ep+1];for(const k in e)if(pl.res[k]<e[k])desired[k]+=.12}
-  if(ep>=3&&diff===2&&pl.res.stone<1000){desired.stone+=.08;desired.gold+=.05}
+  if(ep>=4&&diff===2&&pl.res.stone<1000){desired.stone+=.08;desired.gold+=.05}
   const counts={food:0,wood:0,gold:0,stone:0};
   for(const w of workers)if(w.order.rt)counts[w.order.rt]++;
   // move one worker per think from the most over-staffed to the most under-staffed resource
@@ -1073,9 +1074,9 @@ function roundTower(g,cx,yb,r,h,col,roofCol,ep,pc){
     g.fillStyle='rgba(0,0,0,.25)';g.beginPath();g.moveTo(cx,yb-h-r*1.6);g.lineTo(cx+r+3,yb-h);g.lineTo(cx+2,yb-h);g.closePath();g.fill();
     g.strokeStyle=OUT;g.lineWidth=1;g.beginPath();g.moveTo(cx-r-3,yb-h);g.lineTo(cx,yb-h-r*1.6);g.lineTo(cx+r+3,yb-h);g.stroke();banner(g,cx,yb-h-r*1.6+1,pc,10)}
 }
-function bldSprite(type,ep,owner){
-  const D=BLD[type],S=D.size*T,epi=Math.min(ep,4),mat=MAT[epi],col=WALL[ep]||'#999',roof=ROOF[ep]||'#777',pc=PCOL[owner];
-  return sprite(`b|${type}|${ep}|${owner}`,S+24,S+44,g=>{
+function bldSprite(type,rep,owner){
+  const ep=VIS(rep),D=BLD[type],S=D.size*T,epi=Math.min(ep,4),mat=MAT[epi],col=WALL[rep]||'#999',roof=ROOF[rep]||'#777',pc=PCOL[owner];
+  return sprite(`b|${type}|${rep}|${owner}`,S+24,S+44,g=>{
     const bx=4,by=36,x1=bx+S,y1=by+S,lit=ep>=2;
     if(type==='house'){
       hall(g,bx+3,by-2,x1-3,y1-2,10,mat,col,roof,lit,6);
@@ -1219,7 +1220,7 @@ function humanoid(g,u,ep,pc,dk){
 }
 function drawUnit(g,u){
   const UD=UNITS[u.type];
-  const x=u.x*T,y=u.y*T,pc=PCOL[u.owner],dk=PCOL_DK[u.owner],ep=players[u.owner].epoch,a=u.ang;
+  const x=u.x*T,y=u.y*T,pc=PCOL[u.owner],dk=PCOL_DK[u.owner],ep=VIS(players[u.owner].epoch),a=u.ang;
   g.fillStyle='rgba(8,14,6,.32)';g.beginPath();g.ellipse(x+3,y+u.r*T*.7,u.r*T*1.1,u.r*T*.5,0,0,7);g.fill();
   if(UD.draw){g.save();try{UD.draw(g,u,DRAW_API)}catch(e){}g.restore();return}
   if(u.type==='cavalry'){
@@ -1510,7 +1511,7 @@ function buildInfo(){
     return;
   }
   const D=BLD[e.type];
-  let h=`<h2>${D.name}</h2><div class="sub">${own}${e.built?'':' · im Bau'}</div><div class="hp"><b data-live="hp" style="width:${e.hp/e.maxhp*100}%"></b></div><div class="stats"><span><em>Leben</em><span data-live="hpt">${Math.ceil(e.hp)}/${e.maxhp}</span></span>${D.pop?`<span><em>Bevölkerung</em>+${D.pop}</span>`:''}${D.atk?`<span><em>Angriff</em>${(D.atk*(1+.25*ep)).toFixed(0)}</span><span><em>Reichweite</em>${D.range}</span>`:''}${!e.built?`<span><em>Fortschritt</em><span data-live="prog">${Math.floor(e.prog*100)}%</span></span>`:''}</div>`;
+  let h=`<h2>${D.name}</h2><div class="sub">${own}${e.built?'':' · im Bau'}</div><div class="hp"><b data-live="hp" style="width:${e.hp/e.maxhp*100}%"></b></div><div class="stats"><span><em>Leben</em><span data-live="hpt">${Math.ceil(e.hp)}/${e.maxhp}</span></span>${D.pop?`<span><em>Bevölkerung</em>+${D.pop}</span>`:''}${D.atk?`<span><em>Angriff</em>${(D.atk*(1+.14*ep)).toFixed(0)}</span><span><em>Reichweite</em>${D.range}</span>`:''}${!e.built?`<span><em>Fortschritt</em><span data-live="prog">${Math.floor(e.prog*100)}%</span></span>`:''}</div>`;
   if(e.owner===0&&e.queue.length){h+=`<div class="queue" data-live="queue"></div>`}
   else if(e.owner===0&&trainsOf(e.type).length)h+=`<div class="hint">Keine Ausbildung in Arbeit.</div>`;
   box.innerHTML=h;

@@ -9,9 +9,9 @@ EmpireXY.register({
     barracks:{name:'Kaserne',size:3,hp:900,cost:{wood:150},time:28,sight:5,slot:3,desc:'Bildet Infanterie aus.'},
     range:{name:'Schießplatz',size:3,hp:800,cost:{wood:160},time:28,sight:5,slot:4,desc:'Bildet Fernkämpfer aus.'},
     stable:{name:'Stallung',size:3,hp:900,cost:{wood:175,gold:25},time:30,minEpoch:1,sight:5,slot:5,desc:'Bildet Kavallerie aus.'},
-    workshop:{name:'Werkstatt',size:3,hp:900,cost:{wood:200,gold:75},time:35,minEpoch:2,sight:5,slot:6,desc:'Baut Belagerungswaffen.'},
+    workshop:{name:'Werkstatt',size:3,hp:900,cost:{wood:200,gold:75},time:35,minEpoch:3,sight:5,slot:6,desc:'Baut Belagerungswaffen.'},
     tower:{name:'Wachturm',size:2,hp:750,cost:{wood:50,stone:125},time:30,atk:9,range:7,rate:1.5,sight:9,slot:7,desc:'Beschießt Feinde in Reichweite.'},
     tc:{name:'Stadtzentrum',size:3,hp:1700,cost:{wood:275,stone:150},time:60,pop:10,drop:true,atk:6,range:6,rate:2,sight:9,slot:8,desc:'Bildet Arbeiter aus, nimmt alle Rohstoffe an, rückt in die nächste Epoche vor.'},
-    wonder:{name:'Weltwunder',size:4,hp:4500,cost:{wood:1000,stone:1000,gold:1000},time:150,minEpoch:4,sight:6,slot:9,desc:'Steht es nach Fertigstellung 3 Minuten, gewinnst du.'},
+    wonder:{name:'Weltwunder',size:4,hp:4500,cost:{wood:1000,stone:1000,gold:1000},time:150,minEpoch:5,sight:6,slot:9,desc:'Steht es nach Fertigstellung 3 Minuten, gewinnst du.'},
   },
 });

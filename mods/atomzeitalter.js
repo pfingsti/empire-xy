@@ -1,12 +1,12 @@
-// Beispiel-Baustein: eine sechste Epoche mit Panzern.
+// Beispiel-Baustein: eine elfte Epoche mit Panzern.
 // Zeigt, wie ein Baustein eine Epoche anhängt und bestehende Einheiten per patch() verändert.
 EmpireXY.register({
   id:'atomzeitalter',name:'Atomzeitalter',version:'1.0.0',order:10,
-  description:'Fügt nach dem Industriezeitalter das Atomzeitalter hinzu. Die Werkstatt baut dann Kampfpanzer.',
+  description:'Fügt nach der Moderne das Atomzeitalter hinzu. Die Werkstatt baut dann Kampfpanzer.',
   epochs:[{name:'Atomzeitalter',cost:{food:2000,gold:1500,stone:600},time:80,roof:'#2f3a3f',roofHi:'#4f6670',wall:'#9aa3a8'}],
   units:{
     tank:{
-      label:'Panzer',from:'workshop',minEpoch:5,names:['','','','','','Kampfpanzer'],
+      label:'Atompanzer',from:'workshop',minEpoch:10,names:['','','','','','','','','','','Atompanzer'],
       hp:300,atk:22,range:4.5,rate:2.2,speed:2.1,sight:8,cost:{food:100,gold:200},time:28,r:.42,pop:3,proj:2,vsBld:2,
       bonus:{infantry:1.4,ranged:1.4},
       desc:'Schwer gepanzert, schießt über mittlere Distanz.',
@@ -23,8 +23,8 @@ EmpireXY.register({
     },
   },
   patch(xy){
-    // neue Namen für bestehende Einheiten in der sechsten Epoche
+    // neue Namen für bestehende Einheiten in der elften Epoche
     const add={worker:'Techniker',infantry:'Sturmsoldat',ranged:'Raketenschütze',cavalry:'Spähpanzer',siege:'Raketenwerfer'};
-    for(const k in add)if(xy.units[k])xy.units[k].names[5]=add[k];
+    for(const k in add)if(xy.units[k])xy.units[k].names[10]=add[k];
   },
 });
