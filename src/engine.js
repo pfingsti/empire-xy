@@ -531,7 +531,7 @@ function updUnit(u,dt){
       if(u.carry>=10+players[u.owner].fx.carry){order(u,{t:'return',resume:o});break}
       if(distEnt(u,r)<=.5){
         u.path=null;const c=center(r);u.ang=Math.atan2(c.y-u.y,c.x-u.x);
-        const rate={wood:.85,food:r.kind==='bld'?.6:.95,stone:.65,gold:.65}[o.rt]*(r.kind==='bld'?farmBoost(r):1)*(1+.06*players[u.owner].epoch)*(1+(players[u.owner].fx.gather[o.rt]||0))*(u.owner===1?DIFF[diff].gather:1);
+        const rate={wood:.85,food:r.kind==='bld'?.6:.95,stone:.65,gold:.65}[o.rt]*(players[u.owner].moodMul||1)*(r.kind==='bld'?farmBoost(r):1)*(1+.06*players[u.owner].epoch)*(1+(players[u.owner].fx.gather[o.rt]||0))*(u.owner===1?DIFF[diff].gather:1);
         const amt=Math.min(rate*dt,r.kind==='res'?r.amount:99);
         u.carry+=amt;u.ct=o.rt;u.working=true;
         if(r.kind==='res'){r.amount-=amt;if(r.amount<=0.001)kill(r)}
@@ -1607,6 +1607,7 @@ function refreshInfo(){
 function updateTop(){
   const pl=players[0];
   for(const r of RES){const el=$('#r-'+r),v=Math.floor(pl.res[r]);if(el.textContent!=v)el.textContent=v}
+  const md=$('#r-mood');if(md){const m=Math.round(pl.mood??50),t=m+'';if(md.textContent!==t){md.textContent=t;md.style.color=m>=65?'var(--ok)':m<35?'var(--danger)':'';md.parentNode.title='Beliebtheit '+m+' von 100: '+(pl.moodWhy||'')+' Sammeltempo '+Math.round((pl.moodMul||1)*100)+' %.'}}
   const p=$('#r-pop'),pv=pl.pop+'/'+pl.cap;if(p.textContent!==pv){p.textContent=pv;p.style.color=pl.pop>=pl.cap?'var(--danger)':''}
   const tc=ents.find(e=>e.owner===0&&e.kind==='bld'&&e.queue.some(q=>q.ep));
   const en=pl.advancing&&tc?EPOCHS[pl.epoch]+' → '+EPOCHS[pl.epoch+1]:EPOCHS[pl.epoch];
