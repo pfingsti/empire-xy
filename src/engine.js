@@ -1846,6 +1846,15 @@ $('#btnBuild').onclick=()=>{
 };
 function togglePause(){paused=!paused;$('#btnPause').textContent=paused?'Weiter':'Pause'}
 $('#btnPause').onclick=()=>{if(started&&!over)togglePause()};
+// Tribut (wie AoE2): Rohstoffe an den Gegner zahlen, um seinen nächsten Angriff hinauszuzögern
+$('#btnTribute').onclick=()=>{
+  if(!started||over)return;const pl=players[0],n=aiS.tributes||0,amt=Math.round(150*Math.pow(1.5,n));
+  if(aiS.attacking){toast('Zu spät, die feindliche Armee ist schon unterwegs.','warn');return}
+  const r=['food','wood','stone','gold'].reduce((a,b)=>pl.res[b]>pl.res[a]?b:a);
+  if(pl.res[r]<amt){toast('Für einen Tribut brauchst du '+amt+' einer Ressource.','warn');sfx('warn');return}
+  pl.res[r]-=amt;players[1].res[r]+=amt;aiS.tributes=n+1;aiS.nextAttack=Math.max(aiS.nextAttack,gameT)+60;
+  toast('Tribut gezahlt ('+amt+' '+({food:'Nahrung',wood:'Holz',stone:'Stein',gold:'Gold'})[r]+'). Der Gegner hält eine Minute still.','good');sfx('good');
+};
 $('#btnSound').textContent=soundOn?'Ton an':'Ton aus';$('#btnSound').onclick=()=>{soundOn=!soundOn;try{localStorage.setItem('empire-xy.ton',soundOn?'1':'0')}catch(e){}$('#btnSound').textContent=soundOn?'Ton an':'Ton aus';sfx('click')};
 
 // ================= main loop =================
