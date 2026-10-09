@@ -1,12 +1,12 @@
 // Beispiel-Baustein: Helden (inspiriert von den Heldeneinheiten klassischer Echtzeitstrategie).
 // Zeigt, wie ein Baustein eine neue Einheit mit eigener Grafik und eigener Spiellogik hinzufügt.
 EmpireXY.register({
-  id:'helden',name:'Helden',version:'1.0.0',
-  description:'Ab der Bronzezeit kann jedes Stadtzentrum einen Feldherrn ausbilden. Er heilt Verbündete in der Nähe.',
+  id:'helden',name:'Helden',version:'1.1.0',enabledByDefault:true,
+  description:'Ab der Kupferzeit kann jedes Stadtzentrum einen Feldherrn ausbilden. Er heilt Verbündete in der Nähe.',
   units:{
     hero:{
       label:'Held',from:'tc',minEpoch:1,max:1,
-      names:['','Stammesfürst','Feldherr','Marschall','General'],
+      names:['','Stammesfürst','Kriegsherr','Feldherr','Kreuzritter','Condottiere','Marschall','General','Feldmarschall','Kommandant'],
       hp:260,atk:14,range:.5,rate:1,speed:1.9,sight:8,cost:{food:200,gold:150},time:30,r:.36,pop:1,
       bonus:{infantry:1.3,cavalry:1.3},
       desc:'Einzigartiger Anführer. Heilt Verbündete im Umkreis von 4 Feldern.',

@@ -23,6 +23,7 @@ function syncRegistry(){
 }
 let trainCache={};
 const trainsOf=t=>trainCache[t]||(trainCache[t]=Object.keys(UNITS).filter(k=>UNITS[k].from===t));
+const bname=(D,ep)=>{const n=D.names||[];for(let i=Math.min(ep,n.length-1);i>=0;i--)if(n[i])return n[i];return D.name};
 const uname=(U,ep)=>{const n=U.names||[];for(let i=Math.min(ep,n.length-1);i>=0;i--)if(n[i])return n[i];return U.label};
 const PCOL=['#4a8ae8','#d4473c'];
 const PCOL_DK=['#2b5aa8','#8f2a23'];
@@ -227,15 +228,16 @@ function canPlace(p,type,x,y){
     if(p===0&&!exp[i])return false;
     for(const e of ents)if(e.kind==='bld'&&BLD[e.type].walk&&!e.dead&&xx>=e.x&&xx<e.x+e.size&&yy>=e.y&&yy<e.y+e.size)return false;
   }
+  if(d.shore){let w=0;for(let yy=y-1;yy<=y+d.size;yy++)for(let xx=x-1;xx<=x+d.size;xx++)if(inb(xx,yy)&&terr[idx(xx,yy)]===1)w++;if(w<2)return false}
   return true;
 }
-function freeAround(b,pref){
+function freeAround(b,pref,naval){
   const s=b.size;
   for(let r=1;r<8;r++){
     const cand=[];
     for(let y=b.y-r;y<b.y+s+r;y++)for(let x=b.x-r;x<b.x+s+r;x++){
       if(x>b.x-r&&x<b.x+s+r-1&&y>b.y-r&&y<b.y+s+r-1)continue;
-      if(inb(x,y)&&block[idx(x,y)]===0)cand.push({x,y,d:pref?Math.hypot(x-pref.x,y-pref.y):(y<b.y+s?2:0)+rng()});
+      if(inb(x,y)&&(naval?terr[idx(x,y)]===1:block[idx(x,y)]===0))cand.push({x,y,d:pref?Math.hypot(x-pref.x,y-pref.y):(y<b.y+s?2:0)+rng()});
     }
     if(cand.length){cand.sort((a,b)=>a.d-b.d);return cand[0]}
   }
@@ -273,8 +275,8 @@ function hpush(i,f){hp_i.push(i);hp_f.push(f);let c=hp_i.length-1;while(c>0){con
 function hpop(){const top=hp_i[0],li=hp_i.pop(),lf=hp_f.pop();if(hp_i.length){hp_i[0]=li;hp_f[0]=lf;let c=0;for(;;){const l=c*2+1,r=l+1;let m=c;if(l<hp_i.length&&hp_f[l]<hp_f[m])m=l;if(r<hp_i.length&&hp_f[r]<hp_f[m])m=r;if(m===c)break;[hp_i[m],hp_i[c]]=[hp_i[c],hp_i[m]];[hp_f[m],hp_f[c]]=[hp_f[c],hp_f[m]];c=m}}return top}
 const DIRS=[[1,0,1],[-1,0,1],[0,1,1],[0,-1,1],[1,1,1.414],[1,-1,1.414],[-1,1,1.414],[-1,-1,1.414]];
 // Tore: für den Besitzer begehbar, für alle anderen Mauer. passOwner = wer gerade läuft
-let passOwner=-1;
-const pass=(x,y)=>{if(!inb(x,y))return false;const i=idx(x,y),b=block[i];return b===0||(b>0&&gate[i]===passOwner+1&&passOwner>=0)};
+let passOwner=-1,passNaval=false;
+const pass=(x,y)=>{if(!inb(x,y))return false;const i=idx(x,y),b=block[i];if(passNaval)return terr[i]===1;return b===0||(b>0&&gate[i]===passOwner+1&&passOwner>=0)};
 function findPath(sx,sy,goal,hx,hy,maxN){
   gen++;hp_i.length=0;hp_f.length=0;
   const s=idx(sx,sy);gS[s]=0;stamp[s]=gen;from[s]=-1;
@@ -317,13 +319,13 @@ function smoothPath(u,path){
   return out;
 }
 function pathToPoint(u,tx,ty){
-  passOwner=u.owner;
+  passOwner=u.owner;passNaval=!!UNITS[u.type].naval;
   const gx=Math.floor(tx),gy=Math.floor(ty);const ok=pass(gx,gy);
   u.path=smoothPath(u,findPath(Math.floor(u.x),Math.floor(u.y),(x,y)=>ok?(x===gx&&y===gy):Math.abs(x-gx)<=1&&Math.abs(y-gy)<=1,gx,gy));
   u.goal=ok?{x:tx,y:ty}:null;
 }
 function pathToEnt(u,t){
-  passOwner=u.owner;
+  passOwner=u.owner;passNaval=!!UNITS[u.type].naval;
   const c=center(t);
   let goal;
   if(t.kind==='unit'){const gx=Math.floor(t.x),gy=Math.floor(t.y);goal=(x,y)=>Math.abs(x-gx)<=1&&Math.abs(y-gy)<=1}
@@ -378,7 +380,7 @@ function cmdMove(units,wx,wy,amove){
   const sorted=[...units].sort((a,b)=>Math.hypot(a.x-wx,a.y-wy)-Math.hypot(b.x-wx,b.y-wy));
   for(const u of sorted){
     let tx=wx,ty=wy;
-    if(n>1){const cx=k%cols-(cols-1)/2,cy=Math.floor(k/cols)-(Math.ceil(n/cols)-1)/2;tx=wx+cx*.8;ty=wy+cy*.8;if(!pass(Math.floor(tx),Math.floor(ty))){tx=wx;ty=wy}}
+    if(n>1){const cx=k%cols-(cols-1)/2,cy=Math.floor(k/cols)-(Math.ceil(n/cols)-1)/2;tx=wx+cx*.8;ty=wy+cy*.8;passNaval=!!UNITS[u.type].naval;if(!pass(Math.floor(tx),Math.floor(ty))){tx=wx;ty=wy}}
     k++;
     order(u,{t:amove?'amove':'move',x:tx,y:ty});pathToPoint(u,tx,ty);
   }
@@ -487,7 +489,7 @@ function attackTick(u,t,dt,st){
 // Produktionskette: Mühlen in der Nähe machen Felder ergiebiger (Wert farmBoost am Gebäude)
 function farmBoost(f){if(f.boostT>gameT)return f.boostV;let v=1;for(const e of ents)if(e.kind==='bld'&&e.built&&!e.dead&&e.owner===f.owner&&BLD[e.type].farmBoost&&Math.hypot(e.x-f.x,e.y-f.y)<8)v=Math.max(v,BLD[e.type].farmBoost);f.boostT=gameT+3;f.boostV=v;return v}
 function updUnit(u,dt){
-  passOwner=u.owner;
+  passOwner=u.owner;passNaval=!!UNITS[u.type].naval;
   const st=uStat(u);u.cd-=dt;u.swing=Math.max(0,(u.swing||0)-dt);if(!u.moving)u.v=Math.max(.3,(u.v||.3)-dt*3);u.moving=false;u.scan-=dt;
   const o=u.order;
   switch(o.t){
@@ -610,7 +612,7 @@ function updBld(b,dt){
   q.t+=dt;
   if(q.t>=q.total){
     b.queue.shift();
-    const s=freeAround(b,b.rally?{x:b.rally.x,y:b.rally.y}:null);
+    const s=freeAround(b,b.rally?{x:b.rally.x,y:b.rally.y}:null,!!U.naval);
     if(!s){q.t=q.total;b.queue.unshift(q);return}
     const u=spawnUnit(b.owner,q.u,s.x+.5,s.y+.5);pl.st.trained++;recalcPop();
     if(b.rally){
@@ -694,7 +696,7 @@ function separate(){
   for(const u of ents){if(u.kind!=='unit'||u.dead)continue;
     const gx=u.x|0,gy=u.y|0;
     for(let oy=-1;oy<=1;oy++)for(let ox=-1;ox<=1;ox++){const a=grid.get(gx+ox+(gy+oy)*W);if(!a)continue;
-      for(const v of a){if(v===u||v.id<u.id)continue;
+      for(const v of a){if(v===u||v.id<u.id||!!UNITS[u.type].naval!==!!UNITS[v.type].naval)continue;
         const dx=v.x-u.x,dy=v.y-u.y,d=Math.hypot(dx,dy)||.01,m=u.r+v.r-.04;
         if(d<m){const push=(m-d)*.5,nx=dx/d,ny=dy/d;
           if(u.ghost||v.ghost)continue;
@@ -702,7 +704,7 @@ function separate(){
           tryNudge(u,-nx*push*wu,-ny*push*wu);tryNudge(v,nx*push*wv,ny*push*wv)}}}
   }
 }
-function tryNudge(u,dx,dy){const nx=u.x+dx,ny=u.y+dy;passOwner=u.owner;if(pass(nx|0,ny|0)){u.x=nx;u.y=ny}}
+function tryNudge(u,dx,dy){const nx=u.x+dx,ny=u.y+dy;passOwner=u.owner;passNaval=!!UNITS[u.type].naval;if(pass(nx|0,ny|0)){u.x=nx;u.y=ny}}
 
 // ================= visibility =================
 let visT=0;
@@ -1481,7 +1483,7 @@ function getCommands(){
     const workers=sel.filter(u=>u.type==='worker');
     if(workers.length){
       for(const t in BLD){const d=BLD[t],locked=(d.minEpoch||0)>pl.epoch;
-        cmds[d.slot]={label:d.name,cost:d.cost,desc:d.desc,dis:locked||!canAfford(0,d.cost),need:locked?'Benötigt '+EPOCHS[d.minEpoch]:null,short:!locked&&!canAfford(0,d.cost),on:placing===t,act:()=>{placing=placing===t?null:t;uiDirty=true}}}
+        cmds[d.slot]={label:bname(d,pl.epoch),cost:d.cost,desc:d.desc,dis:locked||!canAfford(0,d.cost),need:locked?'Benötigt '+EPOCHS[d.minEpoch]:null,short:!locked&&!canAfford(0,d.cost),on:placing===t,act:()=>{placing=placing===t?null:t;uiDirty=true}}}
       cmds[14]={label:'Stopp',desc:'Aktuelle Tätigkeit abbrechen.',act:()=>{for(const u of sel)order(u,{t:'idle'})}};
     }else{
       cmds[0]={label:'Angriff­bewegung',desc:'Zum Ziel marschieren und unterwegs jeden Feind angreifen. Danach Rechtsklick auf die Karte.',on:aMode,act:()=>{aMode=!aMode;uiDirty=true}};
@@ -1574,7 +1576,7 @@ function buildInfo(){
     return;
   }
   const D=BLD[e.type];
-  let h=`<h2>${D.name}</h2><div class="sub">${own}${e.built?'':' · im Bau'}</div><div class="hp"><b data-live="hp" style="width:${e.hp/e.maxhp*100}%"></b></div><div class="stats"><span><em>Leben</em><span data-live="hpt">${Math.ceil(e.hp)}/${e.maxhp}</span></span>${D.pop?`<span><em>Bevölkerung</em>+${D.pop}</span>`:''}${D.atk?`<span><em>Angriff</em>${(D.atk*(1+.14*ep)).toFixed(0)}</span><span><em>Reichweite</em>${D.range}</span>`:''}${!e.built?`<span><em>Fortschritt</em><span data-live="prog">${Math.floor(e.prog*100)}%</span></span>`:''}</div>`;
+  let h=`<h2>${bname(D,ep)}</h2><div class="sub">${own}${e.built?'':' · im Bau'}</div><div class="hp"><b data-live="hp" style="width:${e.hp/e.maxhp*100}%"></b></div><div class="stats"><span><em>Leben</em><span data-live="hpt">${Math.ceil(e.hp)}/${e.maxhp}</span></span>${D.pop?`<span><em>Bevölkerung</em>+${D.pop}</span>`:''}${D.atk?`<span><em>Angriff</em>${(D.atk*(1+.14*ep)).toFixed(0)}</span><span><em>Reichweite</em>${D.range}</span>`:''}${!e.built?`<span><em>Fortschritt</em><span data-live="prog">${Math.floor(e.prog*100)}%</span></span>`:''}</div>`;
   if(e.owner===0&&e.queue.length){h+=`<div class="queue" data-live="queue"></div>`}
   else if(e.owner===0&&trainsOf(e.type).length)h+=`<div class="hint">Keine Ausbildung in Arbeit.</div>`;
   box.innerHTML=h;
@@ -1908,5 +1910,5 @@ function autoPlayer(){ // lets the player side be run by the same AI for soak te
   try{aiThink()}finally{window.__ai0=aiS;aiS=a;for(const e of ents)swap(e);players=save;players[0].i=0;players[1].i=1;bases=b}
 }
 window.__ex={start:(d,s)=>{newGame(d,s);started=true},step:n=>{for(let i=0;i<n&&!over;i++)step(DT)},get:()=>({t:gameT,over,players,ents})};
-window.__spawn=(p,t,x,y)=>spawnUnit(p,t,x,y);window.__place=(p,t,x,y)=>placeBld(p,t,x,y,true);window.__move=(u,x,y)=>cmdMove([u],x,y,false);
+window.__spawn=(p,t,x,y)=>spawnUnit(p,t,x,y);window.__place=(p,t,x,y)=>placeBld(p,t,x,y,true);window.__can=(p,t,x,y)=>canPlace(p,t,x,y);window.__water=(x,y)=>terr[idx(x|0,y|0)]===1;window.__cam=(x,y)=>{cam.x=x*T;cam.y=y*T};window.__move=(u,x,y)=>cmdMove([u],x,y,false);
 })();

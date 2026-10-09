@@ -54,7 +54,7 @@ EmpireXY.register({
   id:'kern-burg',name:'Kern: Burg und Mühle',version:'1.0.0',core:true,
   description:'Burg als schwer befestigter Mittelpunkt ab dem Mittelalter, Mühle als erste Stufe der Nahrungskette.',
   buildings:{
-    mill:{name:'Mühle',size:2,hp:450,cost:{wood:120,stone:20},time:20,sight:4,slot:12,farmBoost:1.35,
+    mill:{name:'Mühle',size:2,hp:450,cost:{wood:120,stone:20},time:20,sight:4,slot:12,farmBoost:1.35,ai:{minWorkers:12},
       desc:'Felder im Umkreis von 8 Feldern liefern 35 % mehr Nahrung. Ab dem Industriezeitalter eine Getreidefabrik.',
       draw(g,b,a){
         const {x,y,s,ep,pc}=a,modern=ep>=7,cx=x+s/2,base=y+s-4;
@@ -72,7 +72,7 @@ EmpireXY.register({
         g.fillStyle='#3a2a1a';g.beginPath();g.arc(0,0,2,0,7);g.fill();g.restore();
         g.fillStyle=pc;g.fillRect(cx-6,base-30,12,2);
       }},
-    castle:{name:'Burg',size:4,hp:5000,cost:{stone:650,wood:200},time:90,minEpoch:4,pop:15,atk:16,range:8,rate:1.4,sight:11,slot:15,
+    castle:{name:'Burg',size:4,hp:5000,cost:{stone:650,wood:200},time:90,minEpoch:4,pop:15,atk:16,range:8,rate:1.4,sight:11,slot:15,ai:{minWorkers:24},
       desc:'Schwer befestigter Bergfried mit Ecktürmen. Schießt weit, +15 Bevölkerung. Ab der Weltkriegszeit eine Bunkerfestung.',
       draw(g,b,a){
         const {x,y,s,ep,pc}=a,modern=ep>=8,stone=modern?'#9c9f98':a.wall,dark=a.shade(stone,-30);
