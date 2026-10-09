@@ -186,7 +186,7 @@ function newPlayer(i,ai){return{i,ai,techs:{},fx:{gather:{},atk:{},hp:{},speed:{
 function newGame(d,seed){
   syncRegistry();
   rng=mulberry32(seed);diff=d;curSeed=seed;
-  ents=[];byId=new Map();nextId=1;block=new Int32Array(W*H);gate=new Uint8Array(W*H);terr=new Uint8Array(W*H);vis=new Uint8Array(W*H);exp=new Uint8Array(W*H);
+  ents=[];corpses=[];byId=new Map();nextId=1;block=new Int32Array(W*H);gate=new Uint8Array(W*H);terr=new Uint8Array(W*H);vis=new Uint8Array(W*H);exp=new Uint8Array(W*H);
   proj=[];fx=[];sel=[];gameT=0;over=false;placing=null;aMode=false;groups={};
   players=[newPlayer(0,false),newPlayer(1,true)];
   genMap();renderTerrain();
@@ -438,7 +438,7 @@ function enemyNear(u,radius,wantBld){
 // ================= combat =================
 function damage(t,dmg,src){
   if(t.dead)return;
-  t.hp-=dmg;if(visibleEnt(t))sfx(dmg>20?'boom':'hit');
+  t.hp-=dmg;t.hitT=gameT;if(visibleEnt(t))sfx(dmg>20?'boom':'hit');
   fx.push({x:center(t).x+(rng()-.5)*.4,y:center(t).y+(rng()-.5)*.4,t:0,k:'hit'});
   if(t.owner===0&&gameT-lastAlarm>20&&src){lastAlarm=gameT;toast('Wir werden angegriffen!','warn');ping=center(t);pingT=3}
   if(t.kind==='unit'&&src&&!src.dead&&src.owner!==t.owner){
@@ -449,8 +449,10 @@ function damage(t,dmg,src){
   if(t.hp<=0)kill(t,src);
 }
 let lastAlarm=-99,ping=null,pingT=0;
+let corpses=[];
 function kill(e,src){
   e.dead=true;
+  if(e.kind==='unit'&&!(UNITS[e.type]&&UNITS[e.type].naval)&&visibleEnt(e)){corpses.push(Object.assign({},e,{moving:false,swing:0,working:false,carry:0,dt0:gameT,fall:Math.random()<.5?1:-1}));if(corpses.length>60)corpses.shift()}
   if(e.kind==='bld'){
     if(!BLD[e.type].walk)for(let y=e.y;y<e.y+e.size;y++)for(let x=e.x;x<e.x+e.size;x++)if(block[idx(x,y)]===e.id){block[idx(x,y)]=0;gate[idx(x,y)]=0}
     for(const q of e.queue)if(q.u&&!q.started)refund(e.owner,UNITS[q.u].cost);
@@ -534,7 +536,7 @@ function updUnit(u,dt){
       if(u.carry>=10+players[u.owner].fx.carry){order(u,{t:'return',resume:o});break}
       if(distEnt(u,r)<=.5){
         u.path=null;const c=center(r);u.ang=Math.atan2(c.y-u.y,c.x-u.x);
-        const rate={wood:.85,food:r.kind==='bld'?.6:.95,stone:.65,gold:.65}[o.rt]*(players[u.owner].moodMul||1)*(r.kind==='bld'?farmBoost(r):1)*(1+.06*players[u.owner].epoch)*(1+(players[u.owner].fx.gather[o.rt]||0))*(u.owner===1?DIFF[diff].gather:1);
+        const rate={wood:.85,food:r.kind==='bld'?.6:.95,stone:.65,gold:.65}[o.rt]*(players[u.owner].moodMul||1)*(players[u.owner].toolMul||1)*(r.kind==='bld'?farmBoost(r):1)*(1+.06*players[u.owner].epoch)*(1+(players[u.owner].fx.gather[o.rt]||0))*(u.owner===1?DIFF[diff].gather:1);
         const amt=Math.min(rate*dt,r.kind==='res'?r.amount:99);
         u.carry+=amt;u.ct=o.rt;u.working=true;
         if(r.kind==='res'){r.amount-=amt;if(r.amount<=0.001)kill(r)}
@@ -1400,7 +1402,13 @@ function render(){
     else{ctx.strokeRect(e.x*T+1,e.y*T+1,e.size*T-2,e.size*T-2)}
   }
   ctx.lineWidth=1;
-  for(const e of list){if(e.kind==='res')drawRes(ctx,e);else if(e.kind==='bld')drawBld(ctx,e);else drawUnit(ctx,e)}
+  // Gefallene: kippen um und verblassen (wie in AoE)
+  corpses=corpses.filter(c=>gameT-c.dt0<12&&gameT>=c.dt0);
+  for(const c of corpses){const age=gameT-c.dt0,k=Math.min(1,age/.35),x=c.x*T,y=c.y*T;
+    ctx.save();ctx.globalAlpha=age<9?1:Math.max(0,(12-age)/3);ctx.translate(x,y+4);ctx.rotate(c.fall*k*Math.PI/2);ctx.translate(-x,-y-4);
+    if(age>.35)ctx.filter='saturate(.55) brightness(.8)';drawUnit(ctx,c);ctx.restore()}
+  for(const e of list){if(e.kind==='res')drawRes(ctx,e);else if(e.kind==='bld')drawBld(ctx,e);
+    else if(e.hitT&&gameT-e.hitT<.1){ctx.save();ctx.filter='brightness(1.9)';drawUnit(ctx,e);ctx.restore()}else drawUnit(ctx,e)}
   // ambient particles: dust, wood chips, chimney smoke
   if(!paused&&started){
     for(const e of list){
@@ -1659,6 +1667,7 @@ function updateTop(){
   const pl=players[0];
   for(const r of RES){const el=$('#r-'+r),v=Math.floor(pl.res[r]);if(el.textContent!=v)el.textContent=v;
     const ir=incomeRate(pl,r),ie=$('#i-'+r);if(ie){const t=ir>0?'+'+ir+'/min':'';if(ie.textContent!==t)ie.textContent=t}}
+  const gd=pl.goods,ge=$('#r-goods');if(ge&&gd){const on=gd.wheat+gd.ore+gd.tools>0;ge.hidden=!on;if(on){const t='Weizen '+Math.floor(gd.wheat)+' · Erz '+Math.floor(gd.ore)+' · Werkzeug '+Math.floor(gd.tools);if(ge.textContent!==t){ge.textContent=t;ge.title='Waren aus deinen Produktionsketten. Werkzeug beschleunigt alle Arbeiter um '+Math.round(((pl.toolMul||1)-1)*100)+' %.'}}}
   const md=$('#r-mood');if(md){const m=Math.round(pl.mood??50),t=m+'';if(md.textContent!==t){md.textContent=t;md.style.color=m>=65?'var(--ok)':m<35?'var(--danger)':'';md.parentNode.title='Beliebtheit '+m+' von 100: '+(pl.moodWhy||'')+' Sammeltempo '+Math.round((pl.moodMul||1)*100)+' %.'}}
   const p=$('#r-pop'),pv=pl.pop+'/'+pl.cap;if(p.textContent!==pv){p.textContent=pv;p.style.color=pl.pop>=pl.cap?'var(--danger)':''}
   const tc=ents.find(e=>e.owner===0&&e.kind==='bld'&&e.queue.some(q=>q.ep));
