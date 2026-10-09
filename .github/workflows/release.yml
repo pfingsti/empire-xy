@@ -1,0 +1,27 @@
+# Baut bei jedem Versions-Tag (z. B. v1.1.0) den Windows-Installer und lädt ihn als GitHub Release hoch.
+# Die installierten Spiele finden das Release automatisch über ihren Update-Watcher.
+name: Release
+on:
+  push:
+    tags: ['v*']
+jobs:
+  windows:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Update-Schlüssel für die installierten Spiele hinterlegen
+        shell: bash
+        run: printf '%s' "${{ secrets.UPDATE_READ_TOKEN }}" > desktop/update-token.txt
+      - name: Abhängigkeiten
+        working-directory: desktop
+        run: npm ci || npm install
+      - name: Bauen und veröffentlichen
+        working-directory: desktop
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run release

@@ -1,0 +1,30 @@
+{
+  "name": "empire-xy",
+  "productName": "Empire XY",
+  "version": "1.0.2",
+  "description": "Echtzeitstrategie durch fünf Epochen, erweiterbar mit Bausteinen",
+  "author": "Christian",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "node ../build.js && electron-builder --win nsis",
+    "release": "node ../build.js && electron-builder --win nsis --publish always"
+  },
+  "dependencies": {
+    "electron-updater": "6.3.9"
+  },
+  "devDependencies": {
+    "electron": "33.2.1",
+    "electron-builder": "25.1.8"
+  },
+  "build": {
+    "appId": "de.pfingsti.empirexy",
+    "productName": "Empire XY",
+    "files": ["main.js", "preload.js", "app/**/*"],
+    "extraResources": [{"from": "update-token.txt", "to": "update-token.txt"}],
+    "directories": {"output": "../release"},
+    "win": {"target": "nsis", "signAndEditExecutable": false},
+    "nsis": {"oneClick": false, "allowToChangeInstallationDirectory": true, "createDesktopShortcut": true, "shortcutName": "Empire XY", "artifactName": "Empire-XY-Setup-${version}.exe"},
+    "publish": {"provider": "github", "owner": "pfingsti", "repo": "empire-xy", "private": true, "releaseType": "release"}
+  }
+}

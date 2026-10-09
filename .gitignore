@@ -1,0 +1,4 @@
+node_modules/
+release/
+desktop/app/
+desktop/update-token.txt
