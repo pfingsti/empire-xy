@@ -8,7 +8,7 @@ const mm=$('#minimap'), mctx=mm.getContext('2d');
 const XY=window.EmpireXY;
 const RES=XY.resources.list, RES_DE=XY.resources.label, RES_COL=XY.resources.color;
 const EPOCHS=[],EPOCH_COST=[],EPOCH_TIME=[],ROOF=[],ROOF_HI=[],WALL=[];
-let epStart=0,epEnd=99; // vom Startmenü gewählt
+let epStart=0,epEnd=99,timeLimit=0; // vom Startmenü gewählt (timeLimit in Minuten)
 const MAXEP=()=>Math.min(EPOCHS.length-1,epEnd);
 // cls = Gattung für Konter und Forschung, look = Grafikvorlage
 const CLS=t=>(UNITS[t]&&UNITS[t].cls)||t,LOOK=t=>(UNITS[t]&&(UNITS[t].look||UNITS[t].cls))||t;
@@ -829,14 +829,20 @@ function aiThink(){
   }
   // --- attack waves
   if(aiS.attacking){
-    const out=army.filter(a=>a.order.t==='amove'||a.order.t==='attack');
+    const out=army.filter(a=>a.waveAt||a.order.t==='amove'||a.order.t==='attack');
     if(out.length<Math.max(2,aiS.sent*.25)){aiS.attacking=false;aiS.nextAttack=gameT+70;for(const a of army)cmdMove([a],home.x+(rng()-.5)*6,home.y+6+(rng()-.5)*4,false)}
-    else for(const a of army)if(a.order.t==='idle'||a.order.t==='guard'){const t=playerTarget(a);if(t){const c=center(t);order(a,{t:'amove',x:c.x,y:c.y})}}
+    else for(const a of army)if(a.waveAt&&gameT>=a.waveAt.t){order(a,{t:'amove',x:a.waveAt.x+(rng()-.5)*2,y:a.waveAt.y+(rng()-.5)*2});a.waveAt=null}
+    else if(!a.waveAt&&(a.order.t==='idle'||a.order.t==='guard')){const t=playerTarget(a);if(t){const c=center(t);order(a,{t:'amove',x:c.x,y:c.y})}}
   }else if(gameT>=aiS.nextAttack&&army.length>=aiS.wave){
     const t=playerTarget(army[0]);
     if(t){aiS.attacking=true;aiS.sent=army.length;aiS.wave+=D.waveGrow;const c=center(t);
-      for(const a of army)order(a,{t:'amove',x:c.x+(rng()-.5)*2,y:c.y+(rng()-.5)*2});
-      toast('Feindliche Armee im Anmarsch!','warn');ping={x:army[0].x,y:army[0].y};pingT=3}
+      // Formation: erst am Sammelpunkt aufstellen (Nahkampf vorn, Fernkampf hinten), dann losmarschieren
+      const dx=c.x-home.x,dy=c.y-home.y,dl=Math.hypot(dx,dy)||1,ux=dx/dl,uy=dy/dl,sx0=home.x+ux*10,sy0=home.y+uy*10;
+      const ranged=a=>(UNITS[a.type]&&UNITS[a.type].range>1.5);
+      const rows=[army.filter(a=>!ranged(a)),army.filter(ranged)];
+      rows.forEach((row,ri)=>row.forEach((a,k)=>{const off=(k-(row.length-1)/2)*.9,back=ri*1.6;
+        a.waveAt={x:c.x,y:c.y,t:gameT+14};cmdMove([a],sx0-uy*off-ux*back,sy0+ux*off-uy*back,false)}));
+      toast('Feindliche Armee sammelt sich!','warn');ping={x:army[0].x,y:army[0].y};pingT=3}
   }else{
     // rally idle army in front of home
     const rx=home.x+(bases[0].x-home.x)*.12,ry=home.y+(bases[0].y-home.y)*.12;
@@ -887,8 +893,13 @@ function step(dt){
   popT-=dt;if(popT<=0){popT=1;recalcPop();checkEnd()}
   pingT-=dt;
   XY.emit('tick',API,dt);
+  if(timeLimit&&!over){const left=timeLimit*60-gameT;
+    if(left<=60&&left+dt>60)toast('Noch eine Minute bis zum Zeitlimit!','warn');
+    if(left<=0){const a=score(players[0]),b=score(players[1]);endGame(a>=b,'Zeitlimit erreicht. Punkte: Du '+a+', Gegner '+b+'.')}}
   for(const pl of players)if(pl.wonderT>0){pl.wonderT-=dt;if(pl.wonderT<=0){endGame(pl.i===0,'Das Weltwunder hat drei Minuten überdauert.')}}
 }
+function score(pl){let s=pl.epoch*200+pl.st.killed*8+pl.st.gathered/20+Object.keys(pl.techs).length*30;
+  for(const e of ents)if(!e.dead&&e.owner===pl.i)s+=e.kind==='bld'?(e.type==='wonder'?500:25):(isMil(e)?6:2);return Math.round(s)}
 function checkEnd(){
   if(over)return;
   for(const pl of players){
@@ -1452,7 +1463,7 @@ function renderMini(){
     if(e.dead||!visibleEnt(e))continue;
     if(e.kind==='res'){if(e.type==='tree')continue;mctx.fillStyle=RES_COL[e.rt];mctx.fillRect(e.x*sx,e.y*sy,sx,sy);continue}
     mctx.fillStyle=PCOL[e.owner];
-    if(e.kind==='bld')mctx.fillRect(e.x*sx,e.y*sy,e.size*sx,e.size*sy);
+    if(e.kind==='bld'){mctx.fillRect(e.x*sx,e.y*sy,e.size*sx,e.size*sy);mctx.strokeStyle='rgba(0,0,0,.55)';mctx.lineWidth=dpr*.8;mctx.strokeRect(e.x*sx,e.y*sy,e.size*sx,e.size*sy)}
     else mctx.fillRect(e.x*sx-1.5*dpr,e.y*sy-1.5*dpr,3*dpr,3*dpr);
   }
   // trees as dark specks
@@ -1638,7 +1649,7 @@ function updateTop(){
   if(rh.dataset.sig!==rsig){rh.dataset.sig=rsig;rh.hidden=!rq.length;rh.innerHTML=rq.map(r=>`<div class="rq" data-id="${r.id}"><span>${TECHS[r.id].name}</span><em></em><i><b></b></i></div>`).join('')}
   rq.forEach((r,i)=>{const row=rh.children[i];if(!row)return;row.querySelector('b').style.width=(r.f*100)+'%';row.querySelector('em').textContent=r.wait?'wartet':Math.floor(r.f*100)+'% · '+Math.ceil(r.left)+' s'});
   if(!$('#techScreen').hidden)$('#techCols').querySelectorAll('.tk.running').forEach(btn=>{const r=rq.find(x=>x.id===btn.dataset.id);const st=btn.querySelector('.st');if(r&&st)st.textContent=r.wait?'Wartet in Warteschlange':'Wird erforscht: '+Math.floor(r.f*100)+'%';let bar=btn.querySelector('.pb');if(!bar){bar=document.createElement('i');bar.className='pb';bar.innerHTML='<b></b>';btn.appendChild(bar)}bar.firstChild.style.width=(r?r.f*100:0)+'%'});
-  $('#clock').textContent=fmtTime(gameT);
+  $('#clock').textContent=timeLimit?fmtTime(gameT)+' / '+timeLimit+':00':fmtTime(gameT);
   const idle=ents.filter(e=>e.owner===0&&e.type==='worker'&&e.order.t==='idle').length;$('#idleN').textContent=idle;
   const wb=$('#wonderBanner');const wt=players.find(p=>p.wonderT>0);
   if(wt){wb.hidden=false;wb.textContent=(wt.i===0?'Dein Weltwunder':'Feindliches Weltwunder')+': '+fmtTime(wt.wonderT)}else wb.hidden=true;
@@ -1873,7 +1884,7 @@ let curSeed=0,saveT=0;const SAVE_KEY='empire-xy.spielstand';
 function saveGame(){
   if(!started||over||!ents)return;
   try{
-    const data={v:1,seed:curSeed,diff,epStart,epEnd,gameT,nextId,bases,aiS,players,terr:Array.from(terr),exp:Array.from(exp),
+    const data={v:1,seed:curSeed,diff,epStart,epEnd,timeLimit,gameT,nextId,bases,aiS,players,terr:Array.from(terr),exp:Array.from(exp),
       ents:ents.filter(e=>!e.dead),cam:{x:cam.x,y:cam.y,z:cam.z},saved:Date.now()};
     localStorage.setItem(SAVE_KEY,JSON.stringify(data));
   }catch(e){}
@@ -1881,7 +1892,7 @@ function saveGame(){
 function readSave(){try{const d=JSON.parse(localStorage.getItem(SAVE_KEY));return d&&d.v===1?d:null}catch(e){return null}}
 function clearSave(){try{localStorage.removeItem(SAVE_KEY)}catch(e){}}
 function loadGame(d){
-  syncRegistry();rng=mulberry32(d.seed);curSeed=d.seed;diff=d.diff;epStart=d.epStart||0;epEnd=d.epEnd!==undefined?d.epEnd:99;
+  syncRegistry();rng=mulberry32(d.seed);curSeed=d.seed;diff=d.diff;epStart=d.epStart||0;epEnd=d.epEnd!==undefined?d.epEnd:99;timeLimit=d.timeLimit||0;
   terr=Uint8Array.from(d.terr);exp=Uint8Array.from(d.exp);vis=new Uint8Array(W*H);block=new Int32Array(W*H);gate=new Uint8Array(W*H);
   for(let i=0;i<W*H;i++)if(terr[i]===1)block[i]=-1;
   ents=d.ents.filter(e=>e.kind==='res'?RESDEF[e.type]:e.kind==='unit'?UNITS[e.type]:BLD[e.type]);byId=new Map();
@@ -1920,7 +1931,9 @@ $('#continueBtn').onclick=()=>{
   const d=readSave();if(!d)return;$('#startScreen').hidden=true;resize();
   try{loadGame(d);started=true;paused=false;$('#btnPause').textContent='Pause'}catch(e){clearSave();toast('Der Spielstand konnte nicht geladen werden.','warn');$('#startScreen').hidden=false;showContinue()}
 };
-$('#startBtn').onclick=()=>{
+try{const v=localStorage.getItem('empire-xy.limit');if(v)$('#limitSel').value=v}catch(e){}
+$('#limitSel').onchange=()=>{try{localStorage.setItem('empire-xy.limit',$('#limitSel').value)}catch(e){}};
+$('#startBtn').onclick=()=>{timeLimit=+$('#limitSel').value;
   $('#startScreen').hidden=true;resize();newGame(chosenDiff,seed);started=true;paused=false;$('#btnPause').textContent='Pause';
 };
 $('#againBtn').onclick=()=>{showContinue();$('#endScreen').hidden=true;started=false;over=false;seed=(Math.random()*99999)|0;$('#seedN').textContent=seed;$('#startScreen').hidden=false};
@@ -1935,5 +1948,5 @@ function autoPlayer(){ // lets the player side be run by the same AI for soak te
   try{aiThink()}finally{window.__ai0=aiS;aiS=a;for(const e of ents)swap(e);players=save;players[0].i=0;players[1].i=1;bases=b}
 }
 window.__ex={start:(d,s)=>{newGame(d,s);started=true},step:n=>{for(let i=0;i<n&&!over;i++)step(DT)},get:()=>({t:gameT,over,players,ents})};
-window.__spawn=(p,t,x,y)=>spawnUnit(p,t,x,y);window.__place=(p,t,x,y)=>placeBld(p,t,x,y,true);window.__can=(p,t,x,y)=>canPlace(p,t,x,y);window.__water=(x,y)=>terr[idx(x|0,y|0)]===1;window.__cam=(x,y)=>{cam.x=x*T;cam.y=y*T};window.__move=(u,x,y)=>cmdMove([u],x,y,false);
+window.__spawn=(p,t,x,y)=>spawnUnit(p,t,x,y);window.__place=(p,t,x,y)=>placeBld(p,t,x,y,true);window.__can=(p,t,x,y)=>canPlace(p,t,x,y);window.__water=(x,y)=>terr[idx(x|0,y|0)]===1;window.__cam=(x,y)=>{cam.x=x*T;cam.y=y*T};window.__move=(u,x,y)=>cmdMove([u],x,y,false);window.__limit=m=>{timeLimit=m};
 })();
