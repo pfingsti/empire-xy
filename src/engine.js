@@ -27,7 +27,7 @@ const bname=(D,ep)=>{const n=D.names||[];for(let i=Math.min(ep,n.length-1);i>=0;
 const uname=(U,ep)=>{const n=U.names||[];for(let i=Math.min(ep,n.length-1);i>=0;i--)if(n[i])return n[i];return U.label};
 const PCOL=['#4a8ae8','#d4473c'];
 const PCOL_DK=['#2b5aa8','#8f2a23'];
-const SLOTKEYS=['Q','W','E','R','T','A','S','D','F','G','Y','X','C','V','B','Z','U','I','O','P'];
+const SLOTKEYS=['Q','W','E','R','T','A','S','D','F','G','Y','X','C','V','B','U','I','O','P','J'];
 
 const UNITS=XY.units, BLD=XY.buildings, RESDEF=XY.nodes, TECHS=XY.techs;
 const DIFF=[
@@ -247,6 +247,9 @@ const isMil=u=>u.kind==='unit'&&u.type!=='worker'&&!(UNITS[u.type]&&UNITS[u.type
 const alive=e=>e&&!e.dead;
 function canAfford(p,c){for(const k in c)if(players[p].res[k]<c[k])return false;return true}
 function pay(p,c){for(const k in c)players[p].res[k]-=c[k]}
+// Einkommen je Rohstoff der letzten 60 Sekunden (für die Anzeige oben)
+function income(pl,r,v){(pl.inc=pl.inc||[]).push([gameT,r,v])}
+function incomeRate(pl,r){if(!pl.inc)return 0;while(pl.inc.length&&pl.inc[0][0]<gameT-60)pl.inc.shift();let s=0;for(const x of pl.inc)if(x[1]===r)s+=x[2];return Math.round(s*60/Math.min(60,Math.max(10,gameT)))}
 function refund(p,c){for(const k in c)players[p].res[k]+=c[k]}
 function costOf(type){return UNITS[type]?UNITS[type].cost:BLD[type].cost}
 
@@ -541,7 +544,7 @@ function updUnit(u,dt){
       let d=o.drop?byId.get(o.drop):null;
       if(!alive(d)||!d.built){d=nearestDrop(u.owner,u.x,u.y);if(!d){order(u,{t:'idle'});break}o.drop=d.id;u.path=null}
       if(distEnt(u,d)<=.5){
-        const pl=players[u.owner];pl.res[u.ct]+=u.carry;pl.st.gathered+=u.carry;u.carry=0;
+        const pl=players[u.owner];pl.res[u.ct]+=u.carry;pl.st.gathered+=u.carry;income(pl,u.ct,u.carry);u.carry=0;
         if(o.resume){const r=o.resume;order(u,r)}else order(u,{t:'idle'});
       }else approach(u,d,dt);
       break;}
@@ -866,7 +869,7 @@ function findSpot(p,type,near,minR,maxR){
 
 // ================= module API =================
 const API={
-  get ents(){return ents},get players(){return players},get time(){return gameT},
+  get ents(){return ents},income(pl,r,v){income(pl,r,v)},get players(){return players},get time(){return gameT},
   spawnUnit,placeBld,toast,damage,order,applyTech,techState,center,distEnt,alive,isMil,uStat,
   heal(e,amt){e.hp=Math.min(e.maxhp,e.hp+amt)},
   revealAll(){exp.fill(1)},
@@ -1607,7 +1610,8 @@ function refreshInfo(){
 }
 function updateTop(){
   const pl=players[0];
-  for(const r of RES){const el=$('#r-'+r),v=Math.floor(pl.res[r]);if(el.textContent!=v)el.textContent=v}
+  for(const r of RES){const el=$('#r-'+r),v=Math.floor(pl.res[r]);if(el.textContent!=v)el.textContent=v;
+    const ir=incomeRate(pl,r),ie=$('#i-'+r);if(ie){const t=ir>0?'+'+ir+'/min':'';if(ie.textContent!==t)ie.textContent=t}}
   const md=$('#r-mood');if(md){const m=Math.round(pl.mood??50),t=m+'';if(md.textContent!==t){md.textContent=t;md.style.color=m>=65?'var(--ok)':m<35?'var(--danger)':'';md.parentNode.title='Beliebtheit '+m+' von 100: '+(pl.moodWhy||'')+' Sammeltempo '+Math.round((pl.moodMul||1)*100)+' %.'}}
   const p=$('#r-pop'),pv=pl.pop+'/'+pl.cap;if(p.textContent!==pv){p.textContent=pv;p.style.color=pl.pop>=pl.cap?'var(--danger)':''}
   const tc=ents.find(e=>e.owner===0&&e.kind==='bld'&&e.queue.some(q=>q.ep));
@@ -1737,9 +1741,9 @@ cv.addEventListener('pointerup',e=>{
   drag=null;
 });
 cv.addEventListener('wheel',e=>{
-  e.preventDefault();const before=toWorld(mouse.x,mouse.y);
-  cam.z=Math.max(.5,Math.min(1.8,cam.z*(e.deltaY<0?1.1:1/1.1)));
-  cam.x=before.x*T-mouse.x/cam.z;cam.y=before.y*T-mouse.y/cam.z;clampCam();
+  e.preventDefault();
+  // weiches Zoomen: Ziel setzen, die Kamera gleitet im Frame dorthin (Punkt unter der Maus bleibt stehen)
+  zoomT=Math.max(.5,Math.min(1.8,(zoomT||cam.z)*(e.deltaY<0?1.12:1/1.12)));zoomAt={x:mouse.x,y:mouse.y};
 },{passive:false});
 
 // minimap
@@ -1769,7 +1773,7 @@ window.addEventListener('keydown',e=>{
   const i=SLOTKEYS.indexOf(up);
   if(i>=0&&curCmds[i]){const c=curCmds[i];if(c.need&&c.dis){toast(c.need,'warn');return}if(c.dis){toast('Nicht genug Rohstoffe.','warn');return}c.act()}
 });
-let lastGroup=null,lastGroupT=0,idleIx=0;
+let lastGroup=null,lastGroupT=0,idleIx=0,zoomT=0,zoomAt=null;const camV={x:0,y:0};
 window.addEventListener('keyup',e=>keys.delete(e.key));
 window.addEventListener('blur',()=>keys.clear());
 function selectIdle(){
@@ -1827,9 +1831,13 @@ function frame(now){
   }
   if(started){
     // scrolling
-    const sp=700*dt/cam.z;
-    if(keys.has('ArrowLeft'))cam.x-=sp;if(keys.has('ArrowRight'))cam.x+=sp;if(keys.has('ArrowUp'))cam.y-=sp;if(keys.has('ArrowDown'))cam.y+=sp;
-    if(mouse.inside&&!drag&&!touch&&matchMedia('(pointer:fine)').matches){const m=10;if(mouse.x<m)cam.x-=sp;if(mouse.x>viewW-m)cam.x+=sp;if(mouse.y<m)cam.y-=sp;if(mouse.y>viewH-m)cam.y+=sp}
+    // weiches Scrollen: Kamera beschleunigt und bremst statt ruckartig zu springen
+    let ix=0,iy=0;
+    if(keys.has('ArrowLeft'))ix--;if(keys.has('ArrowRight'))ix++;if(keys.has('ArrowUp'))iy--;if(keys.has('ArrowDown'))iy++;
+    if(mouse.inside&&!drag&&!touch&&matchMedia('(pointer:fine)').matches){const m=12;if(mouse.x<m)ix--;if(mouse.x>viewW-m)ix++;if(mouse.y<m)iy--;if(mouse.y>viewH-m)iy++}
+    const il=Math.hypot(ix,iy)||1,top=760/cam.z,k=Math.min(1,dt*(ix||iy?9:12));
+    camV.x+=(ix/il*top-camV.x)*k;camV.y+=(iy/il*top-camV.y)*k;cam.x+=camV.x*dt;cam.y+=camV.y*dt;
+    if(zoomT&&Math.abs(zoomT-cam.z)>.0005){const a=zoomAt||{x:viewW/2,y:viewH/2},before=toWorld(a.x,a.y);cam.z+=(zoomT-cam.z)*Math.min(1,dt*14);cam.x=before.x*T-a.x/cam.z;cam.y=before.y*T-a.y/cam.z}
     clampCam();
     if(marker)marker.t-=dt*1.5;
     saveT+=dt;if(saveT>30&&!paused){saveT=0;saveGame()}
@@ -1870,7 +1878,7 @@ function loadGame(d){
   nextId=d.nextId;bases=d.bases;aiS=d.aiS;players=d.players;gameT=d.gameT;
   proj=[];fx=[];sel=[];over=false;placing=null;aMode=false;groups={};
   renderTerrain();recalcPop();updateVis(true);
-  if(d.cam){cam.z=d.cam.z;cam.x=d.cam.x;cam.y=d.cam.y;clampCam()}
+  if(d.cam){zoomT=0;cam.z=d.cam.z;cam.x=d.cam.x;cam.y=d.cam.y;clampCam()}
   toast('Spielstand geladen ('+fmtTime(gameT)+').','good');
 }
 function showContinue(){const d=readSave(),b=$('#continueBtn');b.hidden=!d;if(d)b.textContent='Weiterspielen ('+fmtTime(d.gameT)+', '+EPOCHS_NAME(d)+')'}
