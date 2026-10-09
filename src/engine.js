@@ -729,7 +729,8 @@ function aiThink(){
   const P=1,pl=players[P],D=DIFF[diff];
   const mine=ents.filter(e=>!e.dead&&e.owner===P);
   const workers=mine.filter(e=>e.kind==='unit'&&e.type==='worker');
-  const army=mine.filter(e=>isMil(e));
+  const army=mine.filter(e=>isMil(e)&&!(UNITS[e.type]&&UNITS[e.type].naval));
+  const ships=mine.filter(e=>e.kind==='unit'&&UNITS[e.type]&&UNITS[e.type].naval);
   const blds=mine.filter(e=>e.kind==='bld');
   const tcs=blds.filter(b=>b.type==='tc');
   const count=t=>blds.filter(b=>b.type===t).length;
@@ -767,11 +768,26 @@ function aiThink(){
       if(count(t)>=have[t])continue;
       if(!spare(BLD[t].cost))break;
       if(t==='camp'){const r=nearestRes('wood',home.x,home.y,30,P)||nearestRes('gold',home.x,home.y,30,P);if(r&&build('camp',{x:r.x,y:r.y},2,6))break;continue}
+      if(t==='dock'){if(!BLD.dock)continue;const wt=nearWater(home,28);if(wt&&build('dock',wt,0,6))break;continue}
       if(t==='tower'){if(build('tower',{x:home.x+(bases[0].x-home.x)*.15,y:home.y+(bases[0].y-home.y)*.15},2,8))break;continue}
       if(build(t,home,5,15))break;
     }
+    if(BLD.dock&&ep>=1&&workers.length>=11&&!count('dock')&&gameT>(aiS.dockTry||0)&&spare(BLD.dock.cost)){aiS.dockTry=gameT+60;const wt=nearWater(home,28);if(wt)build('dock',wt,0,6)}
     if(BLD.wonder&&ep>=BLD.wonder.minEpoch&&diff===2&&!count('wonder')&&canAfford(P,mulCost(BLD.wonder.cost,1.2)))build('wonder',home,6,16);
   }
+  // --- Mauerabschnitt mit Tor Richtung Gegner (wie die AoE2-KI)
+  if(BLD.wall&&BLD.gate&&!aiS.walled&&ep>=2&&workers.length>=16&&tcs.length&&pl.res.stone>=260){
+    aiS.walled=true;const dx=bases[0].x-home.x,dy=bases[0].y-home.y,dl=Math.hypot(dx,dy)||1,ux=dx/dl,uy=dy/dl;
+    const mx=home.x+ux*11,my=home.y+uy*11,bs=[];
+    for(let k=-5;k<=5;k++){const x=Math.round(mx-uy*k),y=Math.round(my+ux*k),t=k===0?'gate':'wall';
+      if(canPlace(P,t,x,y)&&canAfford(P,BLD[t].cost)){pay(P,BLD[t].cost);bs.push(placeBld(P,t,x,y,false))}}
+    const ws=workers.filter(w=>w.order.t!=='build').slice(0,3);
+    ws.forEach((w,i)=>{const b=bs[Math.floor(i*bs.length/ws.length)];if(b)order(w,{t:'build',target:b.id})});
+  }
+  // --- Schiffe: Gewässer bei der Heimat sichern
+  for(const sh of ships)if(sh.order.t==='idle'){let best=null,bd=40;
+    for(const e of ents)if(!e.dead&&e.owner===0&&((e.kind==='unit'&&UNITS[e.type]&&UNITS[e.type].naval)||e.type==='dock')){const c=center(e),d=Math.hypot(c.x-sh.x,c.y-sh.y);if(d<bd){bd=d;best=c}}
+    if(best)order(sh,{t:'amove',x:best.x,y:best.y})}
   // --- farms when berries run low
   const berries=nearestRes('food',home.x,home.y,12,P);
   const farms=blds.filter(b=>b.type==='farm');
@@ -817,6 +833,7 @@ function aiThink(){
     if(!b.built||b.queue.length>=2)continue;
     const opts=trainsOf(b.type).filter(k=>k!=='worker'&&UNITS[k].ai!==false&&(UNITS[k].minEpoch||0)<=ep&&!(UNITS[k].max&&countUnits(P,k)>=UNITS[k].max));
     if(!opts.length)continue;const tr=opts[(rng()*opts.length)|0],U=UNITS[tr];
+    if(UNITS[tr].naval&&ships.length>=6)continue;
     if(CLS(tr)==='siege'&&army.filter(a=>CLS(a.type)==='siege').length>=4)continue;
     if(gameT<90&&diff<2)continue;
     if(spare(U.cost))queueUnit(b,tr);
@@ -856,6 +873,11 @@ function playerTarget(from){
   if(!best)for(const e of ents)if(!e.dead&&e.owner===0&&e.kind==='unit'){const d=Math.hypot(e.x-from.x,e.y-from.y);if(d<bd){bd=d;best=e}}
   return best;
 }
+function nearWater(c,maxR){let best=null,bd=1e9;
+  for(let y=Math.max(0,(c.y|0)-maxR);y<Math.min(H,(c.y|0)+maxR);y++)for(let x=Math.max(0,(c.x|0)-maxR);x<Math.min(W,(c.x|0)+maxR);x++)
+    if(terr[idx(x,y)]!==1){let w=false;for(const [ox,oy] of [[1,0],[-1,0],[0,1],[0,-1]])if(inb(x+ox,y+oy)&&terr[idx(x+ox,y+oy)]===1)w=true;
+      if(w){const d=Math.hypot(x-c.x,y-c.y);if(d<bd){bd=d;best={x,y}}}}
+  return best}
 function findSpot(p,type,near,minR,maxR){
   const s=BLD[type].size;const cx=Math.round(near.x-s/2),cy=Math.round(near.y-s/2);
   for(let r=minR;r<=maxR;r++){
