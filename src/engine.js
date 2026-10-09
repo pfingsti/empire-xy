@@ -26,7 +26,7 @@ const trainsOf=t=>trainCache[t]||(trainCache[t]=Object.keys(UNITS).filter(k=>UNI
 const uname=(U,ep)=>{const n=U.names||[];for(let i=Math.min(ep,n.length-1);i>=0;i--)if(n[i])return n[i];return U.label};
 const PCOL=['#4a8ae8','#d4473c'];
 const PCOL_DK=['#2b5aa8','#8f2a23'];
-const SLOTKEYS=['Q','W','E','R','T','A','S','D','F','G','Y','X','C','V','B'];
+const SLOTKEYS=['Q','W','E','R','T','A','S','D','F','G','Y','X','C','V','B','Z','U','I','O','P'];
 
 const UNITS=XY.units, BLD=XY.buildings, RESDEF=XY.nodes, TECHS=XY.techs;
 const DIFF=[
@@ -484,6 +484,8 @@ function attackTick(u,t,dt,st){
 }
 
 // ================= unit update =================
+// Produktionskette: Mühlen in der Nähe machen Felder ergiebiger (Wert farmBoost am Gebäude)
+function farmBoost(f){if(f.boostT>gameT)return f.boostV;let v=1;for(const e of ents)if(e.kind==='bld'&&e.built&&!e.dead&&e.owner===f.owner&&BLD[e.type].farmBoost&&Math.hypot(e.x-f.x,e.y-f.y)<8)v=Math.max(v,BLD[e.type].farmBoost);f.boostT=gameT+3;f.boostV=v;return v}
 function updUnit(u,dt){
   passOwner=u.owner;
   const st=uStat(u);u.cd-=dt;u.swing=Math.max(0,(u.swing||0)-dt);if(!u.moving)u.v=Math.max(.3,(u.v||.3)-dt*3);u.moving=false;u.scan-=dt;
@@ -527,7 +529,7 @@ function updUnit(u,dt){
       if(u.carry>=10+players[u.owner].fx.carry){order(u,{t:'return',resume:o});break}
       if(distEnt(u,r)<=.5){
         u.path=null;const c=center(r);u.ang=Math.atan2(c.y-u.y,c.x-u.x);
-        const rate={wood:.85,food:r.kind==='bld'?.6:.95,stone:.65,gold:.65}[o.rt]*(1+.06*players[u.owner].epoch)*(1+(players[u.owner].fx.gather[o.rt]||0))*(u.owner===1?DIFF[diff].gather:1);
+        const rate={wood:.85,food:r.kind==='bld'?.6:.95,stone:.65,gold:.65}[o.rt]*(r.kind==='bld'?farmBoost(r):1)*(1+.06*players[u.owner].epoch)*(1+(players[u.owner].fx.gather[o.rt]||0))*(u.owner===1?DIFF[diff].gather:1);
         const amt=Math.min(rate*dt,r.kind==='res'?r.amount:99);
         u.carry+=amt;u.ct=o.rt;u.working=true;
         if(r.kind==='res'){r.amount-=amt;if(r.amount<=0.001)kill(r)}
