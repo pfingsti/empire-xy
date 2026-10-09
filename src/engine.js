@@ -243,7 +243,7 @@ function freeAround(b,pref,naval){
   }
   return null;
 }
-const isMil=u=>u.kind==='unit'&&u.type!=='worker';
+const isMil=u=>u.kind==='unit'&&u.type!=='worker'&&!(UNITS[u.type]&&UNITS[u.type].civil);
 const alive=e=>e&&!e.dead;
 function canAfford(p,c){for(const k in c)if(players[p].res[k]<c[k])return false;return true}
 function pay(p,c){for(const k in c)players[p].res[k]-=c[k]}
