@@ -117,19 +117,36 @@ label.opt{font-size:14px;padding:5px 12px}
 .tree{width:min(1180px,100%);display:flex;flex-direction:column;gap:10px;align-self:start;padding-block:8px}
 .treeHead{display:flex;justify-content:space-between;align-items:center;gap:12px}
 .treeHead h1{font-family:var(--f-display);color:var(--bronze-hi);margin:0;font-size:32px;font-weight:500}
-#techCols{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
-.tcol{display:flex;flex-direction:column;gap:6px;min-width:0}
-.tcol h3{margin:0;font-family:var(--f-display);font-weight:500;font-size:16px;color:var(--bronze-hi);border-bottom:1px solid var(--line);padding-bottom:4px}
+#techScreen{background:linear-gradient(180deg,#1a2126,#0e1316)}
+#techCols{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:18px 14px;align-items:start}
+.tcol{display:flex;flex-direction:column;gap:8px;min-width:0}
+.tcol h3{margin:0;font-family:var(--f-display);font-weight:500;font-size:15px;letter-spacing:.06em;color:var(--bronze-hi);border-bottom:1px solid var(--line);padding-bottom:5px;display:flex;justify-content:space-between;align-items:baseline}
+.tcol h3 small{font-family:inherit;font-size:11px;color:var(--muted);letter-spacing:0}
 .tcol h3.now{color:var(--ok)}
-.tk{text-align:left;background:var(--panel-2);border:1px solid var(--line);border-radius:4px;padding:6px 8px;display:flex;flex-direction:column;gap:2px;cursor:default;font-size:13px}
-.tk b{font-size:14px}
-.tk .at,.tk .st{color:var(--muted);font-size:12px}
-.tk.open{cursor:pointer;border-color:#6f9fc9}
-.tk.open:hover{border-color:var(--bronze-hi)}
-.tk.done{opacity:.6;border-color:#3d6b40}
-.tk.done .st{color:var(--ok)}
-.tk.running .st{color:var(--bronze-hi)}
-.tk .c{display:flex;gap:6px;color:var(--muted);font-size:12px}
+.tk{text-align:left;background:#1f282e;border:1px solid #33414a;border-left:3px solid #33414a;border-radius:5px;padding:8px 10px;display:grid;grid-template-columns:1fr auto;gap:4px 8px;cursor:default;font-size:12.5px;color:var(--fg,#e8e2d4)}
+.tk>b{font-size:14px;line-height:1.2}
+.tk .lv{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap;align-self:center}
+.tk .ds{grid-column:1/-1;color:#b9b3a6;line-height:1.35}
+.tk .pips{grid-column:1/-1;display:flex;gap:2px}
+.tk .pips i{flex:1;height:3px;border-radius:1px;background:#33414a}
+.tk .pips i.on{background:var(--bronze-hi)}
+.tk .pips i.cur{background:#6f9fc9}
+.tk .c{display:flex;gap:8px;color:#d9d2c3;font-size:12px;font-variant-numeric:tabular-nums;align-items:center}
+.tk .st{font-size:11px;color:var(--muted);text-align:right;align-self:center;white-space:nowrap}
+.tk.open{cursor:pointer;border-left-color:#6fbf73}
+.tk.open .st{color:#8fd393}
+.tk.open:hover{background:#25313a;border-color:var(--bronze-hi)}
+.tk.short{border-left-color:#8a6a3a}
+.tk.short .st{color:#d79a5a}
+.tk.epoch{opacity:.65}
+.epsel{display:inline-flex;gap:6px;align-items:center;color:var(--muted);font-size:13px}
+.epsel select{background:#1f282e;color:#e8e2d4;border:1px solid #33414a;border-radius:4px;padding:5px 8px;font:inherit}
+.ages span.off{opacity:.3;text-decoration:line-through}
+.tk.nobld{opacity:.6;border-left-color:#4a555c}
+.tk.nobld .st{color:var(--muted)}
+.tk.running{border-left-color:#6f9fc9}
+.tk.running .st{color:#9cc3e6}
+.tk .pb{grid-column:1/-1}
 @media (max-width:760px){
   #panel{grid-template-columns:auto minmax(0,1fr);gap:8px;padding:8px 12px}
   #mmWrap{width:112px;height:112px}
@@ -176,12 +193,16 @@ label.opt{font-size:14px;padding:5px 12px}
 <div class="overlay" id="startScreen">
   <div class="card">
     <h1>Empire XY</h1>
-    <p class="tag">Führe dein Volk von der Steinzeit bis ins Industriezeitalter. Sammle Rohstoffe, baue eine Stadt, stelle eine Armee auf und besiege das rivalisierende Reich, oder errichte ein Weltwunder und halte es drei Minuten lang.</p>
+    <p class="tag">Führe dein Volk durch zehn Epochen, von der Steinzeit bis in die Moderne. Sammle Rohstoffe, baue eine Stadt, stelle eine Armee auf und besiege das rivalisierende Reich, oder errichte ein Weltwunder und halte es drei Minuten lang.</p>
     <div class="ages"><span>Steinzeit</span><span>Bronzezeit</span><span>Eisenzeit</span><span>Renaissance</span><span>Industriezeitalter</span></div>
     <div class="row"><span class="lbl">Gegner</span>
       <button class="opt" data-diff="0" aria-pressed="false">Leicht</button>
       <button class="opt" data-diff="1" aria-pressed="true">Normal</button>
       <button class="opt" data-diff="2" aria-pressed="false">Schwer</button>
+    </div>
+    <div class="row"><span class="lbl">Epochen</span>
+      <label class="epsel">von <select id="epStartSel" aria-label="Startepoche"></select></label>
+      <label class="epsel">bis <select id="epEndSel" aria-label="Endepoche"></select></label>
     </div>
     <div class="row"><span class="lbl">Karte</span>
       <button class="opt" id="seedBtn" aria-pressed="true">Zufällig #<span id="seedN"></span></button>

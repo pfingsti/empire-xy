@@ -8,7 +8,8 @@ const mm=$('#minimap'), mctx=mm.getContext('2d');
 const XY=window.EmpireXY;
 const RES=XY.resources.list, RES_DE=XY.resources.label, RES_COL=XY.resources.color;
 const EPOCHS=[],EPOCH_COST=[],EPOCH_TIME=[],ROOF=[],ROOF_HI=[],WALL=[];
-const MAXEP=()=>EPOCHS.length-1;
+let epStart=0,epEnd=99; // vom Startmenü gewählt
+const MAXEP=()=>Math.min(EPOCHS.length-1,epEnd);
 // cls = Gattung für Konter und Forschung, look = Grafikvorlage
 const CLS=t=>(UNITS[t]&&UNITS[t].cls)||t,LOOK=t=>(UNITS[t]&&(UNITS[t].look||UNITS[t].cls))||t;
 const TIER=[];const VIS=ep=>TIER[ep]!==undefined?TIER[ep]:Math.min(4,ep);
@@ -193,6 +194,8 @@ function newGame(d,seed){
     for(let k=0;k<4;k++){const s=freeAround(tc);if(s)spawnUnit(p,'worker',s.x+.5,s.y+.5)}
     const s=freeAround(tc);if(s)spawnUnit(p,'infantry',s.x+.5,s.y+.5);
   });
+  epStart=Math.min(epStart,MAXEP());
+  if(epStart>0)for(const pl of players){pl.epoch=epStart;for(const k in pl.res)pl.res[k]=Math.round(pl.res[k]*(1+epStart*.7))}
   aiS={t:0,nextAttack:DIFF[d].firstAttack,wave:DIFF[d].wave,attacking:false,lastDef:0};
   recalcPop();updateVis(true);
   XY.emit('start',API);
@@ -1732,9 +1735,12 @@ function renderTechTree(){
     if(!next[ln]||(TECHS[next[ln]].epoch||0)>(t.epoch||0))next[ln]=id}
   const byAt={};for(const ln in next){const id=next[ln];(byAt[TECHS[id].at]=byAt[TECHS[id].at]||[]).push(id)}
   const lines=new Set(Object.values(TECHS).map(t=>t.line).filter(Boolean)),doneN=Object.keys(pl.techs).length;
-  cols.innerHTML=Object.keys(byAt).map(at=>`<div class="tcol"><h3>${BLD[at]?BLD[at].name:at}</h3>${byAt[at].map(id=>{const t=TECHS[id],st=techState(0,id);
-    const steps=Object.values(TECHS).filter(x=>t.line&&x.line===t.line).length,stepN=steps?Object.values(TECHS).filter(x=>x.line===t.line&&(x.epoch||0)<(t.epoch||0)).length+1:0;
-    return `<button class="tk ${st}" data-id="${id}" ${st==='open'?'':'tabindex="-1"'}><b>${t.name}</b><span>${t.desc||''}</span>${steps?`<span class="at">Stufe ${stepN} von ${steps}</span>`:''}<span class="c">${costHTML(t.cost||{})}</span><span class="st">${st==='epoch'?'Benötigt '+EPOCHS[t.epoch]:ST[st]||''}</span></button>`}).join('')}</div>`).join('')
+  const have=t=>ents.some(e=>e.kind==='bld'&&e.owner===0&&e.type===t&&e.built&&!e.dead);
+  cols.innerHTML=Object.keys(byAt).map(at=>`<div class="tcol"><h3>${BLD[at]?BLD[at].name:at}<small>${have(at)?byAt[at].length+' offen':'nicht gebaut'}</small></h3>${byAt[at].map(id=>{const t=TECHS[id];let st=techState(0,id);
+    const all=Object.values(TECHS).filter(x=>t.line&&x.line===t.line).sort((a,b)=>(a.epoch||0)-(b.epoch||0)),stepN=all.indexOf(t)+1;
+    const cls=st==='open'&&!have(at)?'nobld':st==='open'&&!canAfford(0,t.cost||{})?'open short':st;
+    const stTxt=st==='epoch'?'ab '+EPOCHS[t.epoch]:st==='running'?'läuft':!have(at)?'Gebäude fehlt':cls==='open short'?'zu teuer':'Verfügbar';
+    return `<button class="tk ${cls}" data-id="${id}" ${st==='open'?'':'tabindex="-1"'}><b>${t.name}</b>${all.length?`<span class="lv">Stufe ${stepN}/${all.length}</span>`:''}<span class="ds">${t.desc||''}</span>${all.length>1?`<span class="pips">${all.map((x,i)=>`<i class="${i<stepN-1?'on':i===stepN-1?'cur':''}"></i>`).join('')}</span>`:''}<span class="c">${costHTML(t.cost||{})} · ${t.time||30} s</span><span class="st">${stTxt}</span></button>`}).join('')}</div>`).join('')
     +(Object.keys(byAt).length?'':'<p class="hint">Alles erforscht.</p>');
   $('#techScreen .hint').textContent='Hier siehst du nur, was du als Nächstes erforschen kannst. Ist eine Stufe fertig, erscheint die nächste. Bisher erforscht: '+doneN+'.';
   cols.querySelectorAll('.tk.open').forEach(b=>b.onclick=()=>{
@@ -1791,7 +1797,7 @@ let curSeed=0,saveT=0;const SAVE_KEY='empire-xy.spielstand';
 function saveGame(){
   if(!started||over||!ents)return;
   try{
-    const data={v:1,seed:curSeed,diff,gameT,nextId,bases,aiS,players,terr:Array.from(terr),exp:Array.from(exp),
+    const data={v:1,seed:curSeed,diff,epStart,epEnd,gameT,nextId,bases,aiS,players,terr:Array.from(terr),exp:Array.from(exp),
       ents:ents.filter(e=>!e.dead),cam:{x:cam.x,y:cam.y,z:cam.z},saved:Date.now()};
     localStorage.setItem(SAVE_KEY,JSON.stringify(data));
   }catch(e){}
@@ -1799,7 +1805,7 @@ function saveGame(){
 function readSave(){try{const d=JSON.parse(localStorage.getItem(SAVE_KEY));return d&&d.v===1?d:null}catch(e){return null}}
 function clearSave(){try{localStorage.removeItem(SAVE_KEY)}catch(e){}}
 function loadGame(d){
-  syncRegistry();rng=mulberry32(d.seed);curSeed=d.seed;diff=d.diff;
+  syncRegistry();rng=mulberry32(d.seed);curSeed=d.seed;diff=d.diff;epStart=d.epStart||0;epEnd=d.epEnd!==undefined?d.epEnd:99;
   terr=Uint8Array.from(d.terr);exp=Uint8Array.from(d.exp);vis=new Uint8Array(W*H);block=new Int32Array(W*H);
   for(let i=0;i<W*H;i++)if(terr[i]===1)block[i]=-1;
   ents=d.ents.filter(e=>e.kind==='res'?RESDEF[e.type]:e.kind==='unit'?UNITS[e.type]:BLD[e.type]);byId=new Map();
@@ -1819,6 +1825,18 @@ const EPOCHS_NAME=d=>{if(!XY.epochs.length)XY.build();const e=XY.epochs[d.player
 document.addEventListener('visibilitychange',()=>{if(document.hidden)saveGame()});
 window.addEventListener('beforeunload',saveGame);
 let chosenDiff=1,seed=(Math.random()*99999)|0;
+// Start- und Endepoche wählen
+function fillEpochSelects(){
+  if(!XY.epochs.length)XY.build();const names=XY.epochs.map(e=>e.name),a=$('#epStartSel'),b=$('#epEndSel');
+  const opts=sel=>names.map((n,i)=>`<option value="${i}"${i===sel?' selected':''}>${n}</option>`).join('');
+  let st=0,en=names.length-1;try{const v=JSON.parse(localStorage.getItem('empire-xy.epochen')||'null');if(v){st=Math.min(v[0],en);en=Math.min(v[1],names.length-1)}}catch(e){}
+  a.innerHTML=opts(st);b.innerHTML=opts(en);
+  const sync=()=>{let x=+a.value,y=+b.value;if(y<x){y=x;b.value=y}epStart=x;epEnd=y;
+    $('#startScreen .ages').innerHTML=names.map((n,i)=>`<span${i<x||i>y?' class="off"':''}>${n}</span>`).join('');
+    try{localStorage.setItem('empire-xy.epochen',JSON.stringify([x,y]))}catch(e){}};
+  a.onchange=b.onchange=sync;sync();
+}
+fillEpochSelects();
 $('#seedN').textContent=seed;
 document.querySelectorAll('[data-diff]').forEach(b=>b.onclick=()=>{chosenDiff=+b.dataset.diff;document.querySelectorAll('[data-diff]').forEach(x=>x.setAttribute('aria-pressed',x===b?'true':'false'))});
 $('#reroll').onclick=()=>{seed=(Math.random()*99999)|0;$('#seedN').textContent=seed};
