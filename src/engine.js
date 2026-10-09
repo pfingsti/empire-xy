@@ -1546,6 +1546,12 @@ function updateTop(){
   const en=pl.advancing&&tc?EPOCHS[pl.epoch]+' → '+EPOCHS[pl.epoch+1]:EPOCHS[pl.epoch];
   if($('#epochName').textContent!==en)$('#epochName').textContent=en;
   const q=tc&&tc.queue.find(q=>q.ep);$('#epochBar b').style.width=(q?q.t/q.total*100:(pl.epoch/Math.max(1,MAXEP())*100))+'%';
+  // research progress HUD (all running techs of the player)
+  const rq=[];for(const e of ents)if(e.owner===0&&e.kind==='bld'&&!e.dead)e.queue.forEach((x,i)=>{if(x.tech)rq.push({id:x.tech,f:i===0?x.t/x.total:0,left:i===0?x.total-x.t:x.total+(i?1e9:0),wait:i>0})});
+  const rh=$('#researchHud'),rsig=rq.map(r=>r.id).join();
+  if(rh.dataset.sig!==rsig){rh.dataset.sig=rsig;rh.hidden=!rq.length;rh.innerHTML=rq.map(r=>`<div class="rq" data-id="${r.id}"><span>${TECHS[r.id].name}</span><em></em><i><b></b></i></div>`).join('')}
+  rq.forEach((r,i)=>{const row=rh.children[i];if(!row)return;row.querySelector('b').style.width=(r.f*100)+'%';row.querySelector('em').textContent=r.wait?'wartet':Math.floor(r.f*100)+'% · '+Math.ceil(r.left)+' s'});
+  if(!$('#techScreen').hidden)$('#techCols').querySelectorAll('.tk.running').forEach(btn=>{const r=rq.find(x=>x.id===btn.dataset.id);const st=btn.querySelector('.st');if(r&&st)st.textContent=r.wait?'Wartet in Warteschlange':'Wird erforscht: '+Math.floor(r.f*100)+'%';let bar=btn.querySelector('.pb');if(!bar){bar=document.createElement('i');bar.className='pb';bar.innerHTML='<b></b>';btn.appendChild(bar)}bar.firstChild.style.width=(r?r.f*100:0)+'%'});
   $('#clock').textContent=fmtTime(gameT);
   const idle=ents.filter(e=>e.owner===0&&e.type==='worker'&&e.order.t==='idle').length;$('#idleN').textContent=idle;
   const wb=$('#wonderBanner');const wt=players.find(p=>p.wonderT>0);

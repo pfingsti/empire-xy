@@ -27,6 +27,11 @@ button:focus-visible{outline:2px solid var(--bronze-hi);outline-offset:1px}
 .res small{font-weight:400;color:var(--muted);font-size:12px}
 #epochBox{display:flex;flex-direction:column;gap:2px;min-width:150px}
 #epochName{font-family:var(--f-display);font-size:15px;color:var(--bronze-hi);letter-spacing:.03em}
+#researchHud{position:absolute;top:52px;right:10px;z-index:5;display:flex;flex-direction:column;gap:4px;min-width:190px;pointer-events:none}
+#researchHud .rq{background:rgba(20,16,10,.82);border:1px solid var(--line);border-radius:4px;padding:4px 7px;font-size:12px;display:grid;grid-template-columns:1fr auto;gap:2px 8px}
+#researchHud em{font-style:normal;color:var(--muted);font-variant-numeric:tabular-nums}
+#researchHud i,.tk .pb{grid-column:1/-1;display:block;height:4px;background:var(--line);border-radius:2px;overflow:hidden}
+#researchHud i b,.tk .pb b{display:block;height:100%;width:0;background:#6f9fc9}
 #epochBar{height:4px;background:var(--line);border-radius:2px;overflow:hidden}
 #epochBar b{display:block;height:100%;width:0;background:var(--bronze-hi)}
 .spacer{flex:1}
@@ -204,6 +209,7 @@ label.opt{font-size:14px;padding:5px 12px}
   </div>
 </div>
 
+<div id="researchHud" hidden></div>
 <div class="overlay" id="techScreen" hidden>
   <div class="tree">
     <div class="treeHead"><h1>Forschung</h1><button class="opt" id="techClose">Schließen</button></div>
