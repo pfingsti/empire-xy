@@ -869,6 +869,7 @@ const API={
   get ents(){return ents},get players(){return players},get time(){return gameT},
   spawnUnit,placeBld,toast,damage,order,applyTech,techState,center,distEnt,alive,isMil,uStat,
   heal(e,amt){e.hp=Math.min(e.maxhp,e.hp+amt)},
+  revealAll(){exp.fill(1)},
   fx(x,y,k){fx.push({x,y,t:0,k:k||'hit'})},
 };
 // ================= main step =================

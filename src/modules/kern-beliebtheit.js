@@ -40,11 +40,12 @@ EmpireXY.register({
         const food=pl.res.food;if(food>=400){m+=12;why.push('volle Speicher +12')}else if(food>=150){m+=5;why.push('genug Nahrung +5')}else if(food<40){m-=18;why.push('Hunger −18')}
         if(pl.cap>0&&pl.pop>=pl.cap){m-=10;why.push('Wohnungsnot −10')}
         const blds=api.ents.filter(e=>e.kind==='bld'&&e.owner===pl.i&&e.built&&!e.dead);
+        if(blds.some(b=>b.type==='wonder')){m+=15;why.push('Weltwunder +15')}
         for(const t of ['market','temple']){const n=Math.min(2,blds.filter(b=>b.type===t).length);if(n){const v=n*(t==='market'?10:8);m+=v;why.push((t==='market'?'Märkte':'Tempel')+' +'+v)}}
         const lost=(pl.st&&pl.st.lost)||0,recent=lost-(pl.moodLost||0);pl.moodLost=lost;pl.moodWar=Math.max(0,(pl.moodWar||0)*.97+recent*2);
         if(pl.moodWar>1){const v=Math.min(20,Math.round(pl.moodWar));m-=v;why.push('Kriegsverluste −'+v)}
         m=Math.max(0,Math.min(100,m));pl.mood=(pl.mood??50)+(m-(pl.mood??50))*.15;
-        pl.moodMul=.75+pl.mood/200;pl.moodWhy=why.length?why.join(', ')+'.':'keine Einflüsse.';
+        pl.moodMul=(.75+pl.mood/200)*(pl.wonderGather||1);pl.moodWhy=why.length?why.join(', ')+'.':'keine Einflüsse.';
       }
     },
   },
