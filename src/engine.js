@@ -1357,7 +1357,11 @@ function render(){
   // fog
   ctx.imageSmoothingEnabled=true;ctx.drawImage(fogC,0,0,W,H,0,0,W*T,H*T);
   // placement ghost
-  if(placing&&mouse.inside){
+  if(placing&&mouse.inside&&BLD[placing].line){
+    const w=toWorld(mouse.x,mouse.y),tl=wallDrag?wallLine(wallDrag.x,wallDrag.y,Math.floor(w.x),Math.floor(w.y)):[[Math.floor(w.x),Math.floor(w.y)]];
+    for(const [gx,gy] of tl){const ok=canPlace(0,placing,gx,gy);ctx.fillStyle=ok?'rgba(120,230,130,.32)':'rgba(240,90,80,.36)';ctx.fillRect(gx*T,gy*T,T,T)}
+    if(wallDrag){ctx.fillStyle='#fff';ctx.font='12px sans-serif';ctx.fillText(tl.length+' Felder · '+tl.length*(BLD[placing].cost.stone||0)+' Stein',w.x*T+12,w.y*T-8)}
+  }else if(placing&&mouse.inside){
     const d=BLD[placing],w=toWorld(mouse.x,mouse.y),gx=Math.floor(w.x-d.size/2+.5),gy=Math.floor(w.y-d.size/2+.5);
     const ok=canPlace(0,placing,gx,gy);
     ctx.fillStyle=ok?'rgba(120,230,130,.28)':'rgba(240,90,80,.32)';ctx.fillRect(gx*T,gy*T,d.size*T,d.size*T);
@@ -1583,6 +1587,20 @@ function rightCommand(wx,wy){
   }else{cmdMove(units,wx,wy,aMode);marker={x:wx,y:wy,t:1,c:aMode?'#ff8a7a':'#9ef0a0'}}
   aMode=false;uiDirty=true;
 }
+let wallDrag=null;
+// tiles of a wall line: straight or diagonal steps from a to b
+function wallLine(ax,ay,bx,by){const out=[],n=Math.max(Math.abs(bx-ax),Math.abs(by-ay));for(let i=0;i<=n;i++){const t=n?i/n:0;out.push([Math.round(ax+(bx-ax)*t),Math.round(ay+(by-ay)*t)])}
+  // close diagonal gaps so units cannot slip through
+  const res=[];for(let i=0;i<out.length;i++){if(i&&out[i][0]!==out[i-1][0]&&out[i][1]!==out[i-1][1])res.push([out[i][0],out[i-1][1]]);res.push(out[i])}return res}
+function placeLine(tiles,keep){
+  const d=BLD[placing];let n=0;const bs=[];
+  for(const [gx,gy] of tiles){if(!canPlace(0,placing,gx,gy))continue;if(!canAfford(0,d.cost)){toast('Nicht genug Rohstoffe für die ganze Mauer.','warn');break}
+    pay(0,d.cost);bs.push(placeBld(0,placing,gx,gy,false));n++}
+  if(!n)toast('Hier kann keine Mauer gebaut werden.','warn');
+  const ws=sel.filter(u=>u.kind==='unit'&&u.type==='worker');
+  ws.forEach((u,i)=>{const b=bs[Math.floor(i*bs.length/ws.length)];if(b)order(u,{t:'build',target:b.id})});
+  if(!keep||!canAfford(0,d.cost)){placing=null;uiDirty=true}
+}
 function tryPlace(wx,wy,keep){
   const d=BLD[placing],gx=Math.floor(wx-d.size/2+.5),gy=Math.floor(wy-d.size/2+.5);
   if(!canPlace(0,placing,gx,gy)){toast('Hier kann nicht gebaut werden.','warn');return}
@@ -1603,8 +1621,9 @@ cv.addEventListener('pointerdown',e=>{
     clearTimeout(touchHold);touchHold=setTimeout(()=>{if(touch&&!touch.moved){touch=null;drag={sx:mouse.x,sy:mouse.y,box:true,shift:false,touchBox:true};if(navigator.vibrate)try{navigator.vibrate(15)}catch(_){}}},380);
     return}
   if(e.button===1){drag={pan:true,sx:mouse.x,sy:mouse.y,cx:cam.x,cy:cam.y};return}
-  if(e.button===2){if(placing){placing=null;uiDirty=true;return}rightCommand(w.x,w.y);return}
+  if(e.button===2){if(placing){placing=null;wallDrag=null;uiDirty=true;return}rightCommand(w.x,w.y);return}
   if(e.button===0){
+    if(placing&&BLD[placing].line){wallDrag={x:Math.floor(w.x),y:Math.floor(w.y)};return}
     if(placing){tryPlace(w.x,w.y,e.shiftKey);return}
     if(aMode){const u=sel.filter(x=>x.kind==='unit'&&x.owner===0);if(u.length){const t=pickAt(w.x,w.y);if(t&&t.owner===1)cmdTarget(u,t);else cmdMove(u,w.x,w.y,true);marker={x:w.x,y:w.y,t:1,c:'#ff8a7a'}}aMode=false;uiDirty=true;return}
     drag={sx:mouse.x,sy:mouse.y,box:false,shift:e.shiftKey};
@@ -1619,6 +1638,7 @@ cv.addEventListener('pointermove',e=>{
 cv.addEventListener('pointerleave',()=>{mouse.inside=false});
 cv.addEventListener('pointerup',e=>{
   const r=cv.getBoundingClientRect();mouse.x=e.clientX-r.left;mouse.y=e.clientY-r.top;
+  if(wallDrag&&placing){const w=toWorld(mouse.x,mouse.y);placeLine(wallLine(wallDrag.x,wallDrag.y,Math.floor(w.x),Math.floor(w.y)),e.shiftKey);wallDrag=null;return}
   clearTimeout(touchHold);
   if(touch){
     if(!touch.moved){
