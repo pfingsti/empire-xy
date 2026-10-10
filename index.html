@@ -79,6 +79,11 @@ button:focus-visible{outline:2px solid var(--bronze-hi);outline-offset:1px}
 .chips{display:flex;gap:4px;flex-wrap:wrap}
 .chip{border:1px solid var(--line);background:var(--panel-2);border-radius:3px;padding:2px 8px;font-size:13px;cursor:pointer}
 .chip:hover{border-color:var(--bronze)}
+.utabs{display:flex;gap:2px;flex-wrap:wrap;margin:4px 0;border-bottom:1px solid var(--line)}
+.utab{border:1px solid var(--line);border-bottom:none;background:var(--panel-2);border-radius:4px 4px 0 0;padding:2px 7px;font-size:12px;cursor:pointer;color:inherit}
+.utab b{margin-left:4px;color:var(--bronze)}
+.utab:hover:not(:disabled){border-color:var(--bronze)}
+.utab:disabled{opacity:.35;cursor:default}
 .hint{color:var(--muted);font-size:13px;line-height:1.4;max-width:60ch}
 .hint kbd{font-family:inherit;border:1px solid var(--line);border-bottom-width:2px;border-radius:3px;padding:0 4px;font-size:12px;color:var(--text)}
 
@@ -910,6 +915,271 @@ EmpireXY.register({
       if((api._achT=(api._achT||0)+dt)<1)return;api._achT=0;
       for(const a of ACH)if(!got[a[0]]&&a[3](p,api)){got[a[0]]=1;show(a);try{localStorage.setItem('empire-xy.erfolge',JSON.stringify(got))}catch(e){}}
     },
+  },
+});
+})();
+
+// --- kern-fahrzeuge.js
+// Kern-Baustein: Fahrzeuge und Luftwaffe als eigene Einheitenkategorien.
+// cls 'vehicle' = Bodenfahrzeuge aus der Panzerfabrik, cls 'aircraft' = Flugzeuge und Hubschrauber vom Flughafen.
+// air:true lässt eine Einheit über Gelände, Wasser und Mauern fliegen; Nahkämpfer und Belagerung können sie nicht treffen.
+// seats = Truppentransport: Fußtruppen steigen per Rechtsklick ein, „Absitzen“ lässt sie wieder aussteigen.
+(function(){
+const L0={x:-.7071,y:-.7071}; // Licht von links oben, unabhängig von der Drehung der Einheit
+function lit(g,ang,len,c,api,hi,lo){const ca=Math.cos(-ang),sa=Math.sin(-ang),lx=L0.x*ca-L0.y*sa,ly=L0.x*sa+L0.y*ca;
+  const gr=g.createLinearGradient(lx*len,ly*len,-lx*len,-ly*len);gr.addColorStop(0,api.shade(c,hi||28));gr.addColorStop(.5,c);gr.addColorStop(1,api.shade(c,lo||-34));return gr}
+function rr(g,x,y,w,h,r){g.beginPath();g.moveTo(x+r,y);g.lineTo(x+w-r,y);g.quadraticCurveTo(x+w,y,x+w,y+r);g.lineTo(x+w,y+h-r);g.quadraticCurveTo(x+w,y+h,x+w-r,y+h);g.lineTo(x+r,y+h);g.quadraticCurveTo(x,y+h,x,y+h-r);g.lineTo(x,y+r);g.quadraticCurveTo(x,y,x+r,y);g.closePath()}
+function poly(g,pts){g.beginPath();pts.forEach((p,i)=>i?g.lineTo(p[0],p[1]):g.moveTo(p[0],p[1]));g.closePath()}
+// Rumpf dreht träge, Turm zeigt sofort aufs Ziel
+function hullAng(u,api){const t=api.time;if(u.hAng===undefined||u.hT===undefined||t-u.hT>1){u.hAng=u.ang;u.hT=t}
+  const dt=Math.max(0,t-u.hT);u.hT=t;let d=u.ang-u.hAng;while(d>Math.PI)d-=Math.PI*2;while(d<-Math.PI)d+=Math.PI*2;
+  if(u.moving||Math.abs(d)>1.2)u.hAng+=d*Math.min(1,dt*(u.moving?6:1.5));return u.hAng}
+
+// ---------- Bodenfahrzeuge ----------
+function tracks(g,L,W,tw,u,api,col){
+  const off=u.moving?(api.time*18)%3:0;
+  for(const s of [-1,1]){const y0=s<0?-W/2:W/2-tw;
+    g.fillStyle=col||'#25241f';rr(g,-L/2,y0,L,tw,2);g.fill();
+    g.strokeStyle='rgba(0,0,0,.55)';g.lineWidth=.8;g.beginPath();for(let x=-L/2+1+off;x<L/2-1;x+=3){g.moveTo(x,y0+.6);g.lineTo(x,y0+tw-.6)}g.stroke();
+    g.fillStyle='rgba(160,155,140,.25)';g.fillRect(-L/2+1,s<0?y0+.4:y0+tw-1.2,L-2,.8)}
+}
+function barrel(g,x0,len,w,u,brake){const rec=u.swing>.12?-3:0;
+  g.fillStyle='#22241f';g.fillRect(x0+rec,-w/2,len,w);g.fillStyle='rgba(255,255,255,.18)';g.fillRect(x0+rec,-w/2,len,w*.35);
+  if(brake){g.fillStyle='#1c1d19';g.fillRect(x0+len-3+rec,-w*.9,3,w*1.8)}
+  if(u.swing>.17){const tx=x0+len+rec+1;g.fillStyle='rgba(255,236,170,.95)';g.beginPath();g.moveTo(tx,0);g.lineTo(tx+5,-2.6);g.lineTo(tx+9,0);g.lineTo(tx+5,2.6);g.closePath();g.fill();
+    g.fillStyle='rgba(255,170,60,.6)';g.beginPath();g.arc(tx+3,0,3.2,0,7);g.fill()}}
+function shadowRect(g,u,ha,L,W,api){g.save();g.translate(u.x*api.T+4,u.y*api.T+4);g.rotate(ha);g.fillStyle='rgba(6,10,4,.32)';rr(g,-L/2-1,-W/2-1,L+2,W+2,4);g.fill();g.restore()}
+const CAMO={steam:'#5f574a',light:'#6b6a4d',medium:'#525c3a',heavy:'#8a7f56',mbt:'#5d6449',future:'#3c444a',apc8:'#5a6040',apc9:'#5f6650'};
+
+function drawTank(g,u,api,kind){
+  const T=api.T,x=u.x*T,y=u.y*T,pc=api.PCOL[u.owner],ha=hullAng(u,api),ta=u.ang-ha;
+  const S={steam:[30,21],light:[22,14],medium:[28,18],heavy:[33,21],mbt:[32,20],future:[34,22]}[kind],L=S[0],W=S[1],tw=W*.25,c=CAMO[kind];
+  shadowRect(g,u,ha,L,W,api);
+  g.translate(x,y);g.rotate(ha);
+  if(kind==='future'){ // schwebt: Antigrav-Kufen statt Ketten
+    const gl=.5+.5*Math.sin(api.time*6+u.id);for(const s of [-1,1]){g.fillStyle='#24292d';rr(g,-L/2,s<0?-W/2:W/2-tw,L,tw,3);g.fill();g.fillStyle=`rgba(120,220,255,${(.35+.4*gl).toFixed(2)})`;g.fillRect(-L/2+3,s<0?-W/2+tw*.4:W/2-tw*.6,L-6,1.2)}}
+  else tracks(g,L,W,tw,u,api,kind==='steam'?'#3a3027':null);
+  // Wanne
+  const hw=W-tw*1.1;g.fillStyle=lit(g,ha,L*.6,c,api);
+  if(kind==='mbt'||kind==='future')poly(g,[[-L/2+1,-hw/2],[L/2-5,-hw/2],[L/2,-hw/2+3],[L/2,hw/2-3],[L/2-5,hw/2],[-L/2+1,hw/2]]);else rr(g,-L/2+1,-hw/2,L-2,hw,kind==='steam'?1:3);
+  g.fill();g.strokeStyle='rgba(0,0,0,.35)';g.lineWidth=.8;g.stroke();
+  g.fillStyle='rgba(0,0,0,.18)';g.fillRect(L/2-6,-hw/2+1,4,hw-2); // Bugplatte im Schatten
+  g.strokeStyle='rgba(0,0,0,.35)';g.lineWidth=.6;g.beginPath();for(let i=0;i<4;i++){g.moveTo(-L/2+3+i*2,-hw/2+3);g.lineTo(-L/2+3+i*2,hw/2-3)}g.stroke(); // Motorgitter
+  g.fillStyle=pc;g.fillRect(-L/2+1,-hw/2,2,hw); // Heckmarkierung in Spielerfarbe
+  if(kind==='heavy'){g.fillStyle='rgba(70,82,48,.55)';for(const [a,b,w] of [[-8,-4,6],[2,3,7],[6,-6,5]]){g.beginPath();g.ellipse(a,b,w,2.2,.6,0,7);g.fill()}}
+  if(kind==='steam'){ // genieteter Kasten mit Schornstein und Seitengeschützen
+    g.fillStyle='rgba(255,255,255,.15)';g.fillRect(-L/2+2,-1,L-4,1.4);g.fillStyle='rgba(30,25,20,.7)';for(let i=-L/2+3;i<L/2-2;i+=3){g.fillRect(i,-hw/2+1,1,1);g.fillRect(i,hw/2-2,1,1)}
+    for(const s of [-1,1]){g.fillStyle='#2a2620';g.fillRect(2+(u.swing>.12?-2:0),s*(hw/2)-1.2,9,2.4)}
+    api.blob(g,-L/2+7,0,3.6,'#5a4c3e','#2c241d','#120e0b');g.fillStyle='#0b0907';g.beginPath();g.arc(-L/2+7,0,2,0,7);g.fill();
+    g.fillStyle='#3a332b';g.fillRect(L/2-2,-hw/2+2,3,hw-4);
+    g.rotate(-ha);for(let i=0;i<4;i++){const f=((api.time*.9+i/4+u.id*.13)%1),bx=Math.cos(ha)*(-L/2+7)-f*10,by=Math.sin(ha)*(-L/2+7)-6-f*16;g.fillStyle=`rgba(110,105,100,${(.45*(1-f)).toFixed(2)})`;g.beginPath();g.arc(bx,by,2.5+f*5,0,7);g.fill()}
+    return}
+  // Turm
+  g.rotate(ta);const tc=api.shade(c,6);
+  if(kind==='light'){g.fillStyle=lit(g,u.ang,6,tc,api);g.beginPath();g.arc(0,0,4.6,0,7);g.fill();barrel(g,3,8,1.8,u)}
+  else if(kind==='medium'){g.fillStyle=lit(g,u.ang,8,tc,api);g.beginPath();g.ellipse(-1,0,7,6.2,0,0,7);g.fill();g.strokeStyle='rgba(0,0,0,.35)';g.stroke();barrel(g,5,14,2.2,u)}
+  else if(kind==='heavy'){g.fillStyle=lit(g,u.ang,9,tc,api);rr(g,-8,-7,15,14,2);g.fill();g.strokeStyle='rgba(0,0,0,.4)';g.stroke();barrel(g,7,18,2.6,u,true)}
+  else if(kind==='mbt'){g.fillStyle=lit(g,u.ang,10,tc,api);poly(g,[[-9,-7],[4,-7],[9,-3],[9,3],[4,7],[-9,7]]);g.fill();g.strokeStyle='rgba(0,0,0,.4)';g.stroke();
+    g.fillStyle='rgba(0,0,0,.25)';g.fillRect(-9,-7,3,14);barrel(g,9,19,2.4,u)}
+  else{g.fillStyle=lit(g,u.ang,10,tc,api);poly(g,[[-10,-7],[3,-8],[10,-3],[10,3],[3,8],[-10,7]]);g.fill();g.strokeStyle='rgba(120,220,255,.6)';g.lineWidth=.8;g.stroke();
+    barrel(g,8,18,1.8,{swing:u.swing});g.translate(0,3.5);barrel(g,8,16,1.6,{swing:0});g.translate(0,-3.5)}
+  g.fillStyle='rgba(0,0,0,.4)';g.beginPath();g.arc(-3,-2.5,1.8,0,7);g.fill();g.fillStyle='rgba(255,255,255,.18)';g.beginPath();g.arc(-3.4,-2.9,.8,0,7);g.fill();
+  g.fillStyle=pc;g.fillRect(-4,1.5,4,2.2);
+}
+function drawApc(g,u,api){
+  const T=api.T,x=u.x*T,y=u.y*T,pc=api.PCOL[u.owner],ep=api.epochOf(u.owner),ha=hullAng(u,api),modern=ep>=9,L=modern?30:27,W=modern?17:15,c=modern?CAMO.apc9:CAMO.apc8;
+  shadowRect(g,u,ha,L,W,api);g.translate(x,y);g.rotate(ha);
+  if(modern){for(const s of [-1,1])for(let i=0;i<4;i++){g.fillStyle='#1d1e1b';rr(g,-L/2+3+i*7,s<0?-W/2-1:W/2-3,5,4,1.5);g.fill()}}
+  else{tracks(g,L*.55,W,3.6,u,api);for(const s of [-1,1]){g.fillStyle='#1d1e1b';rr(g,L/2-8,s<0?-W/2-.5:W/2-3.5,5,4,1.5);g.fill()}}
+  g.fillStyle=lit(g,ha,L*.6,c,api);poly(g,[[-L/2+1,-W/2+2],[L/2-6,-W/2+2],[L/2,-W/2+5],[L/2,W/2-5],[L/2-6,W/2-2],[-L/2+1,W/2-2]]);g.fill();g.strokeStyle='rgba(0,0,0,.4)';g.lineWidth=.8;g.stroke();
+  // Mannschaftsraum: offen (Halbkette) mit Helmen, sonst Dachluken
+  const n=(u.cargo||[]).length;
+  if(!modern){g.fillStyle='#1e1f1a';g.fillRect(-L/2+3,-W/2+4,L*.55,W-8);for(let i=0;i<n;i++){api.blob(g,-L/2+5+(i>>1)*4.2,(i&1?2:-2),1.6,'#7d7a5a','#55553c','#2e2e20')}}
+  else{g.fillStyle='rgba(0,0,0,.3)';for(const [a,b] of [[-8,-3],[-8,3],[-2,-3],[-2,3]]){g.beginPath();g.arc(a,b,1.6,0,7);g.fill()}g.rotate(u.ang-ha);g.fillStyle='#3a3d33';rr(g,2,-2.5,6,5,1);g.fill();barrel(g,6,7,1.2,u);g.rotate(ha-u.ang)}
+  g.fillStyle=pc;g.fillRect(-L/2+1,-W/2+2,2,W-4);
+}
+
+// ---------- Luftfahrzeuge ----------
+// shape(g,S,api,u) zeichnet die Maschine; S=true heißt Schattenpass (alles einfarbig dunkel)
+function flyer(g,u,api,shape,o){
+  const T=api.T,t=api.time;let x=u.x*T,y=u.y*T,a=u.ang;
+  const alt=(o.alt||26)+(o.hover?Math.sin(t*2.2+u.id)*1.6:0);
+  if(!u.moving&&!o.hover&&!(u.swing>0)){const ph=t*(o.circle||.8)+u.id*1.7,R=o.R||10;x+=Math.cos(ph)*R;y+=Math.sin(ph)*R*.55;a=Math.atan2(Math.cos(ph)*R*.55,-Math.sin(ph)*R)}
+  u.airX=x;u.airY=y-alt; // für Treffer und Auswahl
+  g.save();g.translate(x+alt*.42,y+alt*.12);g.rotate(a);g.globalAlpha=.3;shape(g,true,api,u);g.restore();
+  g.save();g.translate(x,y-alt);g.rotate(a);shape(g,false,api,u);g.restore();
+}
+const SH='rgba(4,8,4,1)';
+const F=(S,c)=>S?SH:c;
+function prop(g,S,x,r){if(S)return;g.fillStyle='rgba(40,40,40,.28)';g.beginPath();g.ellipse(x,0,1.3,r,0,0,7);g.fill();g.fillStyle='#222';g.beginPath();g.arc(x,0,1.1,0,7);g.fill()}
+function roundel(g,S,x,y,pc,r){if(S)return;g.fillStyle=pc;g.beginPath();g.arc(x,y,r,0,7);g.fill();g.fillStyle='#e9e4d6';g.beginPath();g.arc(x,y,r*.55,0,7);g.fill();g.fillStyle=pc;g.beginPath();g.arc(x,y,r*.25,0,7);g.fill()}
+function glass(g,S,x,y,rx,ry){if(S)return;const gr=g.createLinearGradient(x-rx,y-ry,x+rx,y+ry);gr.addColorStop(0,'#cfe3ea');gr.addColorStop(.5,'#5d7e8c');gr.addColorStop(1,'#1d2c33');g.fillStyle=gr;g.beginPath();g.ellipse(x,y,rx,ry,0,0,7);g.fill()}
+function flame(g,S,x,u,api){if(S||!u.moving)return;const f=.8+.2*Math.sin(api.time*40+u.id);const gr=g.createLinearGradient(x,0,x-9*f,0);gr.addColorStop(0,'rgba(255,240,200,.95)');gr.addColorStop(.4,'rgba(255,150,60,.75)');gr.addColorStop(1,'rgba(90,120,255,0)');g.fillStyle=gr;g.beginPath();g.ellipse(x-4*f,0,5*f,1.6,0,0,7);g.fill()}
+function fill(g,S,api,u,c,len){g.fillStyle=S?SH:lit(g,u.ang,len||12,c,api)}
+
+const PLANES={
+  biplane(g,S,api,u){const pc=api.PCOL[u.owner];
+    g.fillStyle=F(S,'#6d6446');g.fillRect(-1,-14,6,28); // unterer Flügel
+    fill(g,S,api,u,'#7d7352',10);rr(g,-11,-2.2,23,4.4,2);g.fill();
+    g.fillStyle=F(S,'#6d6446');g.fillRect(-12,-5.5,4,11);
+    fill(g,S,api,u,'#8d8360',14);g.fillRect(-2.5,-16,6.5,32);
+    if(!S){g.strokeStyle='rgba(0,0,0,.18)';g.lineWidth=.6;g.beginPath();for(let i=-14;i<=14;i+=4){g.moveTo(-2.5,i);g.lineTo(4,i)}g.stroke();g.fillStyle='#2a2620';g.beginPath();g.arc(-4,0,1.6,0,7);g.fill()}
+    roundel(g,S,.8,-12,pc,2.4);roundel(g,S,.8,12,pc,2.4);prop(g,S,12.5,6)},
+  propfighter(g,S,api,u){const pc=api.PCOL[u.owner];
+    fill(g,S,api,u,'#59613f',14);poly(g,[[5,-2],[3,-15],[-1,-16],[-3,-2],[-3,2],[-1,16],[3,15],[5,2]]);g.fill();
+    poly(g,[[-11,-1],[-13,-6],[-15,-6],[-15,6],[-13,6],[-11,1]]);g.fill();
+    fill(g,S,api,u,'#636b47',12);g.beginPath();g.ellipse(0,0,13,2.8,0,0,7);g.fill();
+    glass(g,S,0,0,3,1.6);if(!S){g.fillStyle=pc;g.fillRect(-8,-2.6,2,5.2);g.beginPath();g.arc(13,0,1.6,0,7);g.fill()}
+    roundel(g,S,1,-11,pc,1.8);roundel(g,S,1,11,pc,1.8);prop(g,S,14,7)},
+  sabre(g,S,api,u){const pc=api.PCOL[u.owner];
+    fill(g,S,api,u,'#a5abb0',14);poly(g,[[4,-2],[-6,-15],[-9,-15],[-5,-2],[-5,2],[-9,15],[-6,15],[4,2]]);g.fill();
+    poly(g,[[-10,-1],[-15,-6],[-17,-6],[-14,0],[-17,6],[-15,6],[-10,1]]);g.fill();
+    fill(g,S,api,u,'#b4babe',12);g.beginPath();g.ellipse(-1,0,14,2.6,0,0,7);g.fill();
+    if(!S){g.fillStyle='#1b1d1f';g.beginPath();g.arc(13,0,1.4,0,7);g.fill();g.fillStyle=pc;g.fillRect(-12,-2,3,4)}glass(g,S,5,0,2.6,1.4);
+    roundel(g,S,-4,-10,pc,1.6);roundel(g,S,-4,10,pc,1.6);flame(g,S,-15,u,api)},
+  jet(g,S,api,u){const pc=api.PCOL[u.owner];
+    fill(g,S,api,u,'#7e868c',14);poly(g,[[8,-2],[0,-5],[-6,-14],[-9,-14],[-8,-3],[-8,3],[-9,14],[-6,14],[0,5],[8,2]]);g.fill();
+    poly(g,[[-11,-1],[-15,-7],[-17,-7],[-16,0],[-17,7],[-15,7],[-11,1]]);g.fill();
+    fill(g,S,api,u,'#8a9298',12);poly(g,[[16,0],[10,-2.2],[-14,-2.4],[-16,0],[-14,2.4],[10,2.2]]);g.fill();
+    if(!S){g.strokeStyle='#e8e8e2';g.lineWidth=1;g.beginPath();g.moveTo(-4,-14.5);g.lineTo(-10,-14.5);g.moveTo(-4,14.5);g.lineTo(-10,14.5);g.stroke();g.fillStyle=pc;g.fillRect(-16,-1,2.5,2)}
+    glass(g,S,8,0,3.2,1.4);flame(g,S,-16,u,api)},
+  bomber(g,S,api,u){const pc=api.PCOL[u.owner];
+    fill(g,S,api,u,'#5f6644',20);poly(g,[[4,-3],[1,-24],[-3,-24],[-5,-3],[-5,3],[-3,24],[1,24],[4,3]]);g.fill();
+    poly(g,[[-15,-1],[-17,-8],[-20,-8],[-20,8],[-17,8],[-15,1]]);g.fill();
+    for(const s of [-1,1])for(const d of [7,14]){g.fillStyle=F(S,'#4d5236');rr(g,-1,s*d-1.6,8,3.2,1.4);g.fill();if(!S){g.save();g.translate(0,s*d);prop(g,S,8,5);g.restore()}}
+    fill(g,S,api,u,'#686f4b',16);g.beginPath();g.ellipse(-2,0,18,3.2,0,0,7);g.fill();
+    glass(g,S,15,0,2.6,2.4);if(!S){g.fillStyle=pc;g.fillRect(-12,-3,2.5,6)}roundel(g,S,0,-19,pc,2.2);roundel(g,S,0,19,pc,2.2)},
+  stealth(g,S,api,u){const pc=api.PCOL[u.owner];
+    fill(g,S,api,u,'#2f3438',22);poly(g,[[12,0],[-6,-27],[-10,-21],[-6,-14],[-12,-8],[-8,0],[-12,8],[-6,14],[-10,21],[-6,27]]);g.fill();
+    if(!S){g.fillStyle='rgba(255,255,255,.07)';poly(g,[[12,0],[-6,-27],[-4,-20],[4,-3],[4,3],[-4,20],[-6,27]]);g.fill();
+      g.fillStyle='#14181b';for(const s of [-1,1]){g.beginPath();g.ellipse(0,s*5,3.4,1.4,0,0,7);g.fill()}g.fillStyle='#4d5b62';g.fillRect(6,-1.6,2.4,3.2);g.fillStyle=pc;g.fillRect(-5,-24,1.6,3);g.fillRect(-5,21,1.6,3)}},
+  drone(g,S,api,u){const pc=api.PCOL[u.owner];
+    fill(g,S,api,u,'#9ca2a6',16);poly(g,[[2,-1],[1,-18],[-1,-18],[-1.5,-1],[-1.5,1],[-1,18],[1,18],[2,1]]);g.fill();
+    poly(g,[[-9,-1],[-13,-6],[-14,-6],[-12,0],[-14,6],[-13,6],[-9,1]]);g.fill();
+    fill(g,S,api,u,'#aeb3b6',10);g.beginPath();g.ellipse(0,0,10,1.9,0,0,7);g.fill();g.beginPath();g.arc(8,0,2.4,0,7);g.fill();
+    if(!S){g.fillStyle='#2a3034';g.beginPath();g.arc(9,0,1,0,7);g.fill();g.fillStyle=pc;g.fillRect(-3,-17,2,3);g.fillRect(-3,14,2,3)}prop(g,S,-12,4)},
+  heli(g,S,api,u){const pc=api.PCOL[u.owner];
+    fill(g,S,api,u,'#4c5340',12);rr(g,-19,-1,14,2,1);g.fill();g.fillRect(-20,-3.5,3,7);
+    poly(g,[[11,0],[8,-3],[-6,-3.5],[-8,0],[-6,3.5],[8,3]]);g.fill();
+    g.fillStyle=F(S,'#3c4233');g.fillRect(-1,-8,3,16);for(const s of [-1,1]){g.fillStyle=F(S,'#2c2f28');rr(g,-1.5,s*8-1.6,5,3.2,1);g.fill()}
+    glass(g,S,7,0,2.6,1.8);glass(g,S,2.5,0,2.4,1.8);if(!S){g.fillStyle=pc;g.fillRect(-13,-1,3,2)}
+    rotor(g,S,api,u,0,17,1)},
+  chinook(g,S,api,u){const pc=api.PCOL[u.owner];
+    fill(g,S,api,u,'#565c45',16);rr(g,-17,-4,34,8,3.5);g.fill();
+    if(!S){g.fillStyle='rgba(0,0,0,.25)';for(let i=-10;i<10;i+=4)g.fillRect(i,-4,1.6,1.2);g.fillStyle=pc;g.fillRect(-4,-4,6,1.6);g.fillRect(-4,2.4,6,1.6)}
+    glass(g,S,14,0,2.4,2.6);rotor(g,S,api,u,11,14,1);rotor(g,S,api,u,-12,14,-1)},
+};
+function rotor(g,S,api,u,cx,R,dir){if(S){g.globalAlpha*=.4;g.beginPath();g.arc(cx,0,R,0,7);g.fill();g.globalAlpha/=.4;return}
+  g.fillStyle='rgba(30,32,30,.16)';g.beginPath();g.arc(cx,0,R,0,7);g.fill();
+  const r0=api.time*28*dir+u.id;g.strokeStyle='rgba(25,27,25,.55)';g.lineWidth=1.4;g.beginPath();for(let i=0;i<4;i++){const a=r0+i*Math.PI/2;g.moveTo(cx,0);g.lineTo(cx+Math.cos(a)*R,Math.sin(a)*R)}g.stroke();
+  g.fillStyle='#1d1f1c';g.beginPath();g.arc(cx,0,1.6,0,7);g.fill()}
+
+const byEp=(u,api,list)=>{const ep=api.epochOf(u.owner);let k=list[0][1];for(const [e,v] of list)if(ep>=e)k=v;return k};
+const veh=(kinds)=>function(g,u,api){drawTank(g,u,api,byEp(u,api,kinds))};
+const air=(kinds,o)=>function(g,u,api){flyer(g,u,api,PLANES[byEp(u,api,kinds)],o||{})};
+
+// ---------- Gebäude ----------
+function drawFactory(g,b,a){
+  const {x,y,s,ep,pc,lift}=a,modern=ep>=8;if(!b.built)g.globalAlpha=.65;
+  g.fillStyle='#7c7a72';g.fillRect(x+1,y+1,s-2,s-2);g.fillStyle='rgba(0,0,0,.12)';for(let i=0;i<5;i++)g.fillRect(x+4+i*19,y+s-14,12,1);
+  const hx=x+5,hy=y+4,hw=s-10,hh=s*.62,wall=modern?'#8c8a82':'#7d4a38';
+  g.fillStyle='rgba(0,0,0,.3)';g.fillRect(hx+4,hy+4,hw,hh+lift);
+  g.fillStyle=a.shade(wall,-18);g.fillRect(hx,hy+hh,hw,lift);
+  if(!modern){g.strokeStyle='rgba(40,20,14,.35)';g.lineWidth=.6;g.beginPath();for(let r=hy+hh+2;r<hy+hh+lift;r+=2.5){g.moveTo(hx,r);g.lineTo(hx+hw,r)}g.stroke()}
+  // Sheddach: Glasbänder im Wechsel mit Dachflächen
+  const n=4,bw=hw/n;for(let i=0;i<n;i++){const bx=hx+i*bw;
+    const gr=g.createLinearGradient(bx,0,bx+bw,0);gr.addColorStop(0,modern?'#6f767b':'#5a4a40');gr.addColorStop(1,modern?'#9aa1a6':'#7b665a');g.fillStyle=gr;g.fillRect(bx,hy,bw*.68,hh);
+    const gl=g.createLinearGradient(bx+bw*.68,hy,bx+bw,hy+hh);gl.addColorStop(0,'#a9c3cc');gl.addColorStop(1,'#4d6670');g.fillStyle=gl;g.fillRect(bx+bw*.68,hy,bw*.32,hh);
+    g.strokeStyle='rgba(30,40,45,.6)';g.lineWidth=.6;g.beginPath();for(let r=hy+4;r<hy+hh;r+=5){g.moveTo(bx+bw*.68,r);g.lineTo(bx+bw,r)}g.stroke()}
+  // Rolltor und Schild
+  g.fillStyle='#4a4d4f';g.fillRect(hx+hw*.32,hy+hh+1,hw*.36,lift-1);g.strokeStyle='rgba(0,0,0,.35)';g.beginPath();for(let r=hy+hh+2;r<hy+hh+lift;r+=1.6){g.moveTo(hx+hw*.32,r);g.lineTo(hx+hw*.68,r)}g.stroke();
+  g.fillStyle=pc;g.fillRect(hx+hw*.4,hy+hh-5,hw*.2,4);
+  // Schornstein mit Rauch
+  const cx=x+s-14,cy=y+6;g.fillStyle='#5b3a2e';g.fillRect(cx-3,cy-18,6,20);g.fillStyle='#2a1d17';g.fillRect(cx-3,cy-19,6,2);
+  if(b.built)for(let i=0;i<4;i++){const f=((a.time*.35+i/4+b.id*.17)%1);g.fillStyle=`rgba(95,92,88,${(.4*(1-f)).toFixed(2)})`;g.beginPath();g.arc(cx+f*12,cy-20-f*22,3+f*7,0,7);g.fill()}
+}
+function drawAirfield(g,b,a){
+  const {x,y,s,ep,pc,lift}=a,paved=ep>=8,t=a.time;if(!b.built)g.globalAlpha=.65;
+  g.fillStyle=paved?'#6f7069':'#6f7a4a';g.fillRect(x+1,y+1,s-2,s-2);
+  // Startbahn
+  const ry=y+s*.62,rh=s*.24;g.fillStyle=paved?'#3b3d3c':'#8a8a5c';g.fillRect(x+2,ry,s-4,rh);
+  if(paved){g.fillStyle='#e9e7df';for(let i=x+14;i<x+s-14;i+=12)g.fillRect(i,ry+rh/2-.8,7,1.6);for(let k=0;k<4;k++){g.fillRect(x+5,ry+3+k*(rh-6)/4,6,2);g.fillRect(x+s-11,ry+3+k*(rh-6)/4,6,2)}}
+  else{g.fillStyle='rgba(255,255,255,.12)';g.fillRect(x+2,ry+rh*.35,s-4,rh*.3)}
+  // Hangar mit Tonnendach
+  const hx=x+6,hy=y+6,hw=s*.5,hh=s*.4;g.fillStyle='rgba(0,0,0,.3)';g.fillRect(hx+4,hy+4,hw,hh+lift);
+  const gr=g.createLinearGradient(hx,hy,hx,hy+hh);gr.addColorStop(0,paved?'#b5b9bb':'#8b7a5c');gr.addColorStop(.45,paved?'#8e9396':'#6e5f46');gr.addColorStop(1,paved?'#5d6265':'#4a3f2f');g.fillStyle=gr;g.fillRect(hx,hy,hw,hh);
+  g.strokeStyle='rgba(0,0,0,.25)';g.lineWidth=.6;g.beginPath();for(let i=hx+3;i<hx+hw;i+=4){g.moveTo(i,hy);g.lineTo(i,hy+hh)}g.stroke();
+  g.fillStyle='#1c1e1f';g.fillRect(hx+hw*.15,hy+hh,hw*.7,lift);g.fillStyle=pc;g.fillRect(hx+hw*.4,hy+hh-4,hw*.2,3);
+  // geparktes Flugzeug vor dem Hangar
+  if(b.built){g.save();g.translate(hx+hw/2,hy+hh+lift+9);g.rotate(Math.PI/2);g.scale(.7,.7);PLANES[ep>=9?'jet':ep>=8?'sabre':'propfighter'](g,false,a,{owner:b.owner,ang:Math.PI/2,moving:false,id:b.id});g.restore()}
+  // Tower mit Glaskanzel, Windsack in Spielerfarbe
+  const tx=x+s-26,ty=y+10;g.fillStyle='rgba(0,0,0,.3)';g.fillRect(tx+3,ty+3,14,14+lift);g.fillStyle=a.shade('#b9b4a6',-20);g.fillRect(tx,ty+14,14,lift);g.fillStyle='#b9b4a6';g.fillRect(tx,ty,14,14);
+  const gc=g.createLinearGradient(tx,ty-8,tx+14,ty);gc.addColorStop(0,'#cfe6ea');gc.addColorStop(1,'#3f6672');g.fillStyle=gc;g.fillRect(tx-1,ty-8,16,8);g.fillStyle='#2c2f30';g.fillRect(tx-2,ty-10,18,2);
+  g.strokeStyle='#888';g.lineWidth=1;g.beginPath();g.moveTo(tx+12,ty-10);g.lineTo(tx+12,ty-18);g.stroke();
+  const wx=x+s-8,wy=y+s*.5;g.strokeStyle='#ccc';g.beginPath();g.moveTo(wx,wy+8);g.lineTo(wx,wy-6);g.stroke();g.fillStyle=pc;g.beginPath();g.moveTo(wx,wy-6);g.lineTo(wx-9,wy-4+Math.sin(t*3)*1.2);g.lineTo(wx-9,wy-1+Math.sin(t*3)*1.2);g.lineTo(wx,wy-2);g.closePath();g.fill();
+}
+
+const NOSH={noShadow:true,scale:1};
+EmpireXY.register({
+  id:'kern-fahrzeuge',name:'Kern: Fahrzeuge und Luftwaffe',version:'1.0.0',core:true,order:5,
+  description:'Panzerfabrik und Flughafen: Panzer vom Dampfpanzer bis zum Zukunftspanzer, Truppentransporter, Doppeldecker, Jäger, Bomber, Drohnen und Hubschrauber.',
+  buildings:{
+    factory:{name:'Panzerfabrik',size:3,hp:1400,cost:{wood:250,stone:150,gold:100},time:45,minEpoch:6,sight:6,cat:2,ai:{minWorkers:20,prio:true},techTitle:'Militärtechnik',
+      desc:'Baut Panzer und Truppentransporter. Forschung: Militärtechnik.',draw:drawFactory},
+    airfield:{name:'Flughafen',names:['','','','','','','','Flugfeld','Flughafen','Luftwaffenbasis'],size:4,hp:1600,cost:{wood:300,stone:200,gold:200},time:55,minEpoch:7,sight:7,cat:2,ai:{minWorkers:22,prio:true},techTitle:'Luftfahrt',
+      desc:'Startet Flugzeuge und Hubschrauber. Forschung: Luftfahrt.',draw:drawAirfield},
+  },
+  units:{
+    tank:{label:'Panzer',cls:'vehicle',from:'factory',minEpoch:6,names:['','','','','','','Dampfpanzer','Leichter Panzer','Mittlerer Panzer','Kampfpanzer','Zukunftspanzer'],
+      hp:230,atk:15,range:4.2,rate:2.2,speed:1.8,sight:8,cost:{wood:110,gold:90},time:26,r:.5,pop:3,proj:2,vsUnit:1,vsBld:1.8,bonus:{infantry:1.6,ranged:1.6,cavalry:1.5},...NOSH,
+      desc:'Gepanzert, stark gegen Infanterie und Kavallerie. Schwach gegen Artillerie und Luftwaffe, kann nicht auf Flugzeuge schießen.',
+      draw:veh([[0,'steam'],[7,'light'],[8,'medium'],[9,'mbt'],[10,'future']])},
+    heavytank:{label:'Schwerer Panzer',cls:'vehicle',from:'factory',minEpoch:8,names:['','','','','','','','','Schwerer Panzer','Zukunftspanzer','Kolosspanzer'],
+      hp:360,atk:24,range:4.6,rate:2.9,speed:1.3,sight:8,cost:{wood:140,gold:150,stone:40},time:34,r:.56,pop:4,proj:2,vsBld:2.2,bonus:{infantry:1.5,ranged:1.5,cavalry:1.5,vehicle:1.3},...NOSH,
+      desc:'Langsamer Koloss mit dicker Panzerung. Knackt auch andere Panzer.',
+      draw:veh([[0,'heavy'],[9,'future']])},
+    apc:{label:'Truppentransporter',cls:'vehicle',from:'factory',minEpoch:8,ai:false,seats:6,names:['','','','','','','','','Schützenpanzerwagen','Radpanzer','Schwebetransporter'],
+      hp:200,atk:5,range:4,rate:1,speed:2.8,sight:8,cost:{wood:90,gold:60},time:20,r:.48,pop:2,proj:1,bonus:{infantry:1.3},...NOSH,
+      desc:'Fährt bis zu 6 Fußsoldaten geschützt an die Front. Rechtsklick mit Infanterie auf den Transporter zum Aufsitzen.',draw:drawApc},
+    fighter:{label:'Jagdflugzeug',cls:'aircraft',air:true,from:'airfield',minEpoch:7,names:['','','','','','','','Doppeldecker','Propellerjäger','Düsenjäger','Abfangjäger'],
+      hp:120,atk:9,range:3.5,rate:1.1,speed:4.4,sight:10,cost:{wood:100,gold:100},time:24,r:.5,pop:2,proj:1,vsBld:.3,bonus:{aircraft:1.8,vehicle:1.2},...NOSH,
+      desc:'Schnell und wendig, holt feindliche Flugzeuge vom Himmel. Fliegt über Wasser, Wald und Mauern.',
+      draw:air([[0,'biplane'],[8,'propfighter'],[9,'sabre']])},
+    jet:{label:'Mehrzweckjet',cls:'aircraft',air:true,from:'airfield',minEpoch:9,names:['','','','','','','','','','Mehrzweckjet','Hyperschalljet'],
+      hp:180,atk:15,range:4.5,rate:1.3,speed:5.6,sight:11,cost:{wood:80,gold:170,stone:30},time:30,r:.5,pop:3,proj:1,vsBld:.8,bonus:{aircraft:2,vehicle:1.5},...NOSH,
+      desc:'Der schnellste Jäger mit Raketen gegen Flugzeuge und Panzer.',draw:air([[0,'jet']],{R:12,circle:1})},
+    bomber:{label:'Bomber',cls:'aircraft',air:true,from:'airfield',minEpoch:8,names:['','','','','','','','','Propellerbomber','Tarnkappenbomber','Orbitalbomber'],
+      hp:260,atk:36,range:1.2,rate:4,speed:3,sight:9,cost:{wood:140,gold:170},time:36,r:.6,pop:4,proj:2,vsUnit:.7,vsBld:3.6,...NOSH,
+      desc:'Wirft Bomben auf Gebäude und Truppen darunter. Braucht Jägerschutz.',draw:air([[0,'bomber'],[9,'stealth']],{alt:32,R:14,circle:.5})},
+    drone:{label:'Kampfdrohne',cls:'aircraft',air:true,from:'airfield',minEpoch:9,names:['','','','','','','','','','Kampfdrohne','Drohnenschwarm'],
+      hp:80,atk:11,range:5,rate:1.6,speed:3.6,sight:13,cost:{wood:40,gold:90},time:16,r:.42,pop:1,proj:1,bonus:{vehicle:1.8},...NOSH,
+      desc:'Billig, sieht sehr weit und jagt Panzer mit Lenkraketen.',draw:air([[0,'drone']],{alt:30,R:8,circle:.6})},
+    heli:{label:'Kampfhubschrauber',cls:'aircraft',air:true,from:'airfield',minEpoch:9,names:['','','','','','','','','','Kampfhubschrauber','Tarnhubschrauber'],
+      hp:220,atk:13,range:5,rate:1.4,speed:3.2,sight:10,cost:{wood:90,gold:140},time:28,r:.55,pop:3,proj:1,bonus:{vehicle:2,infantry:1.3},...NOSH,
+      desc:'Schwebt über dem Schlachtfeld und zerstört Panzer.',draw:air([[0,'heli']],{alt:18,hover:true})},
+    transheli:{label:'Transporthubschrauber',cls:'aircraft',air:true,from:'airfield',minEpoch:9,ai:false,seats:8,names:['','','','','','','','','','Transporthubschrauber','Schwerlast-Rotor'],
+      hp:240,atk:2,range:3,rate:2,speed:3.4,sight:9,cost:{wood:110,gold:80},time:26,r:.6,pop:2,proj:1,...NOSH,
+      desc:'Fliegt bis zu 8 Fußsoldaten über Wasser und Mauern. Absitzen nur über Land.',draw:air([[0,'chinook']],{alt:20,hover:true})},
+  },
+  techs:(()=>{const out={};
+    const LINES=[
+      ['panzerung','factory',{6:'Genietete Platten',7:'Walzstahl',8:'Schräge Panzerung',9:'Verbundpanzerung'},{hp:{vehicle:.15}},{wood:120,gold:110},'Fahrzeuge: Leben +15 %.'],
+      ['motoren','factory',{6:'Hochdruckdampf',7:'Benzinmotor',8:'Dieselmotor',9:'Gasturbine'},{speed:{vehicle:.08},atk:{vehicle:.1}},{wood:110,gold:120},'Fahrzeuge: Tempo +8 %, Angriff +10 %.'],
+      ['triebwerke','airfield',{7:'Sternmotor',8:'Strahltriebwerk',9:'Nachbrenner'},{speed:{aircraft:.08},atk:{aircraft:.12}},{wood:120,gold:140},'Luftwaffe: Tempo +8 %, Angriff +12 %.'],
+      ['avionik','airfield',{7:'Funkgerät',8:'Radar',9:'Avionik'},{hp:{aircraft:.12},range:{aircraft:.3}},{wood:100,gold:150},'Luftwaffe: Leben +12 %, Reichweite +0,3.'],
+    ];
+    for(const [line,at,names,effect,cost,desc] of LINES){let prev=null;
+      for(const ep of Object.keys(names).map(Number).sort((a,b)=>a-b)){const id=line+'_'+ep,m=1+ep*.6,c={};for(const k in cost)c[k]=Math.round(cost[k]*m/5)*5;
+        out[id]={name:names[ep],at,epoch:ep,requires:prev?[prev]:[],cost:c,time:24+ep*5,effect,desc,line};prev=id}}
+    return out})(),
+  // Konter: Artillerie und Panzerjäger gegen Fahrzeuge, Flak gegen Flugzeuge
+  patch(xy){
+    const U=xy.units,add=(k,o)=>{if(U[k])U[k].bonus=Object.assign(U[k].bonus||{},o)};
+    add('siege',{vehicle:2.2});add('spear',{vehicle:1.5});add('ranged',{aircraft:1.3});add('warship',{aircraft:1.4});
+    if(U.bolt){U.bolt.aa=true;add('bolt',{aircraft:2.6,vehicle:1.2})}
+    // Pferde bleiben Pferde: die Panzernamen wandern in die Fahrzeug-Kategorie
+    const ren={cavalry:{8:'Kosakenreiter',9:'Gebirgsreiter'},knight:{8:'Garde-Kavallerie',9:'Ehrengarde'},harcher:{8:'Karabinerreiter',9:'Berittene Schützen'},scout:{8:'Meldereiter',9:'Grenzreiter'},siege:{9:'Raketenartillerie'},ram:{8:'Sprengtrupp',9:'Pioniertrupp'}};
+    for(const k in ren)if(U[k]&&U[k].names)for(const i in ren[k])U[k].names[i]=ren[k][i];
   },
 });
 })();
@@ -2482,7 +2752,7 @@ function costOf(type){return UNITS[type]?UNITS[type].cost:BLD[type].cost}
 function recalcPop(){
   for(const pl of players){pl.pop=0;pl.cap=0}
   for(const e of ents){if(e.dead)continue;
-    if(e.kind==='unit')players[e.owner].pop+=UNITS[e.type].pop;
+    if(e.kind==='unit'){players[e.owner].pop+=UNITS[e.type].pop;if(e.cargo)for(const c of e.cargo)players[e.owner].pop+=(UNITS[c.type]||{pop:1}).pop}
     else if(e.kind==='bld'&&e.built&&BLD[e.type].pop)players[e.owner].cap+=BLD[e.type].pop;
     if(e.kind==='bld')for(const q of e.queue)if(q.started&&q.u)players[e.owner].pop+=UNITS[q.u].pop;
   }
@@ -2504,8 +2774,8 @@ function hpush(i,f){hp_i.push(i);hp_f.push(f);let c=hp_i.length-1;while(c>0){con
 function hpop(){const top=hp_i[0],li=hp_i.pop(),lf=hp_f.pop();if(hp_i.length){hp_i[0]=li;hp_f[0]=lf;let c=0;for(;;){const l=c*2+1,r=l+1;let m=c;if(l<hp_i.length&&hp_f[l]<hp_f[m])m=l;if(r<hp_i.length&&hp_f[r]<hp_f[m])m=r;if(m===c)break;[hp_i[m],hp_i[c]]=[hp_i[c],hp_i[m]];[hp_f[m],hp_f[c]]=[hp_f[c],hp_f[m]];c=m}}return top}
 const DIRS=[[1,0,1],[-1,0,1],[0,1,1],[0,-1,1],[1,1,1.414],[1,-1,1.414],[-1,1,1.414],[-1,-1,1.414]];
 // Tore: für den Besitzer begehbar, für alle anderen Mauer. passOwner = wer gerade läuft
-let passOwner=-1,passNaval=false;
-const pass=(x,y)=>{if(!inb(x,y))return false;const i=idx(x,y),b=block[i];if(passNaval)return terr[i]===1;return b===0||(b>0&&gate[i]===passOwner+1&&passOwner>=0)};
+let passOwner=-1,passNaval=false,passAir=false;
+const pass=(x,y)=>{if(!inb(x,y))return false;if(passAir)return true;const i=idx(x,y),b=block[i];if(passNaval)return terr[i]===1;return b===0||(b>0&&gate[i]===passOwner+1&&passOwner>=0)};
 function findPath(sx,sy,goal,hx,hy,maxN){
   gen++;hp_i.length=0;hp_f.length=0;
   const s=idx(sx,sy);gS[s]=0;stamp[s]=gen;from[s]=-1;
@@ -2548,13 +2818,13 @@ function smoothPath(u,path){
   return out;
 }
 function pathToPoint(u,tx,ty){
-  passOwner=u.owner;passNaval=!!UNITS[u.type].naval;
+  passOwner=u.owner;passNaval=!!UNITS[u.type].naval;passAir=!!UNITS[u.type].air;
   const gx=Math.floor(tx),gy=Math.floor(ty);const ok=pass(gx,gy);
   u.path=smoothPath(u,findPath(Math.floor(u.x),Math.floor(u.y),(x,y)=>ok?(x===gx&&y===gy):Math.abs(x-gx)<=1&&Math.abs(y-gy)<=1,gx,gy));
   u.goal=ok?{x:tx,y:ty}:null;
 }
 function pathToEnt(u,t){
-  passOwner=u.owner;passNaval=!!UNITS[u.type].naval;
+  passOwner=u.owner;passNaval=!!UNITS[u.type].naval;passAir=!!UNITS[u.type].air;
   const c=center(t);
   let goal;
   if(t.kind==='unit'){const gx=Math.floor(t.x),gy=Math.floor(t.y);goal=(x,y)=>Math.abs(x-gx)<=1&&Math.abs(y-gy)<=1}
@@ -2611,7 +2881,7 @@ function cmdMove(units,wx,wy,amove){
   const sorted=[...units].sort((a,b)=>Math.hypot(a.x-wx,a.y-wy)-Math.hypot(b.x-wx,b.y-wy));
   for(const u of sorted){
     let tx=wx,ty=wy;
-    if(n>1){const cx=k%cols-(cols-1)/2,cy=Math.floor(k/cols)-(Math.ceil(n/cols)-1)/2;tx=wx+cx*.8;ty=wy+cy*.8;passNaval=!!UNITS[u.type].naval;if(!pass(Math.floor(tx),Math.floor(ty))){tx=wx;ty=wy}}
+    if(n>1){const cx=k%cols-(cols-1)/2,cy=Math.floor(k/cols)-(Math.ceil(n/cols)-1)/2;tx=wx+cx*.8;ty=wy+cy*.8;passNaval=!!UNITS[u.type].naval;passAir=!!UNITS[u.type].air;if(!pass(Math.floor(tx),Math.floor(ty))){tx=wx;ty=wy}}
     k++;
     order(u,{t:amove?'amove':'move',x:tx,y:ty});pathToPoint(u,tx,ty);
   }
@@ -2651,12 +2921,16 @@ function nearestDrop(p,x,y){
   for(const e of ents)if(e.kind==='bld'&&e.owner===p&&e.built&&!e.dead&&BLD[e.type].drop){const c=center(e),d=Math.hypot(c.x-x,c.y-y);if(d<bd){bd=d;best=e}}
   return best;
 }
+// Flugzeuge treffen nur Fernkämpfer, Flak, Schiffe, Türme und andere Flugzeuge, keine Granaten und keine Nahkämpfer
+const isAir=e=>!!(e&&e.kind==='unit'&&UNITS[e.type]&&UNITS[e.type].air);
+function canHit(u,t){if(!isAir(t))return true;if(u.kind!=='unit')return true;const D=UNITS[u.type];if(!D)return false;if(D.air||D.aa)return true;return D.proj===1&&D.range>=2}
 function enemyNear(u,radius,wantBld){
   let best=null,bd=radius;
   for(const e of ents){
     if(e.dead||e.owner<0||e.owner===u.owner||aiS&&aiS.allied||e.kind==='unit'&&hidden(e)&&Math.hypot(e.x-u.x,e.y-u.y)>2.5)continue;
     if(e.kind==='res')continue;
     if(e.kind==='bld'&&!wantBld)continue;
+    if(!canHit(u,e))continue;
     if(u.owner===0&&e.kind==='unit'&&!vis[idx(e.x|0,e.y|0)])continue;
     let d=distEnt(u,e);if(e.kind==='bld')d+=2;else if(e.type==='worker')d+=1;
     if(d<bd){bd=d;best=e}
@@ -2674,7 +2948,7 @@ function damage(t,dmg,src){if(src&&src.kind==='unit'&&WX.night>.5)dmg*=.8;if(src
   fx.push({x:center(t).x+(rng()-.5)*.4,y:center(t).y+(rng()-.5)*.4,t:0,k:'hit'});
   if(t.owner===0&&gameT-lastAlarm>20&&src){lastAlarm=gameT;toast('Wir werden angegriffen!','warn');ping=center(t);pingT=3}
   if(t.kind==='unit'&&src&&!src.dead&&src.owner!==t.owner){
-    if(isMil(t)&&!UNITS[t.type].stealth&&(t.order.t==='idle'||(t.order.t==='amove')))order(t,{t:'attack',target:src.id,resume:t.order.t==='amove'?t.order:null});
+    if(isMil(t)&&!UNITS[t.type].stealth&&canHit(t,src)&&(t.order.t==='idle'||(t.order.t==='amove')))order(t,{t:'attack',target:src.id,resume:t.order.t==='amove'?t.order:null});
     else if(t.type==='worker'&&t.owner===1)aiS.alarm={x:t.x,y:t.y,time:gameT};
   }
   if(t.kind==='bld'&&t.owner===1&&src)aiS.alarm={x:src.x,y:src.y,time:gameT};
@@ -2684,7 +2958,9 @@ let lastAlarm=-99,ping=null,pingT=0;
 let corpses=[];
 function kill(e,src){
   e.dead=true;
-  if(e.kind==='unit'&&!(UNITS[e.type]&&UNITS[e.type].naval)&&visibleEnt(e)){corpses.push(Object.assign({},e,{moving:false,swing:0,working:false,carry:0,dt0:gameT,fall:Math.random()<.5?1:-1}));if(corpses.length>60)corpses.shift()}
+  const mech=e.kind==='unit'&&UNITS[e.type]&&(UNITS[e.type].air||CLS(e.type)==='vehicle');
+  if(mech){for(let k=0;k<5;k++)fx.push({x:e.x+(rng()-.5)*.6,y:e.y+(rng()-.5)*.6,t:-k*.12,k:k?'smoke':'boom'});if(e.cargo&&e.cargo.length)players[e.owner].st.lost+=e.cargo.length}
+  if(e.kind==='unit'&&!mech&&!(UNITS[e.type]&&UNITS[e.type].naval)&&visibleEnt(e)){corpses.push(Object.assign({},e,{moving:false,swing:0,working:false,carry:0,dt0:gameT,fall:Math.random()<.5?1:-1}));if(corpses.length>60)corpses.shift()}
   if(e.kind==='bld'){
     if(BLD[e.type].water)block[idx(e.x,e.y)]=-1;
     if(!BLD[e.type].walk)for(let y=e.y;y<e.y+e.size;y++)for(let x=e.x;x<e.x+e.size;x++)if(block[idx(x,y)]===e.id){block[idx(x,y)]=0;gate[idx(x,y)]=0}
@@ -2728,7 +3004,7 @@ function attackTick(u,t,dt,st){
 // Produktionskette: Mühlen in der Nähe machen Felder ergiebiger (Wert farmBoost am Gebäude)
 function farmBoost(f){if(f.boostT>gameT)return f.boostV;let v=1;for(const e of ents)if(e.kind==='bld'&&e.built&&!e.dead&&e.owner===f.owner&&BLD[e.type].farmBoost&&Math.hypot(e.x-f.x,e.y-f.y)<8)v=Math.max(v,BLD[e.type].farmBoost);f.boostT=gameT+3;f.boostV=v;return v}
 function updUnit(u,dt){
-  passOwner=u.owner;passNaval=!!UNITS[u.type].naval;
+  passOwner=u.owner;passNaval=!!UNITS[u.type].naval;passAir=!!UNITS[u.type].air;
   const st=uStat(u);u.cd-=dt;u.swing=Math.max(0,(u.swing||0)-dt);if(!u.moving)u.v=Math.max(.3,(u.v||.3)-dt*3);u.moving=false;u.scan-=dt;
   const o=u.order;
   switch(o.t){
@@ -2752,7 +3028,7 @@ function updUnit(u,dt){
       break;}
     case 'attack':{
       const t=byId.get(o.target);
-      if(!alive(t)||(u.owner===0&&t.kind==='unit'&&!vis[idx(t.x|0,t.y|0)])){
+      if(!alive(t)||!canHit(u,t)||(u.owner===0&&t.kind==='unit'&&!vis[idx(t.x|0,t.y|0)])){
         if(o.resume){const r=o.resume;order(u,r)}else{order(u,{t:'idle'});u.scan=0}break}
       // chasing too far without a forced order: give up
       if(!o.forced&&o.resume&&o.resume.x!==undefined&&Math.hypot(u.x-o.resume.x,u.y-o.resume.y)>14){order(u,o.resume);break}
@@ -2785,6 +3061,11 @@ function updUnit(u,dt){
         if(o.resume){const r=o.resume;order(u,r)}else order(u,{t:'idle'});
       }else approach(u,d,dt);
       break;}
+    case 'board':{ // in einen Transporter einsteigen
+      const c=byId.get(o.target);
+      if(!alive(c)||c.owner!==u.owner||(c.cargo||[]).length>=(UNITS[c.type].seats||0)){order(u,{t:'idle'});break}
+      if(distEnt(u,c)<=.7){(c.cargo=c.cargo||[]).push({type:u.type,hp:u.hp,kills:u.kills||0,rank:u.rank||0});u.dead=true;u.boarded=true;if(c.owner===0)uiDirty=true;recalcPop();break}
+      approach(u,c,dt);break}
     case 'build':{
       const b=byId.get(o.target);
       if(!alive(b)){order(u,{t:'idle'});findMoreWork(u);break}
@@ -2808,6 +3089,15 @@ function updUnit(u,dt){
   u.chk=(u.chk||0)-dt;u.ghost=Math.max(0,(u.ghost||0)-dt);
   if(u.chk<=0){u.chk=.8;if(u.moving&&u.lx!==undefined&&Math.hypot(u.x-u.lx,u.y-u.ly)<.25)u.ghost=1.2;u.lx=u.x;u.ly=u.y}
 }
+// Truppentransport: Fußtruppen steigen in Fahrzeuge oder Hubschrauber mit "seats" ein
+const canBoard=t=>{const D=UNITS[t];return !!D&&!D.naval&&!D.air&&!D.seats&&(D.pop||1)<=1&&!['vehicle','cavalry','siege','ship'].includes(CLS(t))};
+function unload(c){
+  if(!c.cargo||!c.cargo.length)return 0;const D=UNITS[c.type],i0=idx(c.x|0,c.y|0);
+  if(D.air&&(terr[i0]===1||block[i0]!==0)){if(c.owner===0)toast('Absitzen nur über freiem Land.','warn');return 0}
+  const n=c.cargo.length;passOwner=c.owner;passNaval=false;passAir=false;
+  c.cargo.forEach((p,i)=>{let x=c.x+Math.cos(i/n*6.28)*.8,y=c.y+Math.sin(i/n*6.28)*.8;if(!pass(x|0,y|0)){x=c.x;y=c.y}
+    const u=spawnUnit(c.owner,p.type,x,y);u.hp=Math.min(u.maxhp,p.hp);u.kills=p.kills;u.rank=p.rank});
+  c.cargo=[];recalcPop();return n}
 function findMoreWork(u){
   // help on nearby unfinished buildings, otherwise resume gathering near
   let best=null,bd=10;
@@ -2920,7 +3210,7 @@ function updProj(dt){
       if(d>s){p.x+=dx/d*s;p.y+=dy/d*s;continue}
       p.done=true;fx.push({x:p.tx,y:p.ty,t:0,k:'boom'});const src=byId.get(p.src)||null;
       for(const e of ents){ // splash damage, falls off toward the edge
-        if(e.dead||e.owner<0||e.owner===p.owner||e.kind==='res')continue;
+        if(e.dead||e.owner<0||e.owner===p.owner||e.kind==='res'||isAir(e))continue;
         let dd;if(e.kind==='unit')dd=Math.hypot(e.x-p.tx,e.y-p.ty)-e.r;else{const cx=Math.max(e.x,Math.min(p.tx,e.x+e.size)),cy=Math.max(e.y,Math.min(p.ty,e.y+e.size));dd=Math.hypot(cx-p.tx,cy-p.ty)}
         if(dd<.9)damage(e,hitDmg(p.ut,p.atk,e)*(1-.5*Math.max(0,dd)/.9),src);
         else if(dd<3&&players[p.owner]&&players[p.owner].techs.siege_2&&p.ut==='siege')damage(e,hitDmg(p.ut,p.atk,e)*.5,src);
@@ -2947,7 +3237,7 @@ function separate(){
   for(const u of ents){if(u.kind!=='unit'||u.dead)continue;
     const gx=u.x|0,gy=u.y|0;
     for(let oy=-1;oy<=1;oy++)for(let ox=-1;ox<=1;ox++){const a=grid.get(gx+ox+(gy+oy)*W);if(!a)continue;
-      for(const v of a){if(v===u||v.id<u.id||!!UNITS[u.type].naval!==!!UNITS[v.type].naval)continue;
+      for(const v of a){if(v===u||v.id<u.id||!!UNITS[u.type].naval!==!!UNITS[v.type].naval||!!UNITS[u.type].air!==!!UNITS[v.type].air)continue;
         const dx=v.x-u.x,dy=v.y-u.y,d=Math.hypot(dx,dy)||.01,m=u.r+v.r-.04;
         if(d<m){const push=(m-d)*.5,nx=dx/d,ny=dy/d;
           if(u.ghost||v.ghost)continue;
@@ -2955,7 +3245,7 @@ function separate(){
           tryNudge(u,-nx*push*wu,-ny*push*wu);tryNudge(v,nx*push*wv,ny*push*wv)}}}
   }
 }
-function tryNudge(u,dx,dy){const nx=u.x+dx,ny=u.y+dy;passOwner=u.owner;passNaval=!!UNITS[u.type].naval;if(pass(nx|0,ny|0)){u.x=nx;u.y=ny}}
+function tryNudge(u,dx,dy){const nx=u.x+dx,ny=u.y+dy;passOwner=u.owner;passNaval=!!UNITS[u.type].naval;passAir=!!UNITS[u.type].air;if(pass(nx|0,ny|0)){u.x=nx;u.y=ny}}
 
 // ================= visibility =================
 let visT=0;
@@ -3009,7 +3299,7 @@ function aiThink(){
   const prodWant=[['barracks',5],['range',8],['camp',7],['stable',12,1],['workshop',16,2],['barracks',18],['range',20],['stable',22,1],['tower',14,1],['tower',20,2]];
   if(!unfinished.some(b=>b.type!=='house'&&b.type!=='farm')){
     const have={};
-    for(const t in BLD)if(BLD[t].ai&&!prodWant.some(w=>w[0]===t))prodWant.push([t,BLD[t].ai.minWorkers||15,BLD[t].minEpoch||0]);
+    for(const t in BLD)if(BLD[t].ai&&!prodWant.some(w=>w[0]===t)){const w=[t,BLD[t].ai.minWorkers||15,BLD[t].minEpoch||0];if(BLD[t].ai.prio)prodWant.splice(2,0,w);else prodWant.push(w)}
     for(const [t,minW,minE] of prodWant){
       have[t]=(have[t]||0)+1;
       if((minE||0)>ep||workers.length<minW)continue;
@@ -3165,7 +3455,7 @@ let aiTimer=0,popT=0;
 let pathT=0;
 function wearPaths(){// Trampelpfade: wo oft gelaufen wird, wird das Gras zu Erde
   const g=terrC.getContext('2d');g.save();
-  for(const u of ents){if(u.dead||u.kind!=='unit'||!u.moving||UNITS[u.type].naval)continue;const i=idx(u.x|0,u.y|0);if(terr[i]===1)continue;
+  for(const u of ents){if(u.dead||u.kind!=='unit'||!u.moving||UNITS[u.type].naval||UNITS[u.type].air)continue;const i=idx(u.x|0,u.y|0);if(terr[i]===1)continue;
     g.fillStyle='rgba(112,92,62,.045)';g.beginPath();g.ellipse(u.x*T,u.y*T+4,5,3,0,0,7);g.fill()}
   // Pflaster um das Stadtzentrum ab Epoche 3: unregelmäßige Steinplatten mit Fugen
   for(const b of ents){if(b.dead||b.type!=='tc'||!b.built||b.paved||!players[b.owner]||players[b.owner].epoch<3)continue;b.paved=1;
@@ -3699,8 +3989,8 @@ function epochDress(g,re,x,by,hx,hy,pc){
 // Einheiten größer zeichnen (AoE-artige Figuren), schwere Typen etwas wuchtiger
 function drawUnit(g,u){
   const UD=UNITS[u.type],k=(UD.scale||1.18)*Math.sqrt((UD.r||.3)/.3),x=u.x*T,y=u.y*T;
-  if(!UD.naval){const rr=(UD.r||.3)*T*k;g.strokeStyle=PCOL[u.owner];g.globalAlpha=.55;g.lineWidth=1.6;g.beginPath();g.ellipse(x,y+rr*.75,rr*1.05,rr*.48,0,0,7);g.stroke();g.globalAlpha=1;
-    if(u.moving&&SEASON!==3){const ca=Math.cos(u.ang||0),sa=Math.sin(u.ang||0);for(let i=0;i<3;i++){const f=((gameT*2.2+i/3+(u.id%7)/7)%1),d=6+f*14;g.fillStyle=`rgba(150,125,90,${(.32*(1-f)).toFixed(2)})`;g.beginPath();g.arc(x-ca*d+(i-1)*2,y+rr*.7-sa*d*.5,2+f*4,0,7);g.fill()}}}
+  if(!UD.naval){const rr=(UD.r||.3)*T*k;g.strokeStyle=PCOL[u.owner];if(UD.air)g.setLineDash([3,3]);g.globalAlpha=.55;g.lineWidth=1.6;g.beginPath();g.ellipse(x,y+rr*.75,rr*1.05,rr*.48,0,0,7);g.stroke();g.globalAlpha=1;g.setLineDash([]);
+    if(u.moving&&SEASON!==3&&!UD.air){const ca=Math.cos(u.ang||0),sa=Math.sin(u.ang||0);for(let i=0;i<3;i++){const f=((gameT*2.2+i/3+(u.id%7)/7)%1),d=6+f*14;g.fillStyle=`rgba(150,125,90,${(.32*(1-f)).toFixed(2)})`;g.beginPath();g.arc(x-ca*d+(i-1)*2,y+rr*.7-sa*d*.5,2+f*4,0,7);g.fill()}}}
   g.save();g.translate(x,y);g.scale(k,k);g.translate(-x,-y);drawUnitRaw(g,u);g.restore();
   if(u.rank&&u.type!=='hero'){const xx=u.x*T+u.r*T*1.2,yy=u.y*T-u.r*T*2.6;g.fillStyle=u.rank===2?'#f2cf4f':'#c9ccd0';for(let i=0;i<u.rank;i++){g.beginPath();g.moveTo(xx-4,yy+i*3.5);g.lineTo(xx,yy+2.5+i*3.5);g.lineTo(xx+4,yy+i*3.5);g.lineTo(xx+4,yy+1.5+i*3.5);g.lineTo(xx,yy+4+i*3.5);g.lineTo(xx-4,yy+1.5+i*3.5);g.closePath();g.fill()}}
   if(u.form){const yy=u.y*T+u.r*T*1.6,xx=u.x*T;g.fillStyle=['','#6fa0d8','#e07a4a','#8fd06a'][u.form];if(u.form===1)g.fillRect(xx-5,yy,10,3);else if(u.form===2){g.beginPath();g.moveTo(xx-5,yy+3);g.lineTo(xx,yy-2);g.lineTo(xx+5,yy+3);g.closePath();g.fill()}else{for(let i=-1;i<=1;i++)g.fillRect(xx+i*4-1,yy,2,3)}}
@@ -3708,7 +3998,7 @@ function drawUnit(g,u){
 function drawUnitRaw(g,u){
   const UD=UNITS[u.type];
   const x=u.x*T,y=u.y*T,pc=PCOL[u.owner],dk=PCOL_DK[u.owner],ep=VIS(players[u.owner].epoch),a=u.ang;
-  g.fillStyle='rgba(8,14,6,.32)';g.beginPath();g.ellipse(x+3,y+u.r*T*.7,u.r*T*1.1,u.r*T*.5,0,0,7);g.fill();
+  if(!UD.noShadow){g.fillStyle='rgba(8,14,6,.32)';g.beginPath();g.ellipse(x+3,y+u.r*T*.7,u.r*T*1.1,u.r*T*.5,0,0,7);g.fill()}
   if(UD.draw){g.save();try{UD.draw(g,u,DRAW_API)}catch(e){}g.restore();return}
   if(LOOK(u.type)==='cavalry'){
     const ph=u.moving?Math.sin(gameT*16+u.anim):0;
@@ -3823,7 +4113,7 @@ function render(){
     if(e.kind==='bld'&&e.type==='farm'){drawBld(ctx,e);continue}
     list.push(e);
   }
-  list.sort((a,b)=>(a.kind==='unit'?a.y:a.y+a.size-.3)-(b.kind==='unit'?b.y:b.y+b.size-.3));
+  list.sort((a,b)=>(a.kind==='unit'?a.y+(isAir(a)?999:0):a.y+a.size-.3)-(b.kind==='unit'?b.y+(isAir(b)?999:0):b.y+b.size-.3));
   // Handelsrouten: gestrichelte Linie vom Markt (und Lager, Mühle) zum Stadtzentrum, die der Träger abläuft
   ctx.setLineDash([6,6]);ctx.lineDashOffset=-performance.now()/60;ctx.lineWidth=1.6;
   for(const c of ents){if(c.dead||c.type!=='carrier'||c.owner!==0)continue;const h=byId.get(c.home);if(!h||h.dead)continue;
@@ -3858,7 +4148,7 @@ function render(){
   // ambient particles: dust, wood chips, chimney smoke
   if(!paused&&started&&SET.q>=2){
     for(const e of list){
-      if(e.kind==='unit'){if(e.moving&&Math.random()<.04)spawnVfx(e.x,e.y+.25,'dust');
+      if(e.kind==='unit'){if(e.moving&&!isAir(e)&&Math.random()<.04)spawnVfx(e.x,e.y+.25,'dust');
         if(e.working&&e.order.rt==='wood'){const tr=byId.get(e.order.target);if(tr)tr.hitT=gameT+.3}if(e.working&&e.order.rt==='wood'&&Math.random()<.05)spawnVfx(e.x+Math.cos(e.ang)*.4,e.y+Math.sin(e.ang)*.4-.2,'chip',{vx:(Math.random()-.5)*1.5,vy:-1.2})}
       else if(e.kind==='bld'&&e.built&&Math.random()<.03&&((e.type==='tc')||(e.type==='house'&&players[e.owner].epoch>=2)||(e.type==='workshop'&&players[e.owner].epoch>=3)))
         spawnVfx(e.x+e.size-.6,e.y-.4,'smoke2',{vx:.15+Math.random()*.1,vy:-.35});
@@ -4044,6 +4334,7 @@ function getCommands(){
     }else{
       cmds[0]={label:'Angriff­bewegung',desc:'Zum Ziel marschieren und unterwegs jeden Feind angreifen. Danach Rechtsklick auf die Karte.',on:aMode,act:()=>{aMode=!aMode;uiDirty=true}};
       cmds[1]={label:'Stopp',desc:'Halten und Befehle verwerfen.',act:()=>{for(const u of sel)order(u,{t:'idle'})}};
+      {const car=sel.filter(u=>u.cargo&&u.cargo.length);if(car.length)cmds[9]={label:'Absitzen',desc:'Alle Insassen steigen aus ('+car.reduce((a,c)=>a+c.cargo.length,0)+' Soldaten). Hubschrauber nur über Land.',act:()=>{let n=0;for(const c of car)n+=unload(c);if(n)toast(n+' Soldaten sitzen ab.','good');uiDirty=true}}}
       cmds[21]={label:'Feldlager',desc:'Schlägt in 10 Sekunden ein befestigtes Lager auf (L): +40 % Abwehr und Heilung im Umkreis von 4 Feldern. Steht schon eins hier, wird es abgebaut.',act:()=>{campToggle(sel.filter(u=>u.kind==='unit'&&u.owner===0))}};
       {const cur=sel[0].form||0,nx=(cur+1)%4;cmds[8]={label:'Formation: '+FORMS[cur],desc:'Wechselt die Formation (F): Schildwall +30 % Abwehr, halbes Tempo. Keil +30 % Angriff, −20 % Abwehr. Schützenlinie (nur Fernkämpfer) +40 % Reichweite, steht fest. Nächste: '+FORMS[nx]+'.',act:()=>{for(const u of sel){let f=nx;if(f===3&&uStat(u).range<2)f=0;u.form=f;if(f===3)order(u,{t:'idle'})}toast('Formation: '+FORMS[nx]+'.');uiDirty=true}}}
     }
@@ -4110,6 +4401,10 @@ function showTip(c,el){
 }
 function hideTip(){$('#tip').hidden=true}
 
+// Einheitenkategorien für die Auswahl-Tabs
+const CLS_DE={infantry:'Infanterie',ranged:'Fernkämpfer',cavalry:'Kavallerie',siege:'Belagerung',ship:'Schiffe',vehicle:'Fahrzeuge',aircraft:'Luftwaffe',healer:'Heiler'};
+const UCATS=[['inf','Infanterie'],['cav','Kavallerie'],['veh','Fahrzeuge'],['air','Luftwaffe'],['sea','Schiffe'],['sie','Belagerung'],['civ','Zivil']];
+const ucatOf=t=>{const D=UNITS[t]||{},c=CLS(t);if(D.air||c==='aircraft')return 'air';if(D.naval||c==='ship')return 'sea';if(c==='vehicle')return 'veh';if(c==='cavalry')return 'cav';if(c==='siege')return 'sie';if(t==='worker'||t==='caravan'||D.civil)return 'civ';return 'inf'};
 function buildInfo(){
   const box=$('#info');const pl=players[0];
   if(!sel.length){
@@ -4118,8 +4413,10 @@ function buildInfo(){
     const by={};for(const u of sel){const k=u.type;(by[k]=by[k]||[]).push(u)}
     const hp=sel.reduce((a,u)=>a+u.hp,0),mx=sel.reduce((a,u)=>a+u.maxhp,0);
     const nW=sel.filter(u=>u.type==='worker').length;
-    box.innerHTML=`<h2>${sel.length} Einheiten</h2><div class="hp"><b style="width:${hp/mx*100}%"></b></div><div class="chips">${Object.keys(by).map(k=>`<button class="chip" data-t="${k}">${by[k].length}× ${uname(UNITS[k],pl.epoch)}</button>`).join('')}</div><div class="hint">${nW?'Bauen: Gebäude unten rechts wählen, dann auf die Karte klicken. ':''}Typ anklicken, um nur diese Einheiten zu behalten.</div>`;
+    const nc={};for(const u of sel){const c=ucatOf(u.type);nc[c]=(nc[c]||0)+1}
+    box.innerHTML=`<h2>${sel.length} Einheiten</h2><div class="hp"><b style="width:${hp/mx*100}%"></b></div><div class="utabs">${UCATS.filter(([k])=>k!=='civ'||nc.civ).map(([k,n])=>`<button class="utab" data-c="${k}" ${nc[k]?'':'disabled'}>${n}<b>${nc[k]||0}</b></button>`).join('')}</div><div class="chips">${Object.keys(by).map(k=>`<button class="chip" data-t="${k}">${by[k].length}× ${uname(UNITS[k],pl.epoch)}</button>`).join('')}</div><div class="hint">${nW?'Bauen: Gebäude unten rechts wählen, dann auf die Karte klicken. ':''}Kategorie oder Typ anklicken, um nur diese Einheiten zu behalten.</div>`;
     box.querySelectorAll('.chip').forEach(c=>c.onclick=()=>select(sel.filter(u=>u.type===c.dataset.t)));
+    box.querySelectorAll('.utab').forEach(c=>c.onclick=()=>select(sel.filter(u=>ucatOf(u.type)===c.dataset.c)));
     return;
   }
   const e=sel[0];
@@ -4127,11 +4424,11 @@ function buildInfo(){
   const own=e.owner===0?'Dein Reich':'Feindliches Reich',ep=players[e.owner].epoch;
   if(e.kind==='unit'){
     const U=UNITS[e.type],s=uStat(e);
-    const ordTxt={idle:'Untätig',guard:'Wache',move:'Unterwegs',amove:'Angriffsbewegung',attack:'Im Kampf',gather:'Sammelt '+(RES_DE[e.order.rt]||''),return:'Bringt Rohstoffe zurück',build:'Baut'}[e.order.t]||'';
+    const ordTxt={idle:'Untätig',guard:'Wache',move:'Unterwegs',amove:'Angriffsbewegung',attack:'Im Kampf',gather:'Sammelt '+(RES_DE[e.order.rt]||''),return:'Bringt Rohstoffe zurück',build:'Baut',board:'Steigt ein'}[e.order.t]||'';
     box.innerHTML=`<h2>${uname(U,ep)}</h2><div class="sub">${U.label} · ${own} · <span data-live="ord">${ordTxt}</span></div><div class="hp"><b data-live="hp" style="width:${e.hp/e.maxhp*100}%"></b></div>
-    <div class="stats"><span><em>Leben</em><span data-live="hpt">${Math.ceil(e.hp)}/${e.maxhp}</span></span><span><em>Angriff</em>${s.atk.toFixed(0)}</span><span><em>Reichweite</em>${s.range<1?'Nahkampf':s.range}</span><span><em>Tempo</em>${s.speed.toFixed(1)}</span>${e.type==='worker'?`<span><em>Trägt</em><span data-live="carry">${Math.floor(e.carry)}</span></span>`:''}</div>
+    <div class="stats"><span><em>Leben</em><span data-live="hpt">${Math.ceil(e.hp)}/${e.maxhp}</span></span><span><em>Angriff</em>${s.atk.toFixed(0)}</span><span><em>Reichweite</em>${s.range<1?'Nahkampf':s.range}</span><span><em>Tempo</em>${s.speed.toFixed(1)}</span>${U.seats?`<span><em>Insassen</em>${(e.cargo||[]).length}/${U.seats}</span>`:''}${e.type==='worker'?`<span><em>Trägt</em><span data-live="carry">${Math.floor(e.carry)}</span></span>`:''}</div>
     ${e.type==='worker'&&e.owner===0?`<div class="hint">Bauen: Gebäude unten rechts wählen, dann auf die Karte klicken.</div>`:''}
-    ${U.bonus?`<div class="hint">Stark gegen ${Object.keys(U.bonus).map(k=>UNITS[k].label).join(' und ')}.</div>`:''}`;
+    ${U.bonus?`<div class="hint">Stark gegen ${Object.keys(U.bonus).map(k=>CLS_DE[k]||(UNITS[k]&&UNITS[k].label)||k).join(' und ')}.</div>`:''}`;
     return;
   }
   const D=BLD[e.type];
@@ -4150,7 +4447,7 @@ function refreshInfo(){
   if((el=q('amt')))el.textContent=Math.ceil(e.amount);
   if((el=q('carry')))el.textContent=Math.floor(e.carry);
   if((el=q('prog')))el.textContent=Math.floor(e.prog*100)+'%';
-  if((el=q('ord'))){const o=e.order;el.textContent={idle:'Untätig',guard:'Wache',move:'Unterwegs',amove:'Angriffsbewegung',attack:'Im Kampf',gather:'Sammelt '+(RES_DE[o.rt]||''),return:'Bringt Rohstoffe zurück',build:'Baut'}[o.t]||''}
+  if((el=q('ord'))){const o=e.order;el.textContent={idle:'Untätig',guard:'Wache',move:'Unterwegs',amove:'Angriffsbewegung',attack:'Im Kampf',gather:'Sammelt '+(RES_DE[o.rt]||''),return:'Bringt Rohstoffe zurück',build:'Baut',board:'Steigt ein'}[o.t]||''}
   if(e.kind==='bld'&&e.owner===0){
     el=q('queue');
     if(e.queue.length&&!el){buildInfo();return}
@@ -4194,7 +4491,7 @@ const mouse={x:0,y:0,inside:false};let drag=null,placing=null,aMode=false,groups
 const keys=new Set();
 function pickAt(wx,wy){
   let best=null,bd=1e9;
-  for(const e of ents){if(e.dead||e.kind!=='unit'||!visibleEnt(e))continue;const d=Math.hypot(e.x-wx,e.y-wy);if(d<e.r+.25&&d<bd){bd=d;best=e}}
+  for(const e of ents){if(e.dead||e.kind!=='unit'||!visibleEnt(e))continue;const d=isAir(e)&&e.airX!==undefined?Math.min(Math.hypot(e.airX/T-wx,e.airY/T-wy),Math.hypot(e.x-wx,e.y-wy)):Math.hypot(e.x-wx,e.y-wy);if(d<e.r+.25&&d<bd){bd=d;best=e}}
   if(best)return best;
   for(const e of ents){if(e.dead||e.kind==='unit'||!visibleEnt(e))continue;if(wx>=e.x&&wx<e.x+e.size&&wy>=e.y&&wy<e.y+e.size)return e}
   return null;
@@ -4210,6 +4507,9 @@ function rightCommand(wx,wy){
   if(t&&t.kind==='bld'&&t.type==='market'&&t.owner===0&&units.some(u=>u.type==='caravan')){for(const u of units)if(u.type==='caravan'){u.dest=t.id;u.leg=1;u.order={t:'idle'}}toast('Karawanenziel festgelegt.','good');marker={x:wx,y:wy,t:1,c:'#e9be72'};uiDirty=true;return}
   if(shiftHeld&&units.every(u=>u.order&&(u.order.t==='move'||u.order.t==='amove'))){for(const u of units)(u.wq=u.wq||[]).push({x:wx,y:wy,a:aMode});marker={x:wx,y:wy,t:1,c:'#9ef0a0'};aMode=false;uiDirty=true;return}
   for(const u of units)u.wq=[];
+  if(t&&t.kind==='unit'&&t.owner===0&&UNITS[t.type].seats&&units.some(u=>canBoard(u.type))){
+    const free=UNITS[t.type].seats-(t.cargo||[]).length;let n=0;for(const u of units)if(canBoard(u.type)&&n<free){order(u,{t:'board',target:t.id});n++}
+    toast(n?n+' Soldaten sitzen auf.':'Der Transporter ist voll.',n?'good':'warn');marker={x:wx,y:wy,t:1,c:'#9ef0a0'};uiDirty=true;return}
   if(t&&!(t.kind==='bld'&&t.type==='farm'&&units.every(u=>u.type!=='worker')&&t.owner===0)){
     cmdTarget(units,t);marker={x:wx,y:wy,t:1,c:t.owner===1?'#ff8a7a':'#e9be72'};
     // spread workers across multiple farms or trees
@@ -4370,7 +4670,7 @@ function renderTechTree(){
   const byAt={};for(const ln in next){const id=next[ln];(byAt[TECHS[id].at]=byAt[TECHS[id].at]||[]).push(id)}
   const lines=new Set(Object.values(TECHS).map(t=>t.line).filter(Boolean)),doneN=Object.keys(pl.techs).length;
   const have=t=>ents.some(e=>e.kind==='bld'&&e.owner===0&&e.type===t&&e.built&&!e.dead);
-  cols.innerHTML=Object.keys(byAt).map(at=>`<div class="tcol"><h3>${BLD[at]?BLD[at].name:at}<small>${have(at)?byAt[at].length+' offen':'nicht gebaut'}</small></h3>${byAt[at].map(id=>{const t=TECHS[id];let st=techState(0,id);
+  cols.innerHTML=Object.keys(byAt).map(at=>`<div class="tcol"><h3>${BLD[at]?(BLD[at].techTitle?BLD[at].techTitle+' · ':'')+BLD[at].name:at}<small>${have(at)?byAt[at].length+' offen':'nicht gebaut'}</small></h3>${byAt[at].map(id=>{const t=TECHS[id];let st=techState(0,id);
     const all=Object.values(TECHS).filter(x=>t.line&&x.line===t.line).sort((a,b)=>(a.epoch||0)-(b.epoch||0)),stepN=all.indexOf(t)+1;
     const cls=st==='open'&&!have(at)?'nobld':st==='open'&&!canAfford(0,t.cost||{})?'open short':st;
     const stTxt=st==='epoch'?'ab '+EPOCHS[t.epoch]:st==='running'?'läuft':!have(at)?'Gebäude fehlt':cls==='open short'?'zu teuer':'Verfügbar';

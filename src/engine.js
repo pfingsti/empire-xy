@@ -304,7 +304,7 @@ function costOf(type){return UNITS[type]?UNITS[type].cost:BLD[type].cost}
 function recalcPop(){
   for(const pl of players){pl.pop=0;pl.cap=0}
   for(const e of ents){if(e.dead)continue;
-    if(e.kind==='unit')players[e.owner].pop+=UNITS[e.type].pop;
+    if(e.kind==='unit'){players[e.owner].pop+=UNITS[e.type].pop;if(e.cargo)for(const c of e.cargo)players[e.owner].pop+=(UNITS[c.type]||{pop:1}).pop}
     else if(e.kind==='bld'&&e.built&&BLD[e.type].pop)players[e.owner].cap+=BLD[e.type].pop;
     if(e.kind==='bld')for(const q of e.queue)if(q.started&&q.u)players[e.owner].pop+=UNITS[q.u].pop;
   }
@@ -326,8 +326,8 @@ function hpush(i,f){hp_i.push(i);hp_f.push(f);let c=hp_i.length-1;while(c>0){con
 function hpop(){const top=hp_i[0],li=hp_i.pop(),lf=hp_f.pop();if(hp_i.length){hp_i[0]=li;hp_f[0]=lf;let c=0;for(;;){const l=c*2+1,r=l+1;let m=c;if(l<hp_i.length&&hp_f[l]<hp_f[m])m=l;if(r<hp_i.length&&hp_f[r]<hp_f[m])m=r;if(m===c)break;[hp_i[m],hp_i[c]]=[hp_i[c],hp_i[m]];[hp_f[m],hp_f[c]]=[hp_f[c],hp_f[m]];c=m}}return top}
 const DIRS=[[1,0,1],[-1,0,1],[0,1,1],[0,-1,1],[1,1,1.414],[1,-1,1.414],[-1,1,1.414],[-1,-1,1.414]];
 // Tore: für den Besitzer begehbar, für alle anderen Mauer. passOwner = wer gerade läuft
-let passOwner=-1,passNaval=false;
-const pass=(x,y)=>{if(!inb(x,y))return false;const i=idx(x,y),b=block[i];if(passNaval)return terr[i]===1;return b===0||(b>0&&gate[i]===passOwner+1&&passOwner>=0)};
+let passOwner=-1,passNaval=false,passAir=false;
+const pass=(x,y)=>{if(!inb(x,y))return false;if(passAir)return true;const i=idx(x,y),b=block[i];if(passNaval)return terr[i]===1;return b===0||(b>0&&gate[i]===passOwner+1&&passOwner>=0)};
 function findPath(sx,sy,goal,hx,hy,maxN){
   gen++;hp_i.length=0;hp_f.length=0;
   const s=idx(sx,sy);gS[s]=0;stamp[s]=gen;from[s]=-1;
@@ -370,13 +370,13 @@ function smoothPath(u,path){
   return out;
 }
 function pathToPoint(u,tx,ty){
-  passOwner=u.owner;passNaval=!!UNITS[u.type].naval;
+  passOwner=u.owner;passNaval=!!UNITS[u.type].naval;passAir=!!UNITS[u.type].air;
   const gx=Math.floor(tx),gy=Math.floor(ty);const ok=pass(gx,gy);
   u.path=smoothPath(u,findPath(Math.floor(u.x),Math.floor(u.y),(x,y)=>ok?(x===gx&&y===gy):Math.abs(x-gx)<=1&&Math.abs(y-gy)<=1,gx,gy));
   u.goal=ok?{x:tx,y:ty}:null;
 }
 function pathToEnt(u,t){
-  passOwner=u.owner;passNaval=!!UNITS[u.type].naval;
+  passOwner=u.owner;passNaval=!!UNITS[u.type].naval;passAir=!!UNITS[u.type].air;
   const c=center(t);
   let goal;
   if(t.kind==='unit'){const gx=Math.floor(t.x),gy=Math.floor(t.y);goal=(x,y)=>Math.abs(x-gx)<=1&&Math.abs(y-gy)<=1}
@@ -433,7 +433,7 @@ function cmdMove(units,wx,wy,amove){
   const sorted=[...units].sort((a,b)=>Math.hypot(a.x-wx,a.y-wy)-Math.hypot(b.x-wx,b.y-wy));
   for(const u of sorted){
     let tx=wx,ty=wy;
-    if(n>1){const cx=k%cols-(cols-1)/2,cy=Math.floor(k/cols)-(Math.ceil(n/cols)-1)/2;tx=wx+cx*.8;ty=wy+cy*.8;passNaval=!!UNITS[u.type].naval;if(!pass(Math.floor(tx),Math.floor(ty))){tx=wx;ty=wy}}
+    if(n>1){const cx=k%cols-(cols-1)/2,cy=Math.floor(k/cols)-(Math.ceil(n/cols)-1)/2;tx=wx+cx*.8;ty=wy+cy*.8;passNaval=!!UNITS[u.type].naval;passAir=!!UNITS[u.type].air;if(!pass(Math.floor(tx),Math.floor(ty))){tx=wx;ty=wy}}
     k++;
     order(u,{t:amove?'amove':'move',x:tx,y:ty});pathToPoint(u,tx,ty);
   }
@@ -473,12 +473,16 @@ function nearestDrop(p,x,y){
   for(const e of ents)if(e.kind==='bld'&&e.owner===p&&e.built&&!e.dead&&BLD[e.type].drop){const c=center(e),d=Math.hypot(c.x-x,c.y-y);if(d<bd){bd=d;best=e}}
   return best;
 }
+// Flugzeuge treffen nur Fernkämpfer, Flak, Schiffe, Türme und andere Flugzeuge, keine Granaten und keine Nahkämpfer
+const isAir=e=>!!(e&&e.kind==='unit'&&UNITS[e.type]&&UNITS[e.type].air);
+function canHit(u,t){if(!isAir(t))return true;if(u.kind!=='unit')return true;const D=UNITS[u.type];if(!D)return false;if(D.air||D.aa)return true;return D.proj===1&&D.range>=2}
 function enemyNear(u,radius,wantBld){
   let best=null,bd=radius;
   for(const e of ents){
     if(e.dead||e.owner<0||e.owner===u.owner||aiS&&aiS.allied||e.kind==='unit'&&hidden(e)&&Math.hypot(e.x-u.x,e.y-u.y)>2.5)continue;
     if(e.kind==='res')continue;
     if(e.kind==='bld'&&!wantBld)continue;
+    if(!canHit(u,e))continue;
     if(u.owner===0&&e.kind==='unit'&&!vis[idx(e.x|0,e.y|0)])continue;
     let d=distEnt(u,e);if(e.kind==='bld')d+=2;else if(e.type==='worker')d+=1;
     if(d<bd){bd=d;best=e}
@@ -496,7 +500,7 @@ function damage(t,dmg,src){if(src&&src.kind==='unit'&&WX.night>.5)dmg*=.8;if(src
   fx.push({x:center(t).x+(rng()-.5)*.4,y:center(t).y+(rng()-.5)*.4,t:0,k:'hit'});
   if(t.owner===0&&gameT-lastAlarm>20&&src){lastAlarm=gameT;toast('Wir werden angegriffen!','warn');ping=center(t);pingT=3}
   if(t.kind==='unit'&&src&&!src.dead&&src.owner!==t.owner){
-    if(isMil(t)&&!UNITS[t.type].stealth&&(t.order.t==='idle'||(t.order.t==='amove')))order(t,{t:'attack',target:src.id,resume:t.order.t==='amove'?t.order:null});
+    if(isMil(t)&&!UNITS[t.type].stealth&&canHit(t,src)&&(t.order.t==='idle'||(t.order.t==='amove')))order(t,{t:'attack',target:src.id,resume:t.order.t==='amove'?t.order:null});
     else if(t.type==='worker'&&t.owner===1)aiS.alarm={x:t.x,y:t.y,time:gameT};
   }
   if(t.kind==='bld'&&t.owner===1&&src)aiS.alarm={x:src.x,y:src.y,time:gameT};
@@ -506,7 +510,9 @@ let lastAlarm=-99,ping=null,pingT=0;
 let corpses=[];
 function kill(e,src){
   e.dead=true;
-  if(e.kind==='unit'&&!(UNITS[e.type]&&UNITS[e.type].naval)&&visibleEnt(e)){corpses.push(Object.assign({},e,{moving:false,swing:0,working:false,carry:0,dt0:gameT,fall:Math.random()<.5?1:-1}));if(corpses.length>60)corpses.shift()}
+  const mech=e.kind==='unit'&&UNITS[e.type]&&(UNITS[e.type].air||CLS(e.type)==='vehicle');
+  if(mech){for(let k=0;k<5;k++)fx.push({x:e.x+(rng()-.5)*.6,y:e.y+(rng()-.5)*.6,t:-k*.12,k:k?'smoke':'boom'});if(e.cargo&&e.cargo.length)players[e.owner].st.lost+=e.cargo.length}
+  if(e.kind==='unit'&&!mech&&!(UNITS[e.type]&&UNITS[e.type].naval)&&visibleEnt(e)){corpses.push(Object.assign({},e,{moving:false,swing:0,working:false,carry:0,dt0:gameT,fall:Math.random()<.5?1:-1}));if(corpses.length>60)corpses.shift()}
   if(e.kind==='bld'){
     if(BLD[e.type].water)block[idx(e.x,e.y)]=-1;
     if(!BLD[e.type].walk)for(let y=e.y;y<e.y+e.size;y++)for(let x=e.x;x<e.x+e.size;x++)if(block[idx(x,y)]===e.id){block[idx(x,y)]=0;gate[idx(x,y)]=0}
@@ -550,7 +556,7 @@ function attackTick(u,t,dt,st){
 // Produktionskette: Mühlen in der Nähe machen Felder ergiebiger (Wert farmBoost am Gebäude)
 function farmBoost(f){if(f.boostT>gameT)return f.boostV;let v=1;for(const e of ents)if(e.kind==='bld'&&e.built&&!e.dead&&e.owner===f.owner&&BLD[e.type].farmBoost&&Math.hypot(e.x-f.x,e.y-f.y)<8)v=Math.max(v,BLD[e.type].farmBoost);f.boostT=gameT+3;f.boostV=v;return v}
 function updUnit(u,dt){
-  passOwner=u.owner;passNaval=!!UNITS[u.type].naval;
+  passOwner=u.owner;passNaval=!!UNITS[u.type].naval;passAir=!!UNITS[u.type].air;
   const st=uStat(u);u.cd-=dt;u.swing=Math.max(0,(u.swing||0)-dt);if(!u.moving)u.v=Math.max(.3,(u.v||.3)-dt*3);u.moving=false;u.scan-=dt;
   const o=u.order;
   switch(o.t){
@@ -574,7 +580,7 @@ function updUnit(u,dt){
       break;}
     case 'attack':{
       const t=byId.get(o.target);
-      if(!alive(t)||(u.owner===0&&t.kind==='unit'&&!vis[idx(t.x|0,t.y|0)])){
+      if(!alive(t)||!canHit(u,t)||(u.owner===0&&t.kind==='unit'&&!vis[idx(t.x|0,t.y|0)])){
         if(o.resume){const r=o.resume;order(u,r)}else{order(u,{t:'idle'});u.scan=0}break}
       // chasing too far without a forced order: give up
       if(!o.forced&&o.resume&&o.resume.x!==undefined&&Math.hypot(u.x-o.resume.x,u.y-o.resume.y)>14){order(u,o.resume);break}
@@ -607,6 +613,11 @@ function updUnit(u,dt){
         if(o.resume){const r=o.resume;order(u,r)}else order(u,{t:'idle'});
       }else approach(u,d,dt);
       break;}
+    case 'board':{ // in einen Transporter einsteigen
+      const c=byId.get(o.target);
+      if(!alive(c)||c.owner!==u.owner||(c.cargo||[]).length>=(UNITS[c.type].seats||0)){order(u,{t:'idle'});break}
+      if(distEnt(u,c)<=.7){(c.cargo=c.cargo||[]).push({type:u.type,hp:u.hp,kills:u.kills||0,rank:u.rank||0});u.dead=true;u.boarded=true;if(c.owner===0)uiDirty=true;recalcPop();break}
+      approach(u,c,dt);break}
     case 'build':{
       const b=byId.get(o.target);
       if(!alive(b)){order(u,{t:'idle'});findMoreWork(u);break}
@@ -630,6 +641,15 @@ function updUnit(u,dt){
   u.chk=(u.chk||0)-dt;u.ghost=Math.max(0,(u.ghost||0)-dt);
   if(u.chk<=0){u.chk=.8;if(u.moving&&u.lx!==undefined&&Math.hypot(u.x-u.lx,u.y-u.ly)<.25)u.ghost=1.2;u.lx=u.x;u.ly=u.y}
 }
+// Truppentransport: Fußtruppen steigen in Fahrzeuge oder Hubschrauber mit "seats" ein
+const canBoard=t=>{const D=UNITS[t];return !!D&&!D.naval&&!D.air&&!D.seats&&(D.pop||1)<=1&&!['vehicle','cavalry','siege','ship'].includes(CLS(t))};
+function unload(c){
+  if(!c.cargo||!c.cargo.length)return 0;const D=UNITS[c.type],i0=idx(c.x|0,c.y|0);
+  if(D.air&&(terr[i0]===1||block[i0]!==0)){if(c.owner===0)toast('Absitzen nur über freiem Land.','warn');return 0}
+  const n=c.cargo.length;passOwner=c.owner;passNaval=false;passAir=false;
+  c.cargo.forEach((p,i)=>{let x=c.x+Math.cos(i/n*6.28)*.8,y=c.y+Math.sin(i/n*6.28)*.8;if(!pass(x|0,y|0)){x=c.x;y=c.y}
+    const u=spawnUnit(c.owner,p.type,x,y);u.hp=Math.min(u.maxhp,p.hp);u.kills=p.kills;u.rank=p.rank});
+  c.cargo=[];recalcPop();return n}
 function findMoreWork(u){
   // help on nearby unfinished buildings, otherwise resume gathering near
   let best=null,bd=10;
@@ -742,7 +762,7 @@ function updProj(dt){
       if(d>s){p.x+=dx/d*s;p.y+=dy/d*s;continue}
       p.done=true;fx.push({x:p.tx,y:p.ty,t:0,k:'boom'});const src=byId.get(p.src)||null;
       for(const e of ents){ // splash damage, falls off toward the edge
-        if(e.dead||e.owner<0||e.owner===p.owner||e.kind==='res')continue;
+        if(e.dead||e.owner<0||e.owner===p.owner||e.kind==='res'||isAir(e))continue;
         let dd;if(e.kind==='unit')dd=Math.hypot(e.x-p.tx,e.y-p.ty)-e.r;else{const cx=Math.max(e.x,Math.min(p.tx,e.x+e.size)),cy=Math.max(e.y,Math.min(p.ty,e.y+e.size));dd=Math.hypot(cx-p.tx,cy-p.ty)}
         if(dd<.9)damage(e,hitDmg(p.ut,p.atk,e)*(1-.5*Math.max(0,dd)/.9),src);
         else if(dd<3&&players[p.owner]&&players[p.owner].techs.siege_2&&p.ut==='siege')damage(e,hitDmg(p.ut,p.atk,e)*.5,src);
@@ -769,7 +789,7 @@ function separate(){
   for(const u of ents){if(u.kind!=='unit'||u.dead)continue;
     const gx=u.x|0,gy=u.y|0;
     for(let oy=-1;oy<=1;oy++)for(let ox=-1;ox<=1;ox++){const a=grid.get(gx+ox+(gy+oy)*W);if(!a)continue;
-      for(const v of a){if(v===u||v.id<u.id||!!UNITS[u.type].naval!==!!UNITS[v.type].naval)continue;
+      for(const v of a){if(v===u||v.id<u.id||!!UNITS[u.type].naval!==!!UNITS[v.type].naval||!!UNITS[u.type].air!==!!UNITS[v.type].air)continue;
         const dx=v.x-u.x,dy=v.y-u.y,d=Math.hypot(dx,dy)||.01,m=u.r+v.r-.04;
         if(d<m){const push=(m-d)*.5,nx=dx/d,ny=dy/d;
           if(u.ghost||v.ghost)continue;
@@ -777,7 +797,7 @@ function separate(){
           tryNudge(u,-nx*push*wu,-ny*push*wu);tryNudge(v,nx*push*wv,ny*push*wv)}}}
   }
 }
-function tryNudge(u,dx,dy){const nx=u.x+dx,ny=u.y+dy;passOwner=u.owner;passNaval=!!UNITS[u.type].naval;if(pass(nx|0,ny|0)){u.x=nx;u.y=ny}}
+function tryNudge(u,dx,dy){const nx=u.x+dx,ny=u.y+dy;passOwner=u.owner;passNaval=!!UNITS[u.type].naval;passAir=!!UNITS[u.type].air;if(pass(nx|0,ny|0)){u.x=nx;u.y=ny}}
 
 // ================= visibility =================
 let visT=0;
@@ -831,7 +851,7 @@ function aiThink(){
   const prodWant=[['barracks',5],['range',8],['camp',7],['stable',12,1],['workshop',16,2],['barracks',18],['range',20],['stable',22,1],['tower',14,1],['tower',20,2]];
   if(!unfinished.some(b=>b.type!=='house'&&b.type!=='farm')){
     const have={};
-    for(const t in BLD)if(BLD[t].ai&&!prodWant.some(w=>w[0]===t))prodWant.push([t,BLD[t].ai.minWorkers||15,BLD[t].minEpoch||0]);
+    for(const t in BLD)if(BLD[t].ai&&!prodWant.some(w=>w[0]===t)){const w=[t,BLD[t].ai.minWorkers||15,BLD[t].minEpoch||0];if(BLD[t].ai.prio)prodWant.splice(2,0,w);else prodWant.push(w)}
     for(const [t,minW,minE] of prodWant){
       have[t]=(have[t]||0)+1;
       if((minE||0)>ep||workers.length<minW)continue;
@@ -987,7 +1007,7 @@ let aiTimer=0,popT=0;
 let pathT=0;
 function wearPaths(){// Trampelpfade: wo oft gelaufen wird, wird das Gras zu Erde
   const g=terrC.getContext('2d');g.save();
-  for(const u of ents){if(u.dead||u.kind!=='unit'||!u.moving||UNITS[u.type].naval)continue;const i=idx(u.x|0,u.y|0);if(terr[i]===1)continue;
+  for(const u of ents){if(u.dead||u.kind!=='unit'||!u.moving||UNITS[u.type].naval||UNITS[u.type].air)continue;const i=idx(u.x|0,u.y|0);if(terr[i]===1)continue;
     g.fillStyle='rgba(112,92,62,.045)';g.beginPath();g.ellipse(u.x*T,u.y*T+4,5,3,0,0,7);g.fill()}
   // Pflaster um das Stadtzentrum ab Epoche 3: unregelmäßige Steinplatten mit Fugen
   for(const b of ents){if(b.dead||b.type!=='tc'||!b.built||b.paved||!players[b.owner]||players[b.owner].epoch<3)continue;b.paved=1;
@@ -1521,8 +1541,8 @@ function epochDress(g,re,x,by,hx,hy,pc){
 // Einheiten größer zeichnen (AoE-artige Figuren), schwere Typen etwas wuchtiger
 function drawUnit(g,u){
   const UD=UNITS[u.type],k=(UD.scale||1.18)*Math.sqrt((UD.r||.3)/.3),x=u.x*T,y=u.y*T;
-  if(!UD.naval){const rr=(UD.r||.3)*T*k;g.strokeStyle=PCOL[u.owner];g.globalAlpha=.55;g.lineWidth=1.6;g.beginPath();g.ellipse(x,y+rr*.75,rr*1.05,rr*.48,0,0,7);g.stroke();g.globalAlpha=1;
-    if(u.moving&&SEASON!==3){const ca=Math.cos(u.ang||0),sa=Math.sin(u.ang||0);for(let i=0;i<3;i++){const f=((gameT*2.2+i/3+(u.id%7)/7)%1),d=6+f*14;g.fillStyle=`rgba(150,125,90,${(.32*(1-f)).toFixed(2)})`;g.beginPath();g.arc(x-ca*d+(i-1)*2,y+rr*.7-sa*d*.5,2+f*4,0,7);g.fill()}}}
+  if(!UD.naval){const rr=(UD.r||.3)*T*k;g.strokeStyle=PCOL[u.owner];if(UD.air)g.setLineDash([3,3]);g.globalAlpha=.55;g.lineWidth=1.6;g.beginPath();g.ellipse(x,y+rr*.75,rr*1.05,rr*.48,0,0,7);g.stroke();g.globalAlpha=1;g.setLineDash([]);
+    if(u.moving&&SEASON!==3&&!UD.air){const ca=Math.cos(u.ang||0),sa=Math.sin(u.ang||0);for(let i=0;i<3;i++){const f=((gameT*2.2+i/3+(u.id%7)/7)%1),d=6+f*14;g.fillStyle=`rgba(150,125,90,${(.32*(1-f)).toFixed(2)})`;g.beginPath();g.arc(x-ca*d+(i-1)*2,y+rr*.7-sa*d*.5,2+f*4,0,7);g.fill()}}}
   g.save();g.translate(x,y);g.scale(k,k);g.translate(-x,-y);drawUnitRaw(g,u);g.restore();
   if(u.rank&&u.type!=='hero'){const xx=u.x*T+u.r*T*1.2,yy=u.y*T-u.r*T*2.6;g.fillStyle=u.rank===2?'#f2cf4f':'#c9ccd0';for(let i=0;i<u.rank;i++){g.beginPath();g.moveTo(xx-4,yy+i*3.5);g.lineTo(xx,yy+2.5+i*3.5);g.lineTo(xx+4,yy+i*3.5);g.lineTo(xx+4,yy+1.5+i*3.5);g.lineTo(xx,yy+4+i*3.5);g.lineTo(xx-4,yy+1.5+i*3.5);g.closePath();g.fill()}}
   if(u.form){const yy=u.y*T+u.r*T*1.6,xx=u.x*T;g.fillStyle=['','#6fa0d8','#e07a4a','#8fd06a'][u.form];if(u.form===1)g.fillRect(xx-5,yy,10,3);else if(u.form===2){g.beginPath();g.moveTo(xx-5,yy+3);g.lineTo(xx,yy-2);g.lineTo(xx+5,yy+3);g.closePath();g.fill()}else{for(let i=-1;i<=1;i++)g.fillRect(xx+i*4-1,yy,2,3)}}
@@ -1530,7 +1550,7 @@ function drawUnit(g,u){
 function drawUnitRaw(g,u){
   const UD=UNITS[u.type];
   const x=u.x*T,y=u.y*T,pc=PCOL[u.owner],dk=PCOL_DK[u.owner],ep=VIS(players[u.owner].epoch),a=u.ang;
-  g.fillStyle='rgba(8,14,6,.32)';g.beginPath();g.ellipse(x+3,y+u.r*T*.7,u.r*T*1.1,u.r*T*.5,0,0,7);g.fill();
+  if(!UD.noShadow){g.fillStyle='rgba(8,14,6,.32)';g.beginPath();g.ellipse(x+3,y+u.r*T*.7,u.r*T*1.1,u.r*T*.5,0,0,7);g.fill()}
   if(UD.draw){g.save();try{UD.draw(g,u,DRAW_API)}catch(e){}g.restore();return}
   if(LOOK(u.type)==='cavalry'){
     const ph=u.moving?Math.sin(gameT*16+u.anim):0;
@@ -1645,7 +1665,7 @@ function render(){
     if(e.kind==='bld'&&e.type==='farm'){drawBld(ctx,e);continue}
     list.push(e);
   }
-  list.sort((a,b)=>(a.kind==='unit'?a.y:a.y+a.size-.3)-(b.kind==='unit'?b.y:b.y+b.size-.3));
+  list.sort((a,b)=>(a.kind==='unit'?a.y+(isAir(a)?999:0):a.y+a.size-.3)-(b.kind==='unit'?b.y+(isAir(b)?999:0):b.y+b.size-.3));
   // Handelsrouten: gestrichelte Linie vom Markt (und Lager, Mühle) zum Stadtzentrum, die der Träger abläuft
   ctx.setLineDash([6,6]);ctx.lineDashOffset=-performance.now()/60;ctx.lineWidth=1.6;
   for(const c of ents){if(c.dead||c.type!=='carrier'||c.owner!==0)continue;const h=byId.get(c.home);if(!h||h.dead)continue;
@@ -1680,7 +1700,7 @@ function render(){
   // ambient particles: dust, wood chips, chimney smoke
   if(!paused&&started&&SET.q>=2){
     for(const e of list){
-      if(e.kind==='unit'){if(e.moving&&Math.random()<.04)spawnVfx(e.x,e.y+.25,'dust');
+      if(e.kind==='unit'){if(e.moving&&!isAir(e)&&Math.random()<.04)spawnVfx(e.x,e.y+.25,'dust');
         if(e.working&&e.order.rt==='wood'){const tr=byId.get(e.order.target);if(tr)tr.hitT=gameT+.3}if(e.working&&e.order.rt==='wood'&&Math.random()<.05)spawnVfx(e.x+Math.cos(e.ang)*.4,e.y+Math.sin(e.ang)*.4-.2,'chip',{vx:(Math.random()-.5)*1.5,vy:-1.2})}
       else if(e.kind==='bld'&&e.built&&Math.random()<.03&&((e.type==='tc')||(e.type==='house'&&players[e.owner].epoch>=2)||(e.type==='workshop'&&players[e.owner].epoch>=3)))
         spawnVfx(e.x+e.size-.6,e.y-.4,'smoke2',{vx:.15+Math.random()*.1,vy:-.35});
@@ -1866,6 +1886,7 @@ function getCommands(){
     }else{
       cmds[0]={label:'Angriff­bewegung',desc:'Zum Ziel marschieren und unterwegs jeden Feind angreifen. Danach Rechtsklick auf die Karte.',on:aMode,act:()=>{aMode=!aMode;uiDirty=true}};
       cmds[1]={label:'Stopp',desc:'Halten und Befehle verwerfen.',act:()=>{for(const u of sel)order(u,{t:'idle'})}};
+      {const car=sel.filter(u=>u.cargo&&u.cargo.length);if(car.length)cmds[9]={label:'Absitzen',desc:'Alle Insassen steigen aus ('+car.reduce((a,c)=>a+c.cargo.length,0)+' Soldaten). Hubschrauber nur über Land.',act:()=>{let n=0;for(const c of car)n+=unload(c);if(n)toast(n+' Soldaten sitzen ab.','good');uiDirty=true}}}
       cmds[21]={label:'Feldlager',desc:'Schlägt in 10 Sekunden ein befestigtes Lager auf (L): +40 % Abwehr und Heilung im Umkreis von 4 Feldern. Steht schon eins hier, wird es abgebaut.',act:()=>{campToggle(sel.filter(u=>u.kind==='unit'&&u.owner===0))}};
       {const cur=sel[0].form||0,nx=(cur+1)%4;cmds[8]={label:'Formation: '+FORMS[cur],desc:'Wechselt die Formation (F): Schildwall +30 % Abwehr, halbes Tempo. Keil +30 % Angriff, −20 % Abwehr. Schützenlinie (nur Fernkämpfer) +40 % Reichweite, steht fest. Nächste: '+FORMS[nx]+'.',act:()=>{for(const u of sel){let f=nx;if(f===3&&uStat(u).range<2)f=0;u.form=f;if(f===3)order(u,{t:'idle'})}toast('Formation: '+FORMS[nx]+'.');uiDirty=true}}}
     }
@@ -1932,6 +1953,10 @@ function showTip(c,el){
 }
 function hideTip(){$('#tip').hidden=true}
 
+// Einheitenkategorien für die Auswahl-Tabs
+const CLS_DE={infantry:'Infanterie',ranged:'Fernkämpfer',cavalry:'Kavallerie',siege:'Belagerung',ship:'Schiffe',vehicle:'Fahrzeuge',aircraft:'Luftwaffe',healer:'Heiler'};
+const UCATS=[['inf','Infanterie'],['cav','Kavallerie'],['veh','Fahrzeuge'],['air','Luftwaffe'],['sea','Schiffe'],['sie','Belagerung'],['civ','Zivil']];
+const ucatOf=t=>{const D=UNITS[t]||{},c=CLS(t);if(D.air||c==='aircraft')return 'air';if(D.naval||c==='ship')return 'sea';if(c==='vehicle')return 'veh';if(c==='cavalry')return 'cav';if(c==='siege')return 'sie';if(t==='worker'||t==='caravan'||D.civil)return 'civ';return 'inf'};
 function buildInfo(){
   const box=$('#info');const pl=players[0];
   if(!sel.length){
@@ -1940,8 +1965,10 @@ function buildInfo(){
     const by={};for(const u of sel){const k=u.type;(by[k]=by[k]||[]).push(u)}
     const hp=sel.reduce((a,u)=>a+u.hp,0),mx=sel.reduce((a,u)=>a+u.maxhp,0);
     const nW=sel.filter(u=>u.type==='worker').length;
-    box.innerHTML=`<h2>${sel.length} Einheiten</h2><div class="hp"><b style="width:${hp/mx*100}%"></b></div><div class="chips">${Object.keys(by).map(k=>`<button class="chip" data-t="${k}">${by[k].length}× ${uname(UNITS[k],pl.epoch)}</button>`).join('')}</div><div class="hint">${nW?'Bauen: Gebäude unten rechts wählen, dann auf die Karte klicken. ':''}Typ anklicken, um nur diese Einheiten zu behalten.</div>`;
+    const nc={};for(const u of sel){const c=ucatOf(u.type);nc[c]=(nc[c]||0)+1}
+    box.innerHTML=`<h2>${sel.length} Einheiten</h2><div class="hp"><b style="width:${hp/mx*100}%"></b></div><div class="utabs">${UCATS.filter(([k])=>k!=='civ'||nc.civ).map(([k,n])=>`<button class="utab" data-c="${k}" ${nc[k]?'':'disabled'}>${n}<b>${nc[k]||0}</b></button>`).join('')}</div><div class="chips">${Object.keys(by).map(k=>`<button class="chip" data-t="${k}">${by[k].length}× ${uname(UNITS[k],pl.epoch)}</button>`).join('')}</div><div class="hint">${nW?'Bauen: Gebäude unten rechts wählen, dann auf die Karte klicken. ':''}Kategorie oder Typ anklicken, um nur diese Einheiten zu behalten.</div>`;
     box.querySelectorAll('.chip').forEach(c=>c.onclick=()=>select(sel.filter(u=>u.type===c.dataset.t)));
+    box.querySelectorAll('.utab').forEach(c=>c.onclick=()=>select(sel.filter(u=>ucatOf(u.type)===c.dataset.c)));
     return;
   }
   const e=sel[0];
@@ -1949,11 +1976,11 @@ function buildInfo(){
   const own=e.owner===0?'Dein Reich':'Feindliches Reich',ep=players[e.owner].epoch;
   if(e.kind==='unit'){
     const U=UNITS[e.type],s=uStat(e);
-    const ordTxt={idle:'Untätig',guard:'Wache',move:'Unterwegs',amove:'Angriffsbewegung',attack:'Im Kampf',gather:'Sammelt '+(RES_DE[e.order.rt]||''),return:'Bringt Rohstoffe zurück',build:'Baut'}[e.order.t]||'';
+    const ordTxt={idle:'Untätig',guard:'Wache',move:'Unterwegs',amove:'Angriffsbewegung',attack:'Im Kampf',gather:'Sammelt '+(RES_DE[e.order.rt]||''),return:'Bringt Rohstoffe zurück',build:'Baut',board:'Steigt ein'}[e.order.t]||'';
     box.innerHTML=`<h2>${uname(U,ep)}</h2><div class="sub">${U.label} · ${own} · <span data-live="ord">${ordTxt}</span></div><div class="hp"><b data-live="hp" style="width:${e.hp/e.maxhp*100}%"></b></div>
-    <div class="stats"><span><em>Leben</em><span data-live="hpt">${Math.ceil(e.hp)}/${e.maxhp}</span></span><span><em>Angriff</em>${s.atk.toFixed(0)}</span><span><em>Reichweite</em>${s.range<1?'Nahkampf':s.range}</span><span><em>Tempo</em>${s.speed.toFixed(1)}</span>${e.type==='worker'?`<span><em>Trägt</em><span data-live="carry">${Math.floor(e.carry)}</span></span>`:''}</div>
+    <div class="stats"><span><em>Leben</em><span data-live="hpt">${Math.ceil(e.hp)}/${e.maxhp}</span></span><span><em>Angriff</em>${s.atk.toFixed(0)}</span><span><em>Reichweite</em>${s.range<1?'Nahkampf':s.range}</span><span><em>Tempo</em>${s.speed.toFixed(1)}</span>${U.seats?`<span><em>Insassen</em>${(e.cargo||[]).length}/${U.seats}</span>`:''}${e.type==='worker'?`<span><em>Trägt</em><span data-live="carry">${Math.floor(e.carry)}</span></span>`:''}</div>
     ${e.type==='worker'&&e.owner===0?`<div class="hint">Bauen: Gebäude unten rechts wählen, dann auf die Karte klicken.</div>`:''}
-    ${U.bonus?`<div class="hint">Stark gegen ${Object.keys(U.bonus).map(k=>UNITS[k].label).join(' und ')}.</div>`:''}`;
+    ${U.bonus?`<div class="hint">Stark gegen ${Object.keys(U.bonus).map(k=>CLS_DE[k]||(UNITS[k]&&UNITS[k].label)||k).join(' und ')}.</div>`:''}`;
     return;
   }
   const D=BLD[e.type];
@@ -1972,7 +1999,7 @@ function refreshInfo(){
   if((el=q('amt')))el.textContent=Math.ceil(e.amount);
   if((el=q('carry')))el.textContent=Math.floor(e.carry);
   if((el=q('prog')))el.textContent=Math.floor(e.prog*100)+'%';
-  if((el=q('ord'))){const o=e.order;el.textContent={idle:'Untätig',guard:'Wache',move:'Unterwegs',amove:'Angriffsbewegung',attack:'Im Kampf',gather:'Sammelt '+(RES_DE[o.rt]||''),return:'Bringt Rohstoffe zurück',build:'Baut'}[o.t]||''}
+  if((el=q('ord'))){const o=e.order;el.textContent={idle:'Untätig',guard:'Wache',move:'Unterwegs',amove:'Angriffsbewegung',attack:'Im Kampf',gather:'Sammelt '+(RES_DE[o.rt]||''),return:'Bringt Rohstoffe zurück',build:'Baut',board:'Steigt ein'}[o.t]||''}
   if(e.kind==='bld'&&e.owner===0){
     el=q('queue');
     if(e.queue.length&&!el){buildInfo();return}
@@ -2016,7 +2043,7 @@ const mouse={x:0,y:0,inside:false};let drag=null,placing=null,aMode=false,groups
 const keys=new Set();
 function pickAt(wx,wy){
   let best=null,bd=1e9;
-  for(const e of ents){if(e.dead||e.kind!=='unit'||!visibleEnt(e))continue;const d=Math.hypot(e.x-wx,e.y-wy);if(d<e.r+.25&&d<bd){bd=d;best=e}}
+  for(const e of ents){if(e.dead||e.kind!=='unit'||!visibleEnt(e))continue;const d=isAir(e)&&e.airX!==undefined?Math.min(Math.hypot(e.airX/T-wx,e.airY/T-wy),Math.hypot(e.x-wx,e.y-wy)):Math.hypot(e.x-wx,e.y-wy);if(d<e.r+.25&&d<bd){bd=d;best=e}}
   if(best)return best;
   for(const e of ents){if(e.dead||e.kind==='unit'||!visibleEnt(e))continue;if(wx>=e.x&&wx<e.x+e.size&&wy>=e.y&&wy<e.y+e.size)return e}
   return null;
@@ -2032,6 +2059,9 @@ function rightCommand(wx,wy){
   if(t&&t.kind==='bld'&&t.type==='market'&&t.owner===0&&units.some(u=>u.type==='caravan')){for(const u of units)if(u.type==='caravan'){u.dest=t.id;u.leg=1;u.order={t:'idle'}}toast('Karawanenziel festgelegt.','good');marker={x:wx,y:wy,t:1,c:'#e9be72'};uiDirty=true;return}
   if(shiftHeld&&units.every(u=>u.order&&(u.order.t==='move'||u.order.t==='amove'))){for(const u of units)(u.wq=u.wq||[]).push({x:wx,y:wy,a:aMode});marker={x:wx,y:wy,t:1,c:'#9ef0a0'};aMode=false;uiDirty=true;return}
   for(const u of units)u.wq=[];
+  if(t&&t.kind==='unit'&&t.owner===0&&UNITS[t.type].seats&&units.some(u=>canBoard(u.type))){
+    const free=UNITS[t.type].seats-(t.cargo||[]).length;let n=0;for(const u of units)if(canBoard(u.type)&&n<free){order(u,{t:'board',target:t.id});n++}
+    toast(n?n+' Soldaten sitzen auf.':'Der Transporter ist voll.',n?'good':'warn');marker={x:wx,y:wy,t:1,c:'#9ef0a0'};uiDirty=true;return}
   if(t&&!(t.kind==='bld'&&t.type==='farm'&&units.every(u=>u.type!=='worker')&&t.owner===0)){
     cmdTarget(units,t);marker={x:wx,y:wy,t:1,c:t.owner===1?'#ff8a7a':'#e9be72'};
     // spread workers across multiple farms or trees
@@ -2192,7 +2222,7 @@ function renderTechTree(){
   const byAt={};for(const ln in next){const id=next[ln];(byAt[TECHS[id].at]=byAt[TECHS[id].at]||[]).push(id)}
   const lines=new Set(Object.values(TECHS).map(t=>t.line).filter(Boolean)),doneN=Object.keys(pl.techs).length;
   const have=t=>ents.some(e=>e.kind==='bld'&&e.owner===0&&e.type===t&&e.built&&!e.dead);
-  cols.innerHTML=Object.keys(byAt).map(at=>`<div class="tcol"><h3>${BLD[at]?BLD[at].name:at}<small>${have(at)?byAt[at].length+' offen':'nicht gebaut'}</small></h3>${byAt[at].map(id=>{const t=TECHS[id];let st=techState(0,id);
+  cols.innerHTML=Object.keys(byAt).map(at=>`<div class="tcol"><h3>${BLD[at]?(BLD[at].techTitle?BLD[at].techTitle+' · ':'')+BLD[at].name:at}<small>${have(at)?byAt[at].length+' offen':'nicht gebaut'}</small></h3>${byAt[at].map(id=>{const t=TECHS[id];let st=techState(0,id);
     const all=Object.values(TECHS).filter(x=>t.line&&x.line===t.line).sort((a,b)=>(a.epoch||0)-(b.epoch||0)),stepN=all.indexOf(t)+1;
     const cls=st==='open'&&!have(at)?'nobld':st==='open'&&!canAfford(0,t.cost||{})?'open short':st;
     const stTxt=st==='epoch'?'ab '+EPOCHS[t.epoch]:st==='running'?'läuft':!have(at)?'Gebäude fehlt':cls==='open short'?'zu teuer':'Verfügbar';
