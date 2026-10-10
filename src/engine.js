@@ -1571,6 +1571,40 @@ function lateMarket(g,bx,by,S,rep,pc){const x1=bx+S,y1=by+S,cx=bx+S/2;
   for(const [hx,hw] of [[x0+10,12],[xx-24,10]])blk(g,hx,hx+hw,yb-h-d*.4,4,6,'#b0b2ae','#9a9c98','#7a7c78');
   const cars=[[bx+10,'#c8c8c8'],[bx+26,pc],[bx+50,'#2a3a5a'],[bx+66,'#8a2a2a']];for(const [cx2,cc] of cars){const cy=y1-6;g.fillStyle='rgba(0,0,0,.3)';g.fillRect(cx2-1,cy-1,8,2);blk(g,cx2,cx2+6,cy,3,4,shade(cc,15),cc,shade(cc,-30));glassWin(g,cx2+1,cy-5,4,1.6,1)}
   for(const lx of [bx+40,x1-6]){g.strokeStyle='#8a8a8a';g.lineWidth=.8;g.beginPath();g.moveTo(lx,y1-3);g.lineTo(lx,y1-22);g.lineTo(lx-4,y1-22);g.stroke();g.fillStyle='#f0f0e0';g.fillRect(lx-5,y1-22.5,2.4,1)}}
+function logPile(g,x,y,n,rows,len,bark,cut){// gestapelte Stämme, Schnittflächen nach vorn
+  for(let r=0;r<rows;r++)for(let k=0;k<n-r;k++){const lx=x+k*3.2+r*1.6,ly=y-r*2.8;g.fillStyle=bark;g.fillRect(lx-len,ly-1.5,len,3);g.fillStyle='rgba(0,0,0,.25)';g.fillRect(lx-len,ly+.8,len,.7);
+    g.fillStyle='#5a3e24';g.beginPath();g.arc(lx,ly,1.6,0,7);g.fill();g.fillStyle=cut;g.beginPath();g.arc(lx,ly,1.2,0,7);g.fill();g.strokeStyle='rgba(120,80,40,.5)';g.lineWidth=.3;g.beginPath();g.arc(lx,ly,.6,0,7);g.stroke()}}
+function plankStack(g,x,y,w,h,col){blk(g,x,x+w,y,h,5,shade(col,18),col,shade(col,-25));g.strokeStyle='rgba(60,40,20,.35)';g.lineWidth=.4;for(let yy=y-1.4;yy>y-h;yy-=1.4){g.beginPath();g.moveTo(x,yy);g.lineTo(x+w,yy);g.stroke()}}
+function campGfx(g,bx,by,S,rep,pc,roof){const x1=bx+S,y1=by+S;
+  g.fillStyle=rep>=7?'rgba(120,116,104,.55)':'rgba(120,98,66,.5)';g.fillRect(bx+2,by+8,S-4,S-10);
+  for(let i=0;i<40;i++){const sx=bx+4+((i*37)%(S-8)),sy=by+12+((i*53)%(S-16));g.fillStyle=i%2?'rgba(200,160,100,.5)':'rgba(170,130,80,.45)';g.fillRect(sx,sy,1.4,.8)}
+  if(rep<=2){// offener Unterstand mit Rindendach, Hackklotz mit Axt, Sägebock
+    const x0=bx+4,xx=bx+S*.6,yb=by+S*.45;for(const px of [x0+1,xx-2]){g.fillStyle='#4a3220';g.fillRect(px,yb-14,2,14)}
+    g.fillStyle='rgba(0,0,0,.3)';g.fillRect(x0,yb-2,xx-x0+6,3);hroof(g,x0-2,xx+2,yb-12,12,rep===0?'#6a5a40':roof);
+    logPile(g,x1-20,y1-8,5,3,14,'#6b4a2a','#c8a46a');
+    g.fillStyle='#5a3e24';g.fillRect(bx+14,y1-12,5,4);g.fillStyle='#c8a46a';g.fillRect(bx+14,y1-13,5,1.4);g.strokeStyle='#4a3220';g.lineWidth=.9;g.beginPath();g.moveTo(bx+16,y1-13);g.lineTo(bx+19,y1-19);g.stroke();g.fillStyle='#8a9096';g.fillRect(bx+18,y1-20,3,2);
+    g.strokeStyle='#5a3e24';g.lineWidth=1;g.beginPath();g.moveTo(bx+28,y1-6);g.lineTo(bx+32,y1-12);g.lineTo(bx+36,y1-6);g.moveTo(bx+38,y1-6);g.lineTo(bx+42,y1-12);g.lineTo(bx+46,y1-6);g.stroke();g.fillStyle='#8a6236';g.fillRect(bx+30,y1-13.5,14,2.4);
+    for(const [sx,sy] of [[bx+8,by+S*.6],[bx+12,by+S*.62],[bx+10,by+S*.56]])blob(g,sx,sy,3,'#c3c9ce','#9aa1a8','#6c737a');
+    g.fillStyle=pc;g.fillRect(x0+2,yb-11,xx-x0-4,1.4);return}
+  if(rep<=6){// Fachwerk-Sägeschuppen mit Sägegrube, Bretterstapeln, Ladekran und Karren
+    const x0=bx+4,xx=bx+S*.66,yb=by+S*.5;bshadow(g,x0,yb-14,xx,yb,10);blk(g,x0,xx,yb,14,16,'#5a4630','#c8b490','#8a7454');
+    g.strokeStyle='#4a3220';g.lineWidth=1;g.beginPath();g.moveTo(x0,yb-7);g.lineTo(xx,yb-7);for(let x=x0;x<=xx;x+=8){g.moveTo(x,yb);g.lineTo(x,yb-14)}g.moveTo(x0,yb);g.lineTo(x0+8,yb-7);g.moveTo(xx,yb);g.lineTo(xx-8,yb-7);g.stroke();
+    g.fillStyle='#2a2018';g.fillRect(x0+12,yb-11,14,11);g.fillStyle='#8a9096';g.fillRect(x0+13,yb-6,12,.8);hroof(g,x0,xx,yb-14,16,roof);
+    logPile(g,x1-18,y1-10,5,3,16,'#6b4a2a','#c8a46a');plankStack(g,bx+8,y1-6,16,5,'#c8a06a');plankStack(g,bx+28,y1-6,12,7,'#b8905a');
+    const kx=x1-10,ky=by+S*.52;g.strokeStyle='#5a3e24';g.lineWidth=1.6;g.beginPath();g.moveTo(kx,ky);g.lineTo(kx,ky-24);g.lineTo(kx-16,ky-20);g.stroke();g.lineWidth=.6;g.strokeStyle='#3a3a3a';g.beginPath();g.moveTo(kx-15,ky-20);g.lineTo(kx-15,ky-10);g.stroke();g.fillStyle='#6b4a2a';g.fillRect(kx-20,ky-10,10,2.4);
+    g.fillStyle=pc;g.fillRect(x0+2,yb-13,xx-x0-4,1.4);return}
+  // Holzhof: offene Stahlhalle mit Bandsäge, Stammpolter, verpacktes Schnittholz, Portalkran, Langholz-LKW
+  const x0=bx+3,xx=bx+S*.6,yb=by+S*.46;bshadow(g,x0,yb-16,xx,yb,10);
+  g.fillStyle='#6a6e70';g.beginPath();g.moveTo(xx,yb);g.lineTo(xx,yb-16);g.lineTo(xx+6,yb-34);g.lineTo(xx+6,yb-18);g.closePath();g.fill();
+  g.fillStyle='#2a2c2c';g.fillRect(x0,yb-16,xx-x0,16);for(const px of [x0,x0+(xx-x0)/2,xx-1.5]){g.fillStyle='#8a8e90';g.fillRect(px,yb-16,1.5,16)}
+  g.fillStyle='#4a6a8a';g.fillRect(x0+6,yb-8,8,8);g.fillStyle='#c8c8c8';g.fillRect(x0+8,yb-12,1,8);plankStack(g,x0+18,yb-1,10,4,'#d8b880');
+  const rc=rep>=9?'#8a9aa0':'#7a8486';hroof(g,x0,xx,yb-16,18,rc);g.strokeStyle='rgba(0,0,0,.15)';g.lineWidth=.4;for(let x=x0+2;x<xx;x+=2){g.beginPath();g.moveTo(x,yb-16);g.lineTo(x+3,yb-26);g.stroke()}
+  logPile(g,x1-22,by+S*.66,6,4,18,'#5a4028','#d0aa70');
+  for(let i=0;i<2;i++){const px=bx+8+i*16,py=y1-6;plankStack(g,px,py,12,7,'#d8b880');g.fillStyle='rgba(240,240,235,.75)';g.fillRect(px,py-7,12,2.4);g.fillStyle=pc;g.fillRect(px+4,py-6.6,4,1.6)}
+  {const gx0=bx+S*.62,gx1=x1-3,gy=by+S*.5;g.strokeStyle='#d8a020';g.lineWidth=1.6;g.beginPath();g.moveTo(gx0,gy+14);g.lineTo(gx0,gy-12);g.lineTo(gx1,gy-12);g.lineTo(gx1,gy+14);g.stroke();g.lineWidth=.6;g.strokeStyle='#2a2a2a';g.beginPath();g.moveTo(gx0+10,gy-12);g.lineTo(gx0+10,gy-2);g.stroke();g.fillStyle='#d8a020';g.fillRect(gx0+7,gy-13.4,6,3)}
+  {const tx=bx+S*.4,ty=y1+1,cab=rep>=9?shade(pc,-5):'#5a6a4a';g.fillStyle='rgba(0,0,0,.3)';g.fillRect(tx-2,ty-1,26,2.4);blk(g,tx,tx+6,ty-2,6,5,shade(cab,15),cab,shade(cab,-30));glassWin(g,tx+.8,ty-7,3.6,2.4,1);
+    g.fillStyle='#3a3a3a';g.fillRect(tx+6,ty-4,17,1.6);for(let k=0;k<3;k++){g.fillStyle='#6b4a2a';g.fillRect(tx+6.5,ty-6-k*1.8,16,1.7);g.fillStyle='#d0aa70';g.beginPath();g.arc(tx+22.5,ty-5.2-k*1.8,.85,0,7);g.fill()}
+    g.fillStyle='#1a1a1a';for(const wx of [tx+2,tx+12,tx+19]){g.beginPath();g.arc(wx,ty-.6,1.6,0,7);g.fill()}}}
 function roundTower(g,cx,yb,r,h,col,roofCol,ep,pc){
   g.fillStyle='rgba(8,14,6,.32)';g.beginPath();g.ellipse(cx+8,yb+2,r+4,r*.5,0,0,7);g.fill();
   const gr=g.createLinearGradient(cx-r,0,cx+r,0);gr.addColorStop(0,shade(col,25));gr.addColorStop(.5,shade(col,0));gr.addColorStop(1,shade(col,-45));
@@ -1682,15 +1716,7 @@ function bldSprite(type,rep,owner){
         else{for(let i=0;i<3;i++){g.fillStyle='#7a5530';g.fillRect(bx+8,yy-2+i*3,16,2.5)}g.strokeStyle='#4a3220';g.lineWidth=1.6;g.beginPath();g.arc(bx+34,yy+3,5,0,7);g.stroke()}
         banner(g,x1-6,by-2,pc,16);
       }
-    }else if(type==='camp'){
-      bshadow(g,bx+2,by+4,x1-2,y1-2,8);
-      g.fillStyle='rgba(120,98,66,.5)';g.fillRect(bx+2,by+4,S-4,S-6);
-      g.fillStyle='#4a3220';g.fillRect(bx+4,by+4,2,16);g.fillRect(x1-6,by+4,2,16);
-      hipRoof(g,bx+1,by-2,x1-1,by+14,roof,mat.roof,0);
-      for(let i=0;i<4;i++){g.fillStyle=i%2?'#7a5530':'#8f6a40';g.fillRect(bx+5,y1-14+i*2.6,18,2.4);g.fillStyle='#c8a46a';g.beginPath();g.arc(bx+23,y1-12.8+i*2.6,1.2,0,7);g.fill()}
-      for(const [sx,sy] of [[x1-18,y1-10],[x1-12,y1-12],[x1-15,y1-15]])blob(g,sx,sy,3.5,'#c3c9ce','#9aa1a8','#6c737a');
-      g.fillStyle='#8a6a40';g.beginPath();g.arc(x1-8,y1-7,3.5,0,7);g.fill();g.fillStyle='#e8c650';g.beginPath();g.arc(x1-8,y1-9,2,0,7);g.fill();
-      g.fillStyle=pc;g.fillRect(bx+4,by+14,S-8,2);
+    }else if(type==='camp'){campGfx(g,bx,by,S,rep,pc,roof);
     }else if(type==='tower'&&rep>=5){lateTower(g,bx,by,S,rep,pc);
     }else if(type==='tower'){
       roundTower(g,(bx+x1)/2,y1-6,S*.3,S*.78,ep>=3?'#9a9890':col,roof,ep,pc);
