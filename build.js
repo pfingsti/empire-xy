@@ -9,7 +9,7 @@ const examples=fs.readdirSync(path.join(__dirname,'mods')).filter(f=>f.endsWith(
   .map(f=>`// --- Beispiel-Baustein ${f}\nEmpireXY.loadSource(${JSON.stringify(R('mods/'+f)).replace(/<\/script/gi,'<\\/script')},'beispiel');`);
 // PeerJS (WebRTC-Vermittlung für den Mehrspieler) wird mit eingebaut, damit kein CDN nötig ist
 const vendor=fs.existsSync(path.join(__dirname,'src/vendor'))?fs.readdirSync(path.join(__dirname,'src/vendor')).filter(f=>f.endsWith('.js')).sort().map(f=>'<script>\n'+R('src/vendor/'+f).replace(/<\/script/gi,'<\\/script')+'\n</script>\n').join(''):'';
-const body=shell+vendor+'<script>\n'+R('src/registry.js')+'\n'+core.join('\n')+'\n'+examples.join('\n')+'\n</script>\n<script>\n'+R('src/boot.js')+'\n</script>\n<script>\n'+R('src/engine.js')+'</script>\n';
+const body=shell+vendor+'<script>\n'+R('src/registry.js')+'\n'+core.join('\n')+'\n'+examples.join('\n')+'\n</script>\n<script>\n'+R('src/boot.js')+'\n</script>\n<script>\n'+R('src/engine.js').replace('/*@GFX3D@*/',()=>R('src/gfx3d.js'))+'</script>\n';
 fs.writeFileSync(path.join(__dirname,'index.html'),body);
 const full='<!doctype html>\n<html lang="de">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">\n<style>body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>\n</head>\n<body>\n'+body+'</body>\n</html>\n';
 fs.mkdirSync(path.join(__dirname,'desktop/app'),{recursive:true});

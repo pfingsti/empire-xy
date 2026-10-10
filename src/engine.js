@@ -1617,11 +1617,14 @@ function roundTower(g,cx,yb,r,h,col,roofCol,ep,pc){
     g.fillStyle='rgba(0,0,0,.25)';g.beginPath();g.moveTo(cx,yb-h-r*1.6);g.lineTo(cx+r+3,yb-h);g.lineTo(cx+2,yb-h);g.closePath();g.fill();
     g.strokeStyle=OUT;g.lineWidth=1;g.beginPath();g.moveTo(cx-r-3,yb-h);g.lineTo(cx,yb-h-r*1.6);g.lineTo(cx+r+3,yb-h);g.stroke();banner(g,cx,yb-h-r*1.6+1,pc,10)}
 }
+/*@GFX3D@*/
+const BOX=24,BOY=72,BPW=68,BPH=86;// Sprite-Rand: links, oben, Zusatzbreite, Zusatzhöhe
 function bldSprite(type,rep,owner){
   const ep=VIS(rep),D=BLD[type],S=D.size*T,mat=MAT[Math.min(rep,MAT.length-1)],col=WALL[rep]||'#999',roof=ROOF[rep]||'#777',pc=PCOL[owner];
-  return sprite(`b|${type}|${rep}|${owner}`,S+24,S+44,g=>{
-    const bx=4,by=36,x1=bx+S,y1=by+S,lit=ep>=2;
-    if(type==='house'&&rep>=7){lateHouse(g,bx,by,S,rep,pc);
+  return sprite(`b|${type}|${rep}|${owner}`,S+BPW,S+BPH,g=>{
+    const bx=BOX,by=BOY,x1=bx+S,y1=by+S,lit=ep>=2;
+    if(B3[type]&&B3[type](g,bx,by,S,rep,pc)){
+    }else if(type==='house'&&rep>=7){lateHouse(g,bx,by,S,rep,pc);
     }else if(type==='barracks'&&rep>=7){lateBarracks(g,bx,by,S,rep,pc);
     }else if(type==='house'){
       // Hofstelle: festgetretener Vorplatz, Garten mit Flechtzaun, Holzstapel, Regentonne, Wäscheleine
@@ -2102,13 +2105,13 @@ function drawBld0(g,b){
   if(!b.built){
     // foundation, scaffolding and the building rising from the ground
     g.fillStyle='rgba(90,72,48,.75)';g.fillRect(x+2,y+2,s-4,s-4);
-    g.save();const top=y-36+(spr.lh)*(1-b.prog*.999);g.beginPath();g.rect(x-8,top,s+24,y+s+12-top);g.clip();g.globalAlpha=.9;g.drawImage(spr,x-4,y-36,spr.lw,spr.lh);g.restore();
+    g.save();const top=y-BOY+(spr.lh)*(1-b.prog*.999);g.beginPath();g.rect(x-BOX,top,s+BPW,y+s+BPH-top);g.clip();g.globalAlpha=.9;g.drawImage(spr,x-BOX,y-BOY,spr.lw,spr.lh);g.restore();
     g.strokeStyle='#a68a5c';g.lineWidth=1.5;
     for(let i=0;i<=b.size*2;i++){const px=x+2+i*(s-4)/(b.size*2);g.beginPath();g.moveTo(px,y+s-2);g.lineTo(px,y+4-10*(1-b.prog));g.stroke()}
     g.beginPath();for(let k=0;k<3;k++){const py=y+s-4-k*(s/3);g.moveTo(x+2,py);g.lineTo(x+s-2,py)}g.stroke();g.lineWidth=1;
     drawProg(g,b,x,y,s);return;
   }
-  g.drawImage(spr,x-4,y-36,spr.lw,spr.lh);
+  g.drawImage(spr,x-BOX,y-BOY,spr.lw,spr.lh);
   if(b.sabotUntil>gameT){const cx=x+s/2,cy=y-6+Math.sin(gameT*4)*1.5;g.fillStyle='rgba(30,20,20,.8)';g.beginPath();g.arc(cx,cy,7,0,7);g.fill();g.strokeStyle='#ff6a5a';g.lineWidth=2;g.beginPath();g.moveTo(cx-3.5,cy-3.5);g.lineTo(cx+3.5,cy+3.5);g.moveTo(cx+3.5,cy-3.5);g.lineTo(cx-3.5,cy+3.5);g.stroke();g.lineWidth=1}
 }
 // Rauch, Feuer und Explosionen: weiche Partikel statt flacher Kreise
@@ -2475,7 +2478,7 @@ function render(){
   {const dp=(gameT%240)/120;if(dp<1&&WX.night<.9){const k=(dp-.5)*-2.2,sy=.38+.5*Math.abs(dp-.5),al=(.3*(1-WX.night)*(WX.kind==='sun'?1:WX.kind==='rain'?.25:WX.kind==='storm'?.08:.55)).toFixed(3);
     ctx.save();ctx.globalAlpha=+al;
     for(const e of list){let spr,bx,by,dx,dy,w,h;
-      if(e.kind==='bld'&&e.built&&!BLD[e.type].draw&&!BLD[e.type].line){const sp=bldSprite(e.type,players[e.owner].epoch,e.owner);spr=shadowSprite(sp,'b'+e.type+players[e.owner].epoch+e.owner);bx=e.x*T+e.size*T/2;by=e.y*T+e.size*T-4;dx=e.x*T-4-bx;dy=e.y*T-36-by;w=sp.lw;h=sp.lh}
+      if(e.kind==='bld'&&e.built&&!BLD[e.type].draw&&!BLD[e.type].line&&!B3[e.type]){const sp=bldSprite(e.type,players[e.owner].epoch,e.owner);spr=shadowSprite(sp,'b'+e.type+players[e.owner].epoch+e.owner);bx=e.x*T+e.size*T/2;by=e.y*T+e.size*T-4;dx=e.x*T-BOX-bx;dy=e.y*T-BOY-by;w=sp.lw;h=sp.lh}
       else if(e.kind==='res'&&e.type==='tree'&&!(e.amount<e.max)){const sp=treeSprite(e.v);spr=shadowSprite(sp,'t'+e.v);bx=e.x*T+16;by=e.y*T+28;dx=-24;dy=-60;w=48;h=64}
       else continue;
       const z=cam.z*dpr;ctx.setTransform(z,0,0,z,(bx-cam.x)*z,(by-cam.y)*z);ctx.transform(1,0,k,sy,0,0);ctx.drawImage(spr,dx,dy,w,h)}
@@ -3372,7 +3375,7 @@ function autoPlayer(){ // lets the player side be run by the same AI for soak te
 window.__rc=(x,y,sh)=>{shiftHeld=!!sh;rightCommand(x,y);shiftHeld=false};
 window.__wx=(o,t)=>{if(t!=null)gameT=t;Object.assign(WX,o)};window.__fx=(x,y,k)=>fx.push({x,y,t:0,k});window.__vfx=()=>vfx.reduce((m,v)=>(m[v.k]=(m[v.k]||0)+1,m),{});
 window.__ex={start:(d,s)=>{newGame(d,s);started=true},step:n=>{for(let i=0;i<n&&!over;i++)step(DT)},select:a=>select(a),get:()=>({t:gameT,over,players,ents})};
-window.__bldDraw=(t,g,x,y,ep,o)=>{const D=BLD[t],s=D.size*T;if(!D.draw){const c=bldSprite(t,ep,o);g.drawImage(c,x-4,y-36,c.lw,c.lh);return}modDraw(g,{type:t,owner:o,built:true,size:D.size,id:1},{x,y,s,lift:Math.min(12,s*.18),ep,pc:PCOL[o],wall:WALL[ep],roof:ROOF[ep],roofHi:ROOF_HI[ep],...DRAW_API})};window.__look=(x,y,z)=>{zoomT=0;cam.z=z;cam.x=x*T-viewW/(2*z);cam.y=y*T-viewH/(2*z)};window.__tree=v=>treeSprite(v);window.__unitDraw=(g,u)=>{g.save();UNITS[u.type].draw(g,u,DRAW_API);g.restore()};window.__rock=(k,v)=>rockSprite(k,v);window.__spawn=(p,t,x,y)=>spawnUnit(p,t,x,y);window.__reveal=()=>{exp.fill(1);vis.fill(1)};window.__place=(p,t,x,y)=>placeBld(p,t,x,y,true);window.__can=(p,t,x,y)=>canPlace(p,t,x,y);window.__water=(x,y)=>terr[idx(x|0,y|0)]===1;window.__cam=(x,y)=>{cam.x=x*T;cam.y=y*T};window.__move=(u,x,y)=>cmdMove([u],x,y,false);window.__limit=m=>{timeLimit=m};window.__placeU=(p,t,x,y)=>placeBld(p,t,x,y,false);
+window.__bldDraw=(t,g,x,y,ep,o)=>{const D=BLD[t],s=D.size*T;if(!D.draw){const c=bldSprite(t,ep,o);g.drawImage(c,x-BOX,y-BOY,c.lw,c.lh);return}modDraw(g,{type:t,owner:o,built:true,size:D.size,id:1},{x,y,s,lift:Math.min(12,s*.18),ep,pc:PCOL[o],wall:WALL[ep],roof:ROOF[ep],roofHi:ROOF_HI[ep],...DRAW_API})};window.__look=(x,y,z)=>{zoomT=0;cam.z=z;cam.x=x*T-viewW/(2*z);cam.y=y*T-viewH/(2*z)};window.__tree=v=>treeSprite(v);window.__unitDraw=(g,u)=>{g.save();UNITS[u.type].draw(g,u,DRAW_API);g.restore()};window.__rock=(k,v)=>rockSprite(k,v);window.__spawn=(p,t,x,y)=>spawnUnit(p,t,x,y);window.__reveal=()=>{exp.fill(1);vis.fill(1)};window.__place=(p,t,x,y)=>placeBld(p,t,x,y,true);window.__can=(p,t,x,y)=>canPlace(p,t,x,y);window.__water=(x,y)=>terr[idx(x|0,y|0)]===1;window.__cam=(x,y)=>{cam.x=x*T;cam.y=y*T};window.__move=(u,x,y)=>cmdMove([u],x,y,false);window.__limit=m=>{timeLimit=m};window.__placeU=(p,t,x,y)=>placeBld(p,t,x,y,false);
 })();
 
 // ---------- Hauptmenü: gemalte Landschaft im Abendlicht (Berge, Wälder, See, Burg), dezent bewegt
