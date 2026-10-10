@@ -33,6 +33,7 @@ let ME=0,LOCAL=0,MP=null,CMDX=false;
 const uiRand=Math.random; // für reine Grafik-Effekte, damit der Zufall der Simulation unberührt bleibt
 const FORMS=['keine','Schildwall','Keil','Schützenlinie'];
 const SLOTKEYS=['Q','W','E','R','T','A','S','D','F','G','Y','X','C','V','B','U','I','O','M','J','K','L'];
+const WASD={w:'ArrowUp',a:'ArrowLeft',s:'ArrowDown',d:'ArrowRight'};const slotKeyLabel=k=>WASD[(k||'').toLowerCase()]?'⇧'+k:(k||'');
 
 const UNITS=XY.units, BLD=XY.buildings, RESDEF=XY.nodes, TECHS=XY.techs;
 const DIFF=[
@@ -2001,7 +2002,7 @@ function buildCmds(){
   for(let i=0;i<n;i++){
     const c=cmds[i];const b=document.createElement('button');b.className='cmd';
     if(!c){b.style.visibility='hidden';b.tabIndex=-1;box.appendChild(b);continue}
-    b.innerHTML=`<kbd>${SLOTKEYS[i]||''}</kbd><span class="n">${c.label}</span><span class="c">${c.cost?costHTML(c.cost):''}</span>`;
+    b.innerHTML=`<kbd>${slotKeyLabel(SLOTKEYS[i])}</kbd><span class="n">${c.label}</span><span class="c">${c.cost?costHTML(c.cost):''}</span>`;
     b.disabled=!!c.dis&&!c.short;if(c.short)b.classList.add('short');if(c.tech)b.classList.add('tech');if(c.cat)b.classList.add('cat');if(c.on)b.classList.add('on');
     b.addEventListener('click',()=>{if(c.need&&c.dis){toast(c.need,'warn');return}if(c.short&&c.dis){toast('Nicht genug Rohstoffe.','warn');return}sfx('click');runCmd(c)});
     b.addEventListener('pointerenter',ev=>showTip(c,b));b.addEventListener('pointerleave',hideTip);
@@ -2295,9 +2296,11 @@ mm.addEventListener('pointerup',()=>{mmDrag=false});
 
 window.addEventListener('keydown',e=>{
   if(!started||over)return;
-  if(e.target.tagName==='INPUT')return;
+  const tg=e.target;if(tg&&(tg.tagName==='INPUT'||tg.tagName==='TEXTAREA'||tg.tagName==='SELECT'||tg.isContentEditable))return;
   const k=e.key;
   if(k.startsWith('Arrow')){keys.add(k);e.preventDefault();return}
+  // W/A/S/D bewegen die Kamera wie die Pfeiltasten; die Befehle auf diesen Plätzen liegen auf Shift + W/A/S/D
+  {const wk=WASD[k.toLowerCase()];if(wk&&!e.shiftKey&&!e.ctrlKey&&!e.altKey&&!e.metaKey){keys.add(wk);e.preventDefault();return}}
   if(k==='Escape'&&!$('#techScreen').hidden){toggleTech(false);return}
   if(k==='n'||k==='N'){toggleTech();return}
   if(k==='Escape'&&(!$('#diploPanel').hidden||!$('#savePanel').hidden)){$('#diploPanel').hidden=true;$('#savePanel').hidden=true;return}
@@ -2315,7 +2318,7 @@ window.addEventListener('keydown',e=>{
   if(i>=0&&curCmds[i]){const c=curCmds[i];if(c.need&&c.dis){toast(c.need,'warn');return}if(c.dis){toast('Nicht genug Rohstoffe.','warn');return}sfx('click');runCmd(c)}
 });
 let lastGroup=null,lastGroupT=0,idleIx=0,zoomT=0,zoomAt=null;const camV={x:0,y:0};
-window.addEventListener('keyup',e=>keys.delete(e.key));
+window.addEventListener('keyup',e=>{keys.delete(e.key);const a=WASD[e.key.toLowerCase()];if(a)keys.delete(a)});
 window.addEventListener('blur',()=>keys.clear());
 function selectIdle(){
   const idle=ents.filter(e=>e.owner===ME&&e.type==='worker'&&e.order.t==='idle');
