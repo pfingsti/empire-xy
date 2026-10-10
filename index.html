@@ -3141,11 +3141,17 @@ function bldSprite(type,rep,owner){
       else{g.fillStyle='#e9be72';g.beginPath();g.moveTo(cx-8,cy+4);g.lineTo(cx,cy-10);g.lineTo(cx+8,cy+4);g.closePath();g.fill()}
       banner(g,cx,cy-(ep>=3?10:9),pc,16);
     }else if(type==='farm'){
-      g.fillStyle='#6d5532';g.fillRect(bx+2,by+2,S-4,S-4);
-      for(let i=0;i<7;i++){const yy=by+6+i*(S-10)/6.2;g.fillStyle='#5a4428';g.fillRect(bx+4,yy+2,S-8,2);
-        for(let x=bx+6;x<x1-5;x+=4){g.fillStyle=ep>=2?'#d8b84e':'#8fb04a';g.beginPath();g.ellipse(x,yy,1.6,2.6,0,0,7);g.fill()}}
-      for(const [px,py] of [[bx+2,by+2],[x1-4,by+2],[bx+2,y1-4],[x1-4,y1-4]]){g.fillStyle='#4a3220';g.fillRect(px,py-3,2,5)}
-      g.strokeStyle=pc;g.lineWidth=1;g.strokeRect(bx+2.5,by+2.5,S-5,S-5);
+      // Acker: Erde mit Furchen, dichte Halme in leicht wechselnden Tönen, Feldrain
+      let sd=(ep*97+7)>>>0;const rn=()=>((sd=(sd*1664525+1013904223)>>>0)/4294967296);
+      g.fillStyle='#5e4a30';g.fillRect(bx+2,by+2,S-4,S-4);
+      const rows=9,rh=(S-8)/rows;
+      for(let i=0;i<rows;i++){const yy=by+4+i*rh;g.fillStyle='#6f5838';g.fillRect(bx+3,yy,S-6,rh*.45);g.fillStyle='#4a3a24';g.fillRect(bx+3,yy+rh*.55,S-6,rh*.3);
+        for(let x=bx+4;x<x1-3;x+=1.6){const h=2.5+rn()*2.2,c=ep>=2?[[196,168,82],[178,150,70],[210,184,96]]:[[118,146,70],[100,130,60],[134,158,78]];const k=c[rn()*3|0];
+          g.strokeStyle=`rgba(${k[0]},${k[1]},${k[2]},.9)`;g.lineWidth=.8;g.beginPath();g.moveTo(x,yy+rh*.5);g.lineTo(x+(rn()-.5),yy+rh*.5-h);g.stroke();
+          if(ep>=2&&rn()<.5){g.fillStyle=`rgb(${k[0]+20},${k[1]+16},${k[2]})`;g.fillRect(x-.5,yy+rh*.5-h-1.2,1,1.6)}}}
+      g.fillStyle='rgba(90,110,50,.5)';g.fillRect(bx+1,by+1,S-2,1.5);g.fillRect(bx+1,y1-2.5,S-2,1.5);g.fillRect(bx+1,by+1,1.5,S-2);g.fillRect(x1-2.5,by+1,1.5,S-2);
+      for(const [px,py] of [[bx+2,by+2],[x1-4,by+2],[bx+2,y1-4],[x1-4,y1-4]]){g.fillStyle='#4a3220';g.fillRect(px,py-3,1.6,4)}
+      g.fillStyle=pc;g.fillRect(bx+2,by-2,3,2);
     }else{ // building from an add-on module without own drawing
       hall(g,bx+3,by,x1-3,y1-2,12,mat,col,roof,lit,7);
       g.fillStyle='#f1e6cf';g.font='600 '+(S*.3|0)+'px "Alegreya SC",Georgia,serif';g.textAlign='center';g.textBaseline='middle';g.fillText(D.name[0],(bx+x1)/2,by+S*.3);
