@@ -1472,6 +1472,67 @@ function lateTC(g,bx,by,S,rep,pc){const x1=bx+S,y1=by+S;
   g.fillStyle='#d8d6ce';g.fillRect(mx-11,yb,22,2);g.fillRect(mx-13,yb+2,26,2);
   for(const fx of [mx-18,mx+18,mx+24]){g.strokeStyle='#d0d0d0';g.lineWidth=.9;g.beginPath();g.moveTo(fx,yb+6);g.lineTo(fx,yb-22);g.stroke();g.fillStyle=fx===mx+24?'#e8e8e8':pc;g.beginPath();g.moveTo(fx,yb-22);g.quadraticCurveTo(fx+4,yb-23,fx+8,yb-21);g.lineTo(fx+8,yb-16.5);g.quadraticCurveTo(fx+4,yb-18.5,fx,yb-17.5);g.fill()}
   for(const tx of [x0+2,xx-2]){g.fillStyle='#7a7a74';g.fillRect(tx-3,yb+4,6,3);blob(g,tx,yb,4.5,'#6e8c44','#47652e','#2a4120')}}
+function hroof(g,x0,x1,yt,d,col){const dx=d*.35,rg=d*.55;// Walmdach auf einem Quader: Vorderfläche im Licht, rechte Walmfläche im Schatten
+  g.fillStyle=shade(col,-22);g.beginPath();g.moveTo(x0,yt);g.lineTo(x1,yt);g.lineTo(x1+dx,yt-d);g.lineTo(x0+dx,yt-d);g.closePath();g.fill();
+  g.fillStyle=shade(col,-30);g.beginPath();g.moveTo(x1+1,yt);g.lineTo(x1+dx+1,yt-d);g.lineTo(x1+dx-d*.35,yt-rg);g.closePath();g.fill();
+  const gr=g.createLinearGradient(0,yt-rg,0,yt);gr.addColorStop(0,shade(col,12));gr.addColorStop(1,shade(col,-12));g.fillStyle=gr;g.beginPath();g.moveTo(x0-1.5,yt+.5);g.lineTo(x1+1.5,yt+.5);g.lineTo(x1+dx-d*.35,yt-rg);g.lineTo(x0+d*.45,yt-rg);g.closePath();g.fill();
+  g.strokeStyle='rgba(0,0,0,.18)';g.lineWidth=.4;for(let k=1;k<5;k++){const y=yt-rg*k/5;g.beginPath();g.moveTo(x0-1+d*.45*k/5,y);g.lineTo(x1+1-(x1+1-(x1+dx-d*.35))*k/5,y);g.stroke()}
+  g.fillStyle='rgba(255,240,210,.25)';g.fillRect(x0+d*.45,yt-rg-.4,x1+dx-d*.35-x0-d*.45,.8)}
+function sash(g,x,y,w,h,lit){g.fillStyle='#e8e2d4';g.fillRect(x-.6,y-.6,w+1.2,h+1.2);g.fillStyle=lit?'#e8b860':'#34404a';g.fillRect(x,y,w,h);if(lit){g.fillStyle='rgba(255,230,160,.5)';g.fillRect(x,y,w,h*.4)}g.fillStyle='#e8e2d4';g.fillRect(x,y+h/2-.3,w,.6);g.fillRect(x+w/2-.3,y,.6,h)}
+function lateHouse(g,bx,by,S,rep,pc){const x1=bx+S,y1=by+S;
+  g.fillStyle='rgba(112,104,90,.35)';g.fillRect(bx+2,y1-14,S-4,12);
+  if(rep===7){// Backstein-Mietshaus mit Schieferdach, Schornsteinen, Gaslaterne
+    const x0=bx+6,xx=x1-16,yb=y1-8,h=32,d=18;bshadow(g,x0,yb-h,xx,yb,12);blk(g,x0,xx,yb,h,d,'#5a3a2e','#a05a44','#663628');
+    g.strokeStyle='rgba(50,24,16,.3)';g.lineWidth=.45;for(let y=yb-2.2;y>yb-h;y-=2.2){g.beginPath();g.moveTo(x0,y);g.lineTo(xx,y);g.stroke()}
+    g.fillStyle='#d8cfb8';g.fillRect(x0,yb-h*.5,xx-x0,1.2);
+    for(let r=0;r<2;r++)for(let x=x0+4;x<xx-4;x+=8.5){if(r===0&&x>x0+10&&x<x0+20)continue;sash(g,x,yb-h+4+r*14,4.4,7,((x*7+r*3)|0)%3===0)}
+    g.fillStyle='#2a2420';g.fillRect(x0+12,yb-11,6,11);g.fillStyle='#4a3a2c';g.fillRect(x0+12.6,yb-10.4,4.8,10);g.fillStyle='#d8cfb8';g.fillRect(x0+11,yb-12,8,1.4);g.fillRect(x0+11,yb,8,1.6);
+    hroof(g,x0,xx,yb-h,d,'#4a4e56');
+    for(const cx of [x0+5,xx-3]){blk(g,cx,cx+4,yb-h-6,7,3,'#7a4030','#8a4836','#5a2c20');g.fillStyle='#a05030';g.fillRect(cx+.6,yb-h-14.5,1.2,2);g.fillRect(cx+2.4,yb-h-14.5,1.2,2)}
+    g.strokeStyle='#2a2a2a';g.lineWidth=.8;g.beginPath();g.moveTo(xx+8,y1-3);g.lineTo(xx+8,y1-20);g.stroke();g.fillStyle='#2a2a2a';g.fillRect(xx+6.4,y1-23,3.2,3);g.fillStyle='rgba(255,220,150,.9)';g.fillRect(xx+7,y1-22.4,2,1.8);
+    g.strokeStyle='#2a2a2a';g.lineWidth=.6;g.beginPath();g.moveTo(x0,y1-3);g.lineTo(xx,y1-3);for(let x=x0;x<=xx;x+=2.5){g.moveTo(x,y1-3);g.lineTo(x,y1-6.5)}g.stroke();
+    g.fillStyle=pc;g.fillRect(xx-8,yb-h+2,4,2.4);return}
+  if(rep===8){// verputztes Stadthaus der Zwischenkriegszeit mit Ziegelwalmdach, Fensterläden
+    const x0=bx+6,xx=x1-14,yb=y1-8,h=26,d=22;bshadow(g,x0,yb-h,xx,yb,12);blk(g,x0,xx,yb,h,d,'#a8a090','#d2c8ae','#9c927a');
+    g.fillStyle='#8a8270';g.fillRect(x0,yb-4,xx-x0,4);
+    for(let r=0;r<2;r++)for(let x=x0+5;x<xx-5;x+=10){if(r===0&&x>x0+12&&x<x0+24)continue;g.fillStyle='#4a5a3a';g.fillRect(x-2,yb-h+4+r*11,1.6,7);g.fillRect(x+5.4,yb-h+4+r*11,1.6,7);sash(g,x,yb-h+4+r*11,5,7,((x+r*5)|0)%4===0)}
+    g.fillStyle='#5a3a24';g.fillRect(x0+14,yb-10,6,10);g.fillStyle='#d8d0bc';g.fillRect(x0+12,yb-12,10,2);
+    hroof(g,x0,xx,yb-h,d,'#9a4a34');blk(g,xx-8,xx-4,yb-h-8,6,3,'#7a7064','#a8a090','#6a6458');
+    g.fillStyle='#3a4a2a';for(let i=0;i<6;i++){g.beginPath();g.arc(xx+5,y1-4-i*2.6,2.4,0,7);g.fill()}
+    g.fillStyle=pc;g.fillRect(x0+14,yb-h+1.5,6,2);return}
+  // Moderne: kubisches Wohnhaus, Flachdach mit Solarmodulen, große Fenster, Holzverkleidung, Auto, Hecke
+  const x0=bx+6,xx=x1-18,yb=y1-10,h=24,d=22;bshadow(g,x0,yb-h,xx,yb,12);blk(g,x0,xx,yb,h,d,'#9a9c98','#ece9e2','#b8b6b0');
+  g.fillStyle='#8a6440';g.fillRect(xx-12,yb-h,12,h);g.strokeStyle='rgba(40,24,10,.35)';g.lineWidth=.5;for(let x=xx-11;x<xx;x+=1.6){g.beginPath();g.moveTo(x,yb-h);g.lineTo(x,yb);g.stroke()}
+  glassWin(g,x0+3,yb-h+3,xx-x0-18,8,1);glassWin(g,x0+3,yb-11,10,10,1);glassWin(g,x0+16,yb-11,6,6,1);g.fillStyle='#3a3a3a';g.fillRect(xx-9,yb-10,5,10);
+  g.fillStyle='#d8d6d0';g.fillRect(x0-1,yb-h-1.5,xx-x0+2,1.8);
+  const dx=d*.35;for(let i=0;i<3;i++){const px=x0+5+i*9,py=yb-h-4;g.fillStyle='#1e2a3a';g.beginPath();g.moveTo(px,py);g.lineTo(px+7,py);g.lineTo(px+7+dx*.4,py-d*.45);g.lineTo(px+dx*.4,py-d*.45);g.closePath();g.fill();g.strokeStyle='rgba(160,190,220,.35)';g.lineWidth=.4;g.beginPath();g.moveTo(px+3.5,py);g.lineTo(px+3.5+dx*.4,py-d*.45);g.stroke()}
+  {const cx=xx+5,cy=y1-6;g.fillStyle='rgba(0,0,0,.3)';g.beginPath();g.ellipse(cx+5,cy+1.5,8,2,0,0,7);g.fill();blk(g,cx-1,cx+11,cy,4,5,shade(pc,10),shade(pc,-10),shade(pc,-35));glassWin(g,cx+1,cy-6,7,2,1);g.fillStyle='#1a1a1a';g.beginPath();g.arc(cx+1.5,cy,1.4,0,7);g.arc(cx+9,cy,1.4,0,7);g.fill()}
+  g.fillStyle='#3e5a2a';g.fillRect(bx+3,y1-5,S*.4,3);g.fillStyle='#4e6c34';g.fillRect(bx+3,y1-5.5,S*.4,1.2)}
+function lateBarracks(g,bx,by,S,rep,pc){const x1=bx+S,y1=by+S;
+  g.fillStyle=rep>=8?'rgba(140,140,130,.6)':'rgba(130,112,86,.55)';g.fillRect(bx+2,by+S*.25,S-4,S*.73);
+  if(rep===7){// Backstein-Kaserne: langer Bau, zwei Geschosse, Torbogen, Exerzierplatz, Fahnenmast
+    const x0=bx+4,xx=x1-14,yb=by+S*.6,h=28,d=22;bshadow(g,x0,yb-h,xx,yb,14);blk(g,x0,xx,yb,h,d,'#4e525a','#9e5a44','#663628');
+    g.fillStyle='#d8cfb8';g.fillRect(x0,yb-h,xx-x0,1.8);g.fillRect(x0,yb-h*.5,xx-x0,1);
+    for(let r=0;r<2;r++)for(let x=x0+4;x<xx-4;x+=6.5){const m=(x0+xx)/2;if(r===1&&Math.abs(x+2-m)<7)continue;sash(g,x,yb-h+4+r*12,3.6,6.5,((x*3+r)|0)%5===0)}
+    const m=(x0+xx)/2;g.fillStyle='#2a2420';g.beginPath();g.moveTo(m-5,yb);g.lineTo(m-5,yb-7);g.arc(m,yb-7,5,Math.PI,0);g.lineTo(m+5,yb);g.fill();g.fillStyle='#d8cfb8';g.fillRect(m-7,yb-14,14,2);
+    hroof(g,x0,xx,yb-h,d,'#4a4e56');
+    g.strokeStyle='#ececec';g.lineWidth=.6;g.strokeRect(bx+12,yb+6,S-30,S*.3);g.beginPath();g.moveTo(bx+12+(S-30)/2,yb+6);g.lineTo(bx+12+(S-30)/2,yb+6+S*.3);g.stroke();
+    for(let i=0;i<4;i++)for(let j=0;j<2;j++){const sx=bx+20+i*9,sy=yb+12+j*8;g.fillStyle='rgba(0,0,0,.25)';g.beginPath();g.ellipse(sx+1,sy+1,2,1,0,0,7);g.fill();g.fillStyle='#3e4a34';g.fillRect(sx-1,sy-5,2,5);g.fillStyle='#c4a07a';g.beginPath();g.arc(sx,sy-6,1.1,0,7);g.fill()}
+    g.strokeStyle='#d0d0d0';g.lineWidth=.9;g.beginPath();g.moveTo(xx+6,y1-6);g.lineTo(xx+6,by-6);g.stroke();banner(g,xx+6,by-6,pc,14);
+    g.strokeStyle='#2a2a2a';g.lineWidth=.7;g.beginPath();g.moveTo(bx+2,y1-2);g.lineTo(x1-2,y1-2);for(let x=bx+2;x<=x1-2;x+=3){g.moveTo(x,y1-2);g.lineTo(x,y1-6)}g.stroke();return}
+  // Stützpunkt: Fahrzeughalle mit Wellblech-Tonnendach, Stabsgebäude, Funkmast, Maschendrahtzaun, Sandsäcke bzw. Hubschrauberlandeplatz
+  const x0=bx+4,xx=bx+S*.62,yb=by+S*.62,r=13,d=26,dx=d*.35,hc=rep>=9?'#7a7e78':'#5a6248';
+  bshadow(g,x0,yb-r,xx,yb,14);
+  g.fillStyle=shade(hc,-25);g.beginPath();g.moveTo(xx,yb);g.lineTo(xx+dx,yb-d);g.lineTo(xx+dx,yb-d-r*.2);g.lineTo(xx,yb-r*.2);g.fill();
+  const vg=g.createLinearGradient(0,yb-r-d,0,yb);vg.addColorStop(0,shade(hc,25));vg.addColorStop(1,shade(hc,-15));g.fillStyle=vg;g.beginPath();g.moveTo(x0,yb);g.bezierCurveTo(x0,yb-r*1.35,xx,yb-r*1.35,xx,yb);g.lineTo(xx+dx,yb-d);g.bezierCurveTo(xx+dx,yb-d-r*1.35,x0+dx,yb-d-r*1.35,x0+dx,yb-d);g.closePath();g.fill();
+  g.strokeStyle='rgba(0,0,0,.18)';g.lineWidth=.5;for(let k=1;k<9;k++){const t=k/9;g.beginPath();g.moveTo(x0+(xx-x0)*t,yb-Math.sin(t*Math.PI)*r);g.lineTo(x0+(xx-x0)*t+dx,yb-d-Math.sin(t*Math.PI)*r);g.stroke()}
+  g.fillStyle=shade(hc,-10);g.beginPath();g.moveTo(x0,yb);g.bezierCurveTo(x0,yb-r*1.35,xx,yb-r*1.35,xx,yb);g.closePath();g.fill();g.fillStyle='#2a2c28';g.fillRect((x0+xx)/2-8,yb-9,16,9);g.strokeStyle='rgba(255,255,255,.12)';g.lineWidth=.5;for(let y=yb-8;y<yb;y+=1.6){g.beginPath();g.moveTo((x0+xx)/2-8,y);g.lineTo((x0+xx)/2+8,y);g.stroke()}
+  const ax=xx+6,ab=by+S*.5;blk(g,ax,x1-6,ab,14,14,'#8a8a84',rep>=9?'#d8d6ce':'#b4ae98','#8a867a');for(let x=ax+3;x<x1-9;x+=6)glassWin(g,x,ab-11,3.5,4,rep>=9);
+  g.strokeStyle='#6a6a6a';g.lineWidth=.8;g.beginPath();g.moveTo(x1-10,ab-14);g.lineTo(x1-10,by-20);g.moveTo(x1-13,ab-14);g.lineTo(x1-10,by-20);g.lineTo(x1-7,ab-14);g.stroke();g.fillStyle='#e33';g.fillRect(x1-10.6,by-21,1.2,1.2);banner(g,ax+2,ab-14,pc,12);
+  if(rep>=9){const hx=bx+S*.62,hy=y1-14;g.fillStyle='#5a5c58';g.beginPath();g.ellipse(hx,hy,13,6.5,0,0,7);g.fill();g.strokeStyle='#e8e4d8';g.lineWidth=1;g.beginPath();g.ellipse(hx,hy,10,5,0,0,7);g.stroke();g.lineWidth=1.4;g.beginPath();g.moveTo(hx-3,hy-2.4);g.lineTo(hx-3,hy+2.4);g.moveTo(hx+3,hy-2.4);g.lineTo(hx+3,hy+2.4);g.moveTo(hx-3,hy);g.lineTo(hx+3,hy);g.stroke()}
+  else for(let i=0;i<9;i++){const sx=bx+S*.45+i*4.2,sy=y1-12;g.fillStyle=i%2?'#a89a72':'#968a64';g.beginPath();g.ellipse(sx,sy,2.6,1.6,0,0,7);g.fill();g.beginPath();g.ellipse(sx+2,sy-2.4,2.6,1.6,0,0,7);g.fill()}
+  g.strokeStyle='rgba(160,165,165,.8)';g.lineWidth=.5;g.beginPath();g.moveTo(bx+2,y1-2);g.lineTo(x1-2,y1-2);g.stroke();g.save();g.globalAlpha=.35;for(let x=bx+2;x<x1-2;x+=1.6){g.beginPath();g.moveTo(x,y1-2);g.lineTo(x+1.6,y1-7);g.moveTo(x+1.6,y1-2);g.lineTo(x,y1-7);g.stroke()}g.restore();
+  g.strokeStyle='#6a6a6a';g.lineWidth=.9;g.beginPath();for(let x=bx+2;x<=x1-2;x+=12){g.moveTo(x,y1-1);g.lineTo(x,y1-8)}g.moveTo(bx+2,y1-8);g.lineTo(x1-2,y1-8);g.stroke()}
 function roundTower(g,cx,yb,r,h,col,roofCol,ep,pc){
   g.fillStyle='rgba(8,14,6,.32)';g.beginPath();g.ellipse(cx+8,yb+2,r+4,r*.5,0,0,7);g.fill();
   const gr=g.createLinearGradient(cx-r,0,cx+r,0);gr.addColorStop(0,shade(col,25));gr.addColorStop(.5,shade(col,0));gr.addColorStop(1,shade(col,-45));
@@ -1488,7 +1549,9 @@ function bldSprite(type,rep,owner){
   const ep=VIS(rep),D=BLD[type],S=D.size*T,mat=MAT[Math.min(rep,MAT.length-1)],col=WALL[rep]||'#999',roof=ROOF[rep]||'#777',pc=PCOL[owner];
   return sprite(`b|${type}|${rep}|${owner}`,S+24,S+44,g=>{
     const bx=4,by=36,x1=bx+S,y1=by+S,lit=ep>=2;
-    if(type==='house'){
+    if(type==='house'&&rep>=7){lateHouse(g,bx,by,S,rep,pc);
+    }else if(type==='barracks'&&rep>=7){lateBarracks(g,bx,by,S,rep,pc);
+    }else if(type==='house'){
       // Hofstelle: festgetretener Vorplatz, Garten mit Flechtzaun, Holzstapel, Regentonne, Wäscheleine
       const hx1=x1-21,hyb=y1-7,dcx=(bx+3+hx1-Math.min(18,(hx1-bx-3)*.34))/2;let sd=(ep*977+owner*131)>>>0;const rn=()=>((sd=(sd*1664525+1013904223)>>>0)/4294967296);
       g.fillStyle='rgba(112,92,62,.38)';g.beginPath();g.ellipse(dcx+2,hyb+3,14,4.5,0,0,7);g.fill();
