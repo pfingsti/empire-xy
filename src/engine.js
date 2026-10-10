@@ -926,7 +926,7 @@ function findSpot(p,type,near,minR,maxR){
 // ================= module API =================
 const API={
   get ents(){return ents},income(pl,r,v){income(pl,r,v)},get players(){return players},get time(){return gameT},
-  spawnUnit,placeBld,toast,damage,order,applyTech,techState,center,distEnt,alive,isMil,uStat,
+  spawnUnit,get gate(){return gate},idx,W,placeBld,toast,damage,order,applyTech,techState,center,distEnt,alive,isMil,uStat,
   heal(e,amt){e.hp=Math.min(e.maxhp,e.hp+amt)},
   revealAll(){exp.fill(1)},
   fx(x,y,k){fx.push({x,y,t:0,k:k||'hit'})},
@@ -1801,6 +1801,7 @@ function rightCommand(wx,wy){
     b.rally={x:wx,y:wy,id:t&&(t.kind==='res'||(t.kind==='bld'&&t.owner===0&&(t.type==='farm'||!t.built)))?t.id:0};marker={x:wx,y:wy,t:1,c:'#e9be72'};return;
   }
   const units=mine.filter(e=>e.kind==='unit');if(!units.length)return;
+  if(t&&t.kind==='bld'&&t.type==='market'&&t.owner===0&&units.some(u=>u.type==='caravan')){for(const u of units)if(u.type==='caravan'){u.dest=t.id;u.leg=1;u.order={t:'idle'}}toast('Karawanenziel festgelegt.','good');marker={x:wx,y:wy,t:1,c:'#e9be72'};uiDirty=true;return}
   if(t&&!(t.kind==='bld'&&t.type==='farm'&&units.every(u=>u.type!=='worker')&&t.owner===0)){
     cmdTarget(units,t);marker={x:wx,y:wy,t:1,c:t.owner===1?'#ff8a7a':'#e9be72'};
     // spread workers across multiple farms or trees

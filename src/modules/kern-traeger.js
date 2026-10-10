@@ -25,6 +25,7 @@ EmpireXY.register({
         const home=ents.find(e=>e.id===u.home&&!e.dead);if(!home){u.hp=0;api.damage(u,1,null);continue}
         let tc=null,bd=1e9;for(const e of ents)if(e.kind==='bld'&&e.type==='tc'&&e.built&&!e.dead&&e.owner===u.owner){const a=api.center(home),c=api.center(e),d=Math.hypot(a.x-c.x,a.y-c.y);if(d<bd){bd=d;tc=e}}
         if(!tc)continue;
+        const tcC=api.center(tc);if(u.leg===1&&Math.hypot(u.x-tcC.x,u.y-tcC.y)>tc.size/2+3){api.order(u,{t:'move',x:tcC.x,y:tcC.y+tc.size/2+1});continue}
         if(u.leg===1){// am Stadtzentrum angekommen: Waren abliefern, Menge wächst mit der Strecke
           const g=GOODS[home.type],pl=api.players[u.owner],k=Math.min(3,.6+bd/12)*(pl.moodMul||1);
           for(const r in g){const v=Math.round(g[r]*k);pl.res[r]+=v;api.income(pl,r,v);pl.carried=(pl.carried||0)+v}if(pl.st)pl.st.gathered=(pl.st.gathered||0)+1;
