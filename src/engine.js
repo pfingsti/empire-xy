@@ -2115,7 +2115,10 @@ $('#saveSlots').onclick=e=>{const b=e.target.closest('[data-slot]');if(!b)return
 $('#loadSlots').onclick=e=>{const b=e.target.closest('[data-load]');if(!b)return;const d=readSave(slotKey(+b.dataset.load));if(!d)return;
   $('#startScreen').hidden=true;resize();try{loadGame(d);started=true;paused=false;$('#btnPause').textContent='Pause'}catch(err){toast('Dieser Spielstand konnte nicht geladen werden.','warn');$('#startScreen').hidden=false;showContinue()}};
 $('#btnExport').onclick=()=>{const txt=saveGame('__file');if(!txt){toast('Speichern ist gerade nicht möglich.','warn');return}
-  try{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([txt],{type:'application/json'}));a.download='empire-xy-'+fmtTime(gameT).replace(':','-')+'.json';document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},2000);toast('Spielstand als Datei gespeichert.','good')}catch(e){toast('Die Datei konnte nicht gespeichert werden.','warn')}};
+  const fn='empire-xy-'+fmtTime(gameT).replace(':','-')+'.json';
+  const dlP=window.claude&&window.claude.use?window.claude.use('downloads').catch(()=>null):Promise.resolve(null);
+  dlP.then(dl=>{if(dl){dl.save({filename:fn,data:txt}).then(()=>toast('Spielstand als Datei gespeichert.','good'),e=>{if(!e||e.code!=='declined')toast('Die Datei konnte nicht gespeichert werden.','warn')});return}
+  try{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([txt],{type:'application/json'}));a.download=fn;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},2000);toast('Spielstand als Datei gespeichert.','good')}catch(e){toast('Die Datei konnte nicht gespeichert werden.','warn')}})};
 $('#btnImport').onclick=()=>$('#fileImport').click();
 $('#fileImport').onchange=e=>{const f=e.target.files&&e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{let d=null;try{d=JSON.parse(r.result)}catch(err){}
   if(!d||d.v!==1){toast('Das ist keine gültige Spielstand-Datei.','warn');return}
