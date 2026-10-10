@@ -1771,27 +1771,42 @@ function drawUnitRaw(g,u){
       const rec=u.swing>.15?-3:0;g.fillStyle='#565f40';g.beginPath();g.ellipse(-1,0,6.5,5.5,0,0,7);g.fill();g.stroke();
       g.fillStyle='#2e3326';g.fillRect(4+rec,-1.3,16,2.6);g.fillRect(18+rec,-1.8,3,3.6);
       if(u.swing>.18){g.fillStyle='#ffd27a';g.beginPath();g.arc(23,0,4.5,0,7);g.fill();g.fillStyle='rgba(210,210,210,.6)';g.beginPath();g.arc(28,0,6,0,7);g.fill()}
-    }else if(ep>=3){
-      g.fillStyle='#5a3f22';g.beginPath();g.moveTo(-14,-3);g.lineTo(2,-4);g.lineTo(2,4);g.lineTo(-14,3);g.closePath();g.fill();
-      if(re>=7&&re<=8){g.fillStyle='#4a5236';g.beginPath();g.moveTo(-18,-6);g.lineTo(-2,-2);g.lineTo(-2,2);g.lineTo(-18,6);g.lineTo(-16,0);g.closePath();g.fill();g.fillStyle='#5d6748';g.fillRect(1,-8,2.5,16)}
-      wheel(-1,-7,5);wheel(-1,7,5);
-      const bl=ep>=4?20:17,br=ep>=4?3.8:3.2,rec=u.swing>.15?-3:0;
-      const gr=g.createLinearGradient(0,-br,0,br);gr.addColorStop(0,ep>=4?'#7c8a6a':'#5b6066');gr.addColorStop(.5,ep>=4?'#56623f':'#3a3e43');gr.addColorStop(1,'#1c1e20');
-      g.fillStyle=gr;g.fillRect(-6+rec,-br,bl,br*2);g.fillStyle='#1c1e20';g.fillRect(bl-7+rec,-br-.8,2,br*2+1.6);
-      if(u.swing>.18){g.fillStyle='#ffd27a';g.beginPath();g.arc(bl-3,0,5,0,7);g.fill();g.fillStyle='rgba(210,210,210,.6)';g.beginPath();g.arc(bl+3,0,6,0,7);g.fill()}
-    }else{
-      // Holzrahmen aus Bohlen mit Maserung und Eisenbeschlägen
-      const wg=g.createLinearGradient(0,-7,0,7);wg.addColorStop(0,'#86633f');wg.addColorStop(1,'#4e3620');g.fillStyle=wg;g.fillRect(-12,-7,22,14);
-      g.strokeStyle='rgba(40,26,14,.55)';g.lineWidth=.6;for(let k=-4;k<=4;k+=2.8){g.beginPath();g.moveTo(-12,k);g.lineTo(10,k+.4);g.stroke()}
-      g.strokeStyle='rgba(160,125,85,.35)';for(let k=-5;k<=5;k+=2.8){g.beginPath();g.moveTo(-11,k);g.quadraticCurveTo(-1,k+.8,9,k);g.stroke()}
-      g.fillStyle='#4a4d50';for(const [cx,cy] of [[-12,-7],[8,-7],[-12,5],[8,5]])g.fillRect(cx,cy,2.4,2.4);
-      g.fillStyle='rgba(0,0,0,.25)';g.fillRect(-12,5,22,2);
-      wheel(-8,-8,4);wheel(-8,8,4);wheel(6,-8,4);wheel(6,8,4);
-      g.fillStyle='#5a3f22';g.fillRect(-2,-6,3,12);
-      const sw=u.swing>0?Math.sin(u.swing/.25*Math.PI)*1.6:0,ang=Math.PI*.9-sw;
-      g.strokeStyle='#4a3220';g.lineWidth=2.6;g.beginPath();g.moveTo(-.5,0);g.lineTo(-.5+Math.cos(ang)*14,Math.sin(ang)*14*.3);g.stroke();
-      g.fillStyle='#8f8a80';g.beginPath();g.arc(-.5+Math.cos(ang)*14,Math.sin(ang)*14*.3,3,0,7);g.fill();
-      g.fillStyle=pc;g.fillRect(4,-6.5,4,13);
+    }else{// Belagerungsgerät in Seitenansicht: Holz mit Maserung, Speichenräder mit Eisenreifen, Wimpel in Spielerfarbe
+      const dir=Math.cos(a)>=0?1:-1,isRam=u.type==='ram',isBolt=u.type==='bolt',gun=ep>=3&&!isRam,sw=u.swing>0?Math.sin(u.swing/.25*Math.PI):0,rot=u.moving?gameT*5:0;
+      g.rotate(-a);g.translate(0,u.r*T*.55);g.scale(dir,1);g.lineCap='round';g.lineJoin='round';
+      const sWheel=(wx,wy,r)=>{g.strokeStyle='#2e2418';g.lineWidth=1.8;g.beginPath();g.arc(wx,wy,r,0,7);g.stroke();g.strokeStyle='#5a5d60';g.lineWidth=.6;g.beginPath();g.arc(wx,wy,r+.6,0,7);g.stroke();
+        g.strokeStyle='#6b4c2c';g.lineWidth=.8;g.beginPath();for(let k=0;k<6;k++){const q=rot+k*Math.PI/3;g.moveTo(wx,wy);g.lineTo(wx+Math.cos(q)*r,wy+Math.sin(q)*r)}g.stroke();g.fillStyle='#3d3f40';g.beginPath();g.arc(wx,wy,1.1,0,7);g.fill()};
+      const beam=(x0,y0,x1,y1,w,c)=>{g.strokeStyle=c||'#5e4226';g.lineWidth=w;g.beginPath();g.moveTo(x0,y0);g.lineTo(x1,y1);g.stroke();g.strokeStyle='rgba(255,230,190,.16)';g.lineWidth=w*.3;g.beginPath();g.moveTo(x0,y0-w*.25);g.lineTo(x1,y1-w*.25);g.stroke()};
+      const flag=(fx,fy,h)=>{g.strokeStyle='#3a2a1a';g.lineWidth=.7;g.beginPath();g.moveTo(fx,fy);g.lineTo(fx,fy-h);g.stroke();const wv=Math.sin(gameT*4+u.anim)*.8;
+        g.fillStyle=pc;g.beginPath();g.moveTo(fx,fy-h);g.quadraticCurveTo(fx-3,fy-h+.6+wv,fx-6,fy-h+1.2);g.lineTo(fx,fy-h+3);g.closePath();g.fill();g.fillStyle='rgba(0,0,0,.2)';g.beginPath();g.moveTo(fx,fy-h+1.8);g.lineTo(fx-5,fy-h+1.6);g.lineTo(fx,fy-h+3);g.fill()};
+      if(isRam){// Rammbock: fahrbares Schutzdach mit Fellbespannung, Stammramme mit Eisenkopf an Ketten
+        sWheel(-8,-3.5,3.6);sWheel(8,-3.5,3.6);beam(-13,-6,13,-6,2.2);beam(-11,-6,-9,-16,1.6);beam(11,-6,9,-16,1.6);
+        const lx=sw*5;g.strokeStyle='#3a3a3a';g.lineWidth=.5;g.beginPath();g.moveTo(-4,-17);g.lineTo(-5+lx,-10.5);g.moveTo(5,-17);g.lineTo(4+lx,-10.5);g.stroke();
+        beam(-12+lx,-10,15+lx,-10,3.4,'#5a3f22');g.fillStyle='#4e5256';g.beginPath();g.moveTo(14+lx,-12.4);g.quadraticCurveTo(19+lx,-10,14+lx,-7.6);g.closePath();g.fill();g.fillStyle='rgba(255,255,255,.25)';g.fillRect(14.5+lx,-11.6,2,.7);
+        const rg=g.createLinearGradient(0,-22,0,-12);rg.addColorStop(0,'#8a7052');rg.addColorStop(1,'#4a3a28');g.fillStyle=rg;g.beginPath();g.moveTo(-14,-12.5);g.lineTo(0,-22);g.lineTo(14,-12.5);g.lineTo(12,-11);g.lineTo(-12,-11);g.closePath();g.fill();
+        g.strokeStyle='rgba(30,20,10,.4)';g.lineWidth=.5;g.beginPath();for(let k=-10;k<=10;k+=3.3){g.moveTo(k,-11.5);g.lineTo(k*.15,-21)}g.stroke();g.fillStyle='rgba(0,0,0,.2)';g.fillRect(-12,-11.6,24,1);flag(0,-22,6)}
+      else if(gun){// Geschütz: Lafette mit Schwanz, großes Rad, Rohr aus Bronze oder Eisen, Rückstoß und Pulverdampf
+        const bronze=ep<=4,rec=-sw*3,isB=isBolt;
+        beam(-15,-1.2,2,-8.5,3,'#5a3f22');g.fillStyle='#3a2a1a';g.fillRect(-16,-2,2.4,2);
+        g.save();g.translate(1+rec,-9.5);g.rotate(isB?-.05:-.16);const L=isB?13:18,R=isB?1.6:2.6;
+        const bg=g.createLinearGradient(0,-R,0,R);bg.addColorStop(0,bronze?'#c09a5a':'#6a7076');bg.addColorStop(.45,bronze?'#8a6a3a':'#3a3e43');bg.addColorStop(1,bronze?'#4a3618':'#18191b');g.fillStyle=bg;
+        if(isB){for(const o of [-2.2,0,2.2]){const og=g.createLinearGradient(0,o-.8,0,o+.8);og.addColorStop(0,bronze?'#c09a5a':'#6a7076');og.addColorStop(1,bronze?'#4a3618':'#18191b');g.fillStyle=og;g.fillRect(-4,o-.8,L,1.6)}g.fillStyle='#2a2a2a';g.fillRect(-4.5,-3.4,3,6.8)}
+        else{g.beginPath();g.moveTo(-5,-R-.6);g.lineTo(L,-R*.75);g.lineTo(L,R*.75);g.lineTo(-5,R+.6);g.quadraticCurveTo(-7.5,0,-5,-R-.6);g.fill();g.fillStyle=bronze?'#6a4e26':'#26282a';g.fillRect(L-1.6,-R*.95,1.8,R*1.9);g.fillRect(3,-R*.95,1.2,R*1.9)}
+        if(u.swing>.18){g.fillStyle='rgba(255,210,120,.9)';g.beginPath();g.ellipse(L+3,0,3,1.6,0,0,7);g.fill();for(let k=0;k<3;k++){const pg=g.createRadialGradient(L+6+k*4,-k*2,0,L+6+k*4,-k*2,4+k);pg.addColorStop(0,'rgba(225,222,214,.65)');pg.addColorStop(1,'rgba(225,222,214,0)');g.fillStyle=pg;g.beginPath();g.arc(L+6+k*4,-k*2,4+k,0,7);g.fill()}}
+        g.restore();sWheel(0,-6,6);g.fillStyle=pc;g.globalAlpha=.85;g.fillRect(-11,-4.6,4,1.2);g.globalAlpha=1}
+      else if(isBolt){// Balliste: Fahrgestell, Bock, Läufer mit Bogenarmen von der Seite, gespannte Sehne und Bolzen
+        sWheel(-6,-3.5,3.6);sWheel(6,-3.5,3.6);beam(-11,-6,10,-6,2.4);beam(0,-6,0,-12,2);beam(-10,-12.5,11,-14.5,2.2);
+        const pull=u.swing>0?0:3;g.strokeStyle='#4a3220';g.lineWidth=1.5;g.beginPath();g.moveTo(7,-14);g.quadraticCurveTo(5.5-pull*.3,-20,2,-22);g.moveTo(7,-14);g.quadraticCurveTo(5.5-pull*.3,-8,2,-6.5);g.stroke();
+        g.strokeStyle='rgba(225,215,190,.8)';g.lineWidth=.5;g.beginPath();g.moveTo(2,-22);g.lineTo(-pull,-13.6);g.lineTo(2,-6.5);g.stroke();
+        if(u.swing<=0){g.strokeStyle='#7a5a32';g.lineWidth=.9;g.beginPath();g.moveTo(-pull,-14.2);g.lineTo(13,-15.4);g.stroke();g.fillStyle='#5c6266';g.beginPath();g.moveTo(13,-16.2);g.lineTo(15.5,-15.6);g.lineTo(13,-14.6);g.fill()}
+        flag(-9,-12.5,6)}
+      else{// Katapult (Mange): Grundrahmen, Bock mit Prellbalken, Wurfarm mit Schale, Torsionsbündel
+        sWheel(-8,-3,3.4);sWheel(8,-3,3.4);beam(-13,-5.5,13,-5.5,2.8);beam(-1,-5.5,1,-16,1.8);beam(4,-5.5,2,-16,1.8);beam(-.5,-15.5,4.5,-15.5,2);
+        g.fillStyle='#3a2c1e';g.beginPath();g.ellipse(-4,-7.5,2.4,1.8,0,0,7);g.fill();g.strokeStyle='rgba(200,170,120,.35)';g.lineWidth=.4;g.beginPath();for(let k=-1.6;k<=1.6;k+=.8){g.moveTo(-4+k,-9);g.lineTo(-4+k*.6,-6)}g.stroke();
+        const ang=Math.PI*.93-sw*1.25,ax=-4+Math.cos(ang)*15,ay=-7.5-Math.sin(ang)*15;beam(-4,-7.5,ax,ay,2,'#6b4c2c');
+        g.fillStyle='#4a3220';g.beginPath();g.ellipse(ax,ay-.6,2.6,1.5,ang,0,7);g.fill();if(sw<.3){g.fillStyle='#8f8a80';g.beginPath();g.arc(ax,ay-1.6,1.8,0,7);g.fill()}
+        flag(11,-5.5,10)}
+      g.lineCap='butt';g.lineJoin='miter';
     }
     g.restore();
   }else{humanoid(g,u,ep,pc,dk);
