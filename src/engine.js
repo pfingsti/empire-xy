@@ -1109,7 +1109,9 @@ function drawRes(g,r){
   const x=r.x*T,y=r.y*T;
   if(r.type==='tree'){
     if(r.amount<r.max){const s=stumpSprite();g.drawImage(s,x,y,32,32);return}
-    const s=treeSprite(r.v);g.drawImage(s,x+16-24,y+28-60,48,64);return}
+    const s=treeSprite(r.v),t=performance.now()/1000,wind=WX.kind==='storm'?3:WX.kind==='rain'?1.6:1,hit=r.hitT>gameT?Math.sin(t*40)*.05:0;
+    const sw=(Math.sin(t*1.3+r.x*.7+r.y*.4)*.025+Math.sin(t*2.9+r.x)*.01)*wind+hit;
+    g.save();g.translate(x+16,y+28);g.transform(1,0,sw,1,0,0);g.drawImage(s,-24,-60,48,64);g.restore();return}
   if(r.type==='berry'){
     g.drawImage(bushSprite(r.v),x,y,32,32);
     const n=Math.ceil(r.amount/r.max*10);
@@ -1542,7 +1544,7 @@ function render(){
   if(!paused&&started){
     for(const e of list){
       if(e.kind==='unit'){if(e.moving&&Math.random()<.04)spawnVfx(e.x,e.y+.25,'dust');
-        if(e.working&&e.order.rt==='wood'&&Math.random()<.05)spawnVfx(e.x+Math.cos(e.ang)*.4,e.y+Math.sin(e.ang)*.4-.2,'chip',{vx:(Math.random()-.5)*1.5,vy:-1.2})}
+        if(e.working&&e.order.rt==='wood'){const tr=byId.get(e.order.target);if(tr)tr.hitT=gameT+.3}if(e.working&&e.order.rt==='wood'&&Math.random()<.05)spawnVfx(e.x+Math.cos(e.ang)*.4,e.y+Math.sin(e.ang)*.4-.2,'chip',{vx:(Math.random()-.5)*1.5,vy:-1.2})}
       else if(e.kind==='bld'&&e.built&&Math.random()<.03&&((e.type==='tc')||(e.type==='house'&&players[e.owner].epoch>=2)||(e.type==='workshop'&&players[e.owner].epoch>=3)))
         spawnVfx(e.x+e.size-.6,e.y-.4,'smoke2',{vx:.15+Math.random()*.1,vy:-.35});
     }
