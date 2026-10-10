@@ -952,7 +952,7 @@ const API={
   get ents(){return ents},income(pl,r,v){income(pl,r,v)},get players(){return players},get time(){return gameT},
   spawnUnit,uCost,get aiS(){return aiS},water:(x,y)=>inb(x|0,y|0)&&terr[idx(x|0,y|0)]===1,get gate(){return gate},idx,W,placeBld,toast,damage,order,applyTech,techState,center,distEnt,alive,isMil,uStat,
   heal(e,amt){e.hp=Math.min(e.maxhp,e.hp+amt)},
-  revealAll(){exp.fill(1)},
+  revealAll(){exp.fill(1)},sel:()=>sel,
   fx(x,y,k){fx.push({x,y,t:0,k:k||'hit'})},
 };
 // ================= main step =================
@@ -1878,7 +1878,8 @@ cv.addEventListener('pointerdown',e=>{
   if(e.pointerType==='touch'){touch={sx:mouse.x,sy:mouse.y,cx:cam.x,cy:cam.y,moved:false,t:performance.now()};
     clearTimeout(touchHold);touchHold=setTimeout(()=>{if(touch&&!touch.moved){touch=null;drag={sx:mouse.x,sy:mouse.y,box:true,shift:false,touchBox:true};if(navigator.vibrate)try{navigator.vibrate(15)}catch(_){}}},380);
     return}
-  if(e.button===1){drag={pan:true,sx:mouse.x,sy:mouse.y,cx:cam.x,cy:cam.y};return}
+  if(e.button===1||(freeCam&&e.button===0)){drag={pan:true,sx:mouse.x,sy:mouse.y,cx:cam.x,cy:cam.y};return}
+  if(freeCam)return;
   if(e.button===2){if(placing){placing=null;wallDrag=null;uiDirty=true;return}rightCommand(w.x,w.y);return}
   if(e.button===0){
     if(placing&&BLD[placing].line){wallDrag={x:Math.floor(w.x),y:Math.floor(w.y)};return}
@@ -1973,7 +1974,8 @@ window.addEventListener('keydown',e=>{
   if(k==='h'||k==='H'){const tc=ents.find(x=>x.owner===0&&x.type==='tc');if(tc){select([tc]);centerOn(tc.x+1.5,tc.y+1.5)}return}
   if(k==='.'||k===','){selectIdle();return}
   if(k===' '){if(sel[0]){const c=center(sel[0]);centerOn(c.x,c.y)}e.preventDefault();return}
-  let up=k.toUpperCase();if(up==='Z')up='Y';
+  if(k==='z'||k==='Z'){toggleFreeCam();return}
+  let up=k.toUpperCase();
   const i=SLOTKEYS.indexOf(up);
   if(i>=0&&curCmds[i]){const c=curCmds[i];if(c.need&&c.dis){toast(c.need,'warn');return}if(c.dis){toast('Nicht genug Rohstoffe.','warn');return}sfx('click');c.act()}
 });
@@ -2208,6 +2210,10 @@ $('#limitSel').onchange=()=>{try{localStorage.setItem('empire-xy.limit',$('#limi
   $('#edLoad').onclick=()=>$('#edFile').click();
   $('#edFile').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(d&&d.terr&&d.terr.length===W*H&&d.starts){M=d;draw()}}catch(err){}};r.readAsText(f);e.target.value=''};
 })();
+let freeCam=false;
+function toggleFreeCam(){freeCam=!freeCam;if(freeCam){select([]);placing=null;aMode=false}$('#camLbl').hidden=!freeCam;$('#btnCam').classList.toggle('on',freeCam);toast(freeCam?'Freie Kamera: ziehen zum Schwenken, Mausrad zum Zoomen, Z beendet.':'Freie Kamera aus.')}
+$('#btnCam').onclick=()=>{if(started)toggleFreeCam()};
+window.__freeCam=()=>freeCam;
 $('#startBtn').onclick=()=>{timeLimit=+$('#limitSel').value;useCustomMap=!!(CUSTOM_MAP&&$('#useCustom').checked);
   $('#startScreen').hidden=true;resize();newGame(chosenDiff,seed);started=true;paused=false;$('#btnPause').textContent='Pause';
 };
