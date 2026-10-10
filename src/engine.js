@@ -214,12 +214,14 @@ function newGame(d,seed){
 // Wetter und Tageszeit: Sonne, Regen (−20 % Tempo), Schnee (−10 %); ein Tag dauert 8 Minuten, nachts sinkt die Sicht
 let WX={kind:'sun',until:150,speed:1,night:0};
 const WXN={sun:'Sonnenschein',rain:'Regen: alle Truppen 20 % langsamer',snow:'Schneefall: alle Truppen 10 % langsamer'};
+const SEAS=['Frühling','Sommer','Herbst','Winter'],SEAS_I=['🌱','☀','🍂','❄'],SEAS_D=['Nahrung +30 %','Bauen +20 %','Holz +25 %','Produktion −20 %, Bewegung −30 %'];let SEASON=0;
 function weatherTick(){
+  {const sn=Math.floor(gameT/180)%4;if(sn!==SEASON){SEASON=sn;if(started)toast(SEAS[sn]+' beginnt: '+SEAS_D[sn]+'.');if(sn===3){WX.kind='snow';WX.speed=.9;WX.until=gameT+180}else if(WX.kind==='snow'){WX.until=gameT}}}
   const ph=(gameT/480)%1;WX.night=Math.max(0,Math.min(1,(Math.cos(ph*Math.PI*2)*-1-.35)*1.6));// 0 Tag … 1 tiefe Nacht
-  if(gameT>=WX.until){const r=rng(),ep=players[0].epoch,old=WX.kind;WX.kind=r<.55?'sun':r<.82||ep>6?'rain':'snow';WX.until=gameT+90+rng()*150;
+  if(gameT>=WX.until){const r=rng(),ep=players[0].epoch,old=WX.kind;WX.kind=SEASON===3?'snow':r<.55?'sun':r<.82||ep>6?'rain':'snow';WX.until=gameT+90+rng()*150;
     WX.speed=WX.kind==='rain'?.8:WX.kind==='snow'?.9:1;if(started&&old!==WX.kind)toast(WXN[WX.kind]+'.')}
 }
-function uStat(u){const d=UNITS[u.type],pl=players[u.owner],f=pl.fx,t=CLS(u.type),e=pl.epoch,m=1+.17*e;return{hp:Math.round(d.hp*m*(1+(f.hp[t]||0))),atk:d.atk*m*(1+(f.atk[t]||0)),range:(d.range+(f.range[t]||0))*(u.form===3?1.4:1),rate:d.rate,speed:d.speed*(1+.03*e)*(1+(f.speed[t]||0))*(d.naval?1:WX.speed)*(u.rallyUntil>gameT?1.2:1)*(u.form===1?.5:u.form===3?.02:1),sight:Math.max(2,d.sight-WX.night*2)}}
+function uStat(u){const d=UNITS[u.type],pl=players[u.owner],f=pl.fx,t=CLS(u.type),e=pl.epoch,m=1+.17*e;return{hp:Math.round(d.hp*m*(1+(f.hp[t]||0))),atk:d.atk*m*(1+(f.atk[t]||0)),range:(d.range+(f.range[t]||0))*(u.form===3?1.4:1),rate:d.rate,speed:d.speed*(1+.03*e)*(1+(f.speed[t]||0))*(d.naval?1:WX.speed*(SEASON===3?.7:1))*(u.rallyUntil>gameT?1.2:1)*(u.form===1?.5:u.form===3?.02:1),sight:Math.max(2,d.sight-WX.night*2)}}
 function spawnUnit(p,type,x,y){
   const d=UNITS[type];
   const u=addEnt({kind:'unit',type,owner:p,x,y,r:d.r,hp:0,cd:0,ang:p?Math.PI*.75:-Math.PI*.25,order:{t:'idle'},path:null,pathCD:0,carry:0,ct:null,scan:rng()*.5,anim:rng()*6});
@@ -453,7 +455,7 @@ function enemyNear(u,radius,wantBld){
 // ================= combat =================
 function damage(t,dmg,src){
   if(t.dead)return;
-  if(src&&src.buffUntil>gameT)dmg*=1.2;if(src&&src.templeT>gameT)dmg*=1.1;if(src&&src.form===2)dmg*=1.3;if(t.form===1)dmg*=.7;else if(t.form===2)dmg*=1.2;if(src&&src.owner!=null&&players[src.owner]&&players[src.owner].monAtk)dmg*=1+players[src.owner].monAtk;if(src&&src.type==='hero'&&t.kind==='unit'&&t.hp>0&&t.hp<=dmg)src.kills=(src.kills||0)+1;
+  if(src&&src.buffUntil>gameT)dmg*=1.2;if(src&&src.templeT>gameT)dmg*=1.1;if(src&&src.form===2)dmg*=1.3;if(t.form===1)dmg*=.7;if(t.campT>gameT)dmg*=.6;else if(t.form===2)dmg*=1.2;if(src&&src.owner!=null&&players[src.owner]&&players[src.owner].monAtk)dmg*=1+players[src.owner].monAtk;if(src&&src.type==='hero'&&t.kind==='unit'&&t.hp>0&&t.hp<=dmg)src.kills=(src.kills||0)+1;
   t.hp-=dmg;t.hitT=gameT;t.revealT=gameT+6;if(src)src.revealT=gameT+6;if(visibleEnt(t))sfx(dmg>20?'boom':src&&src.kind==='unit'&&uStat(src).range<1.5&&!['siege'].includes(CLS(src.type))?'sword':'hit');
   fx.push({x:center(t).x+(rng()-.5)*.4,y:center(t).y+(rng()-.5)*.4,t:0,k:'hit'});
   if(t.owner===0&&gameT-lastAlarm>20&&src){lastAlarm=gameT;toast('Wir werden angegriffen!','warn');ping=center(t);pingT=3}
@@ -553,7 +555,7 @@ function updUnit(u,dt){
       if(u.carry>=10+players[u.owner].fx.carry){order(u,{t:'return',resume:o});break}
       if(distEnt(u,r)<=.5){
         u.path=null;const c=center(r);u.ang=Math.atan2(c.y-u.y,c.x-u.x);
-        const rate={wood:.85,food:r.kind==='bld'?.6:.95,stone:.65,gold:.65}[o.rt]*(players[u.owner].moodMul||1)*(players[u.owner].toolMul||1)*(r.kind==='bld'?farmBoost(r):1)*(1+.06*players[u.owner].epoch)*(1+(players[u.owner].fx.gather[o.rt]||0))*(u.owner===1?DIFF[diff].gather:1);
+        const rate={wood:.85,food:r.kind==='bld'?.6:.95,stone:.65,gold:.65}[o.rt]*(players[u.owner].moodMul||1)*(players[u.owner].toolMul||1)*(r.kind==='bld'?farmBoost(r):1)*(1+.06*players[u.owner].epoch)*(1+(players[u.owner].fx.gather[o.rt]||0))*(u.owner===1?DIFF[diff].gather:1)*(SEASON===0&&o.rt==='food'?1.3:SEASON===2&&o.rt==='wood'?1.25:1);
         const amt=Math.min(rate*dt,r.kind==='res'?r.amount:99);
         u.carry+=amt;u.ct=o.rt;u.working=true;if(u.owner===0&&visibleEnt(u)&&onScreen(u))sfx(o.rt==='wood'?'chop':o.rt==='food'?'':'mine');
         if(r.kind==='res'){r.amount-=amt;if(r.amount<=0.001)kill(r)}
@@ -578,7 +580,7 @@ function updUnit(u,dt){
         u.path=null;const c=center(b);u.ang=Math.atan2(c.y-u.y,c.x-u.x);u.working=true;
         const D=BLD[b.type];
         if(!b.built){
-          const inc=dt/D.time*(u.owner===1?DIFF[diff].gather:1)*(1+players[u.owner].fx.build);b.prog=Math.min(1,b.prog+inc);b.hp=Math.min(b.maxhp,b.hp+b.maxhp*inc);
+          const inc=dt/D.time*(u.owner===1?DIFF[diff].gather:1)*(1+players[u.owner].fx.build)*(SEASON===1?1.2:1);b.prog=Math.min(1,b.prog+inc);b.hp=Math.min(b.maxhp,b.hp+b.maxhp*inc);
           if(b.prog>=1){b.built=true;players[b.owner].st.built++;recalcPop();if(b.owner===0){toast(D.name+' fertiggestellt.');sfx('bell')}
             if(b.type==='wonder'){players[b.owner].wonderT=180;toast((b.owner===0?'Dein':'Das feindliche')+' Weltwunder steht! 3 Minuten bis zum Sieg.',b.owner===0?'good':'warn')}}
         }else{b.hp=Math.min(b.maxhp,b.hp+b.maxhp*dt/D.time*.6)}
@@ -612,7 +614,7 @@ function updBld(b,dt){
       if(best){b.cd=D.rate;const c=center(b);proj.push({x:c.x,y:c.y-.6,tid:best.id,dmg:D.atk*(1+.14*pl.epoch)*(1+pl.fx.bldAtk),src:b.id,k:'arrow',ep:pl.epoch,sp:14,arc:bd})}
     }
   }
-  const q=b.queue[0];if(!q)return;const sdt=(b.sabotUntil>gameT?dt*.5:dt)*(players[b.owner].crowdMul||1)*(players[b.owner].monProd||1);// sabotiert: halbe Produktion
+  const q=b.queue[0];if(!q)return;const sdt=(b.sabotUntil>gameT?dt*.5:dt)*(players[b.owner].crowdMul||1)*(players[b.owner].monProd||1)*(SEASON===3?.8:1);// sabotiert: halbe Produktion
   if(q.tech){
     q.t+=sdt;
     if(q.t>=q.total){b.queue.shift();applyTech(pl,q.tech);
@@ -949,7 +951,7 @@ function step(dt){
   for(const b of ents){if(b.dead||b.built||!BLD[b.type]||!BLD[b.type].water)continue;
     let ok=false;for(const [ox,oy] of [[1,0],[-1,0],[0,1],[0,-1]]){const xx=b.x+ox,yy=b.y+oy;if(!inb(xx,yy))continue;const j=idx(xx,yy);if(terr[j]!==1){ok=true;break}
       for(const o of ents)if(o.type==='bridge'&&o.built&&!o.dead&&o.x===xx&&o.y===yy){ok=true;break}if(ok)break}
-    if(!ok)continue;const inc=dt/BLD[b.type].time*(1+players[b.owner].fx.build);b.prog=Math.min(1,b.prog+inc);b.hp=Math.min(b.maxhp,b.hp+b.maxhp*inc);
+    if(!ok)continue;const inc=dt/BLD[b.type].time*(1+players[b.owner].fx.build)*(SEASON===1?1.2:1);b.prog=Math.min(1,b.prog+inc);b.hp=Math.min(b.maxhp,b.hp+b.maxhp*inc);
     if(b.prog>=1){b.built=true;block[idx(b.x,b.y)]=0;players[b.owner].st.built++}}
   XY.emit('tick',API,dt);
   if(timeLimit&&!over){const left=timeLimit*60-gameT;
@@ -1637,6 +1639,10 @@ function select(list,add){
 }
 function selKey(){return sel.map(e=>e.id).join(',')+'|'+players[0].epoch+'|'+(placing||'')+(aMode?'A':'')+'|'+(sel[0]&&sel[0].kind==='bld'?(sel[0].built?1:0):'')}
 
+function campToggle(us){if(!us.length)return;const cx=us.reduce((a,u)=>a+u.x,0)/us.length,cy=us.reduce((a,u)=>a+u.y,0)/us.length;
+  const ex=ents.find(e=>e.type==='fieldcamp'&&!e.dead&&e.owner===0&&Math.hypot(e.x+1-cx,e.y+1-cy)<4);
+  if(ex){ex.dead=true;ex.hp=0;toast('Feldlager abgebaut.');players[0].res.wood+=40;return}
+  if(!BLD.fieldcamp)return;if(!canAfford(0,{wood:80})){toast('Feldlager kostet 80 Holz.','warn');return}pay(0,{wood:80});const b=placeBld(0,'fieldcamp',Math.round(cx-1),Math.round(cy-1),false);if(b)toast('Feldlager wird aufgeschlagen.','good')}
 function getCommands(){
   const cmds=[];if(!sel.length)return cmds;
   const pl=players[0],first=sel[0];
@@ -1644,17 +1650,19 @@ function getCommands(){
   if(first.kind==='unit'){
     const workers=sel.filter(u=>u.type==='worker');
     if(workers.length){
-      for(const t in BLD){const d=BLD[t],locked=(d.minEpoch||0)>pl.epoch;
+      for(const t in BLD){if(BLD[t].slot==null)continue;const d=BLD[t],locked=(d.minEpoch||0)>pl.epoch;
         cmds[d.slot]={label:bname(d,pl.epoch),cost:d.cost,desc:d.desc,dis:locked||!canAfford(0,d.cost),need:locked?'Benötigt '+EPOCHS[d.minEpoch]:null,short:!locked&&!canAfford(0,d.cost),on:placing===t,act:()=>{placing=placing===t?null:t;uiDirty=true}}}
       cmds[14]={label:'Stopp',desc:'Aktuelle Tätigkeit abbrechen.',act:()=>{for(const u of sel)order(u,{t:'idle'})}};
     }else{
       cmds[0]={label:'Angriff­bewegung',desc:'Zum Ziel marschieren und unterwegs jeden Feind angreifen. Danach Rechtsklick auf die Karte.',on:aMode,act:()=>{aMode=!aMode;uiDirty=true}};
       cmds[1]={label:'Stopp',desc:'Halten und Befehle verwerfen.',act:()=>{for(const u of sel)order(u,{t:'idle'})}};
+      cmds[21]={label:'Feldlager',desc:'Schlägt in 10 Sekunden ein befestigtes Lager auf (L): +40 % Abwehr und Heilung im Umkreis von 4 Feldern. Steht schon eins hier, wird es abgebaut.',act:()=>{campToggle(sel.filter(u=>u.kind==='unit'&&u.owner===0))}};
       {const cur=sel[0].form||0,nx=(cur+1)%4;cmds[8]={label:'Formation: '+FORMS[cur],desc:'Wechselt die Formation (F): Schildwall +30 % Abwehr, halbes Tempo. Keil +30 % Angriff, −20 % Abwehr. Schützenlinie (nur Fernkämpfer) +40 % Reichweite, steht fest. Nächste: '+FORMS[nx]+'.',act:()=>{for(const u of sel){let f=nx;if(f===3&&uStat(u).range<2)f=0;u.form=f;if(f===3)order(u,{t:'idle'})}toast('Formation: '+FORMS[nx]+'.');uiDirty=true}}}
     }
     cmds[13]={label:'Abwählen',desc:'Auswahl aufheben (Esc).',act:()=>select([])};
   }else if(first.kind==='bld'&&first.built){
     const D=BLD[first.type];
+    if(D.cmds){try{D.cmds(first,API).forEach((c,i)=>{if(c)cmds[10+i]={...c,dis:c.dis||(c.cost&&!canAfford(0,c.cost)),act:()=>{if(c.cost&&!canAfford(0,c.cost)){toast('Nicht genug Rohstoffe.','warn');return}if(c.cost)pay(0,c.cost);c.act();uiDirty=true}}})}catch(e){}}
     const tl=trainsOf(first.type);let us=0;
     for(const ut of tl){const U=UNITS[ut],locked=(U.minEpoch||0)>pl.epoch,full=U.max&&countUnits(0,ut)>=U.max;
       if(us===1&&first.type==='tc')us=2;if(us===4)us=5;
@@ -1784,7 +1792,7 @@ function updateTop(){
   if(rh.dataset.sig!==rsig){rh.dataset.sig=rsig;rh.hidden=!rq.length;rh.innerHTML=rq.map(r=>`<div class="rq" data-id="${r.id}"><span>${TECHS[r.id].name}</span><em></em><i><b></b></i></div>`).join('')}
   rq.forEach((r,i)=>{const row=rh.children[i];if(!row)return;row.querySelector('b').style.width=(r.f*100)+'%';row.querySelector('em').textContent=r.wait?'wartet':Math.floor(r.f*100)+'% · '+Math.ceil(r.left)+' s'});
   if(!$('#techScreen').hidden)$('#techCols').querySelectorAll('.tk.running').forEach(btn=>{const r=rq.find(x=>x.id===btn.dataset.id);const st=btn.querySelector('.st');if(r&&st)st.textContent=r.wait?'Wartet in Warteschlange':'Wird erforscht: '+Math.floor(r.f*100)+'%';let bar=btn.querySelector('.pb');if(!bar){bar=document.createElement('i');bar.className='pb';bar.innerHTML='<b></b>';btn.appendChild(bar)}bar.firstChild.style.width=(r?r.f*100:0)+'%'});
-  $('#clock').textContent=(WX.kind==='rain'?'🌧 ':WX.kind==='snow'?'❄ ':WX.night>.5?'☾ ':'☀ ')+(timeLimit?fmtTime(gameT)+' / '+timeLimit+':00':fmtTime(gameT));$('#clock').title=WXN[WX.kind]+(WX.night>.5?', Nacht: weniger Sicht, der Gegner greift eher an':'');
+  $('#clock').textContent=SEAS_I[SEASON]+' '+(WX.kind==='rain'?'🌧 ':WX.kind==='snow'?'❄ ':WX.night>.5?'☾ ':'☀ ')+(timeLimit?fmtTime(gameT)+' / '+timeLimit+':00':fmtTime(gameT));$('#clock').title=SEAS[SEASON]+' ('+SEAS_D[SEASON]+', wechselt alle 3 Minuten). '+WXN[WX.kind]+(WX.night>.5?', Nacht: weniger Sicht, der Gegner greift eher an':'');
   const idle=ents.filter(e=>e.owner===0&&e.type==='worker'&&e.order.t==='idle').length;$('#idleN').textContent=idle;
   const wb=$('#wonderBanner');const wt=players.find(p=>p.wonderT>0);
   if(wt){wb.hidden=false;wb.textContent=(wt.i===0?'Dein Weltwunder':'Feindliches Weltwunder')+': '+fmtTime(wt.wonderT)}else wb.hidden=true;
