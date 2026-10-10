@@ -727,7 +727,9 @@ function updProj(dt){
         if(e.dead||e.owner<0||e.owner===p.owner||e.kind==='res')continue;
         let dd;if(e.kind==='unit')dd=Math.hypot(e.x-p.tx,e.y-p.ty)-e.r;else{const cx=Math.max(e.x,Math.min(p.tx,e.x+e.size)),cy=Math.max(e.y,Math.min(p.ty,e.y+e.size));dd=Math.hypot(cx-p.tx,cy-p.ty)}
         if(dd<.9)damage(e,hitDmg(p.ut,p.atk,e)*(1-.5*Math.max(0,dd)/.9),src);
+        else if(dd<3&&players[p.owner]&&players[p.owner].techs.siege_2&&p.ut==='siege')damage(e,hitDmg(p.ut,p.atk,e)*.5,src);
       }
+      if(players[p.owner]&&players[p.owner].techs.siege_2&&p.ut==='siege')fx.push({x:p.tx,y:p.ty,t:0,k:'ring3'});
       continue;
     }
     const t=byId.get(p.tid);
@@ -739,7 +741,7 @@ function updProj(dt){
   }
   proj=proj.filter(p=>!p.done);
   for(const f of fx)f.t+=dt;
-  fx=fx.filter(f=>f.t<(f.k==='smoke'?1.6:f.k==='die'?1.2:f.k==='stuck'?4:.4));
+  fx=fx.filter(f=>f.t<(f.k==='smoke'?1.6:f.k==='die'?1.2:f.k==='stuck'?4:f.k==='ring3'?.6:.4));
 }
 
 // ================= separation =================
@@ -957,7 +959,7 @@ const API={
   get ents(){return ents},income(pl,r,v){income(pl,r,v)},get players(){return players},get time(){return gameT},
   spawnUnit,uCost,get aiS(){return aiS},water:(x,y)=>inb(x|0,y|0)&&terr[idx(x|0,y|0)]===1,get gate(){return gate},idx,W,placeBld,toast,damage,order,applyTech,techState,center,distEnt,alive,isMil,uStat,
   heal(e,amt){e.hp=Math.min(e.maxhp,e.hp+amt)},
-  revealAll(){exp.fill(1)},sel:()=>sel,
+  revealAll(){exp.fill(1)},sel:()=>sel,kill,
   fx(x,y,k){fx.push({x,y,t:0,k:k||'hit'})},
 };
 // ================= main step =================
@@ -1573,6 +1575,7 @@ function render(){
   for(const f of fx){
     if(f.t<0)continue;const x=f.x*T,y=f.y*T;
     if(f.k==='hit'){ctx.fillStyle=`rgba(255,230,180,${1-f.t/.4})`;ctx.beginPath();ctx.arc(x,y,2+f.t*10,0,7);ctx.fill()}
+    else if(f.k==='ring3'){const k=Math.min(1,f.t/.5);ctx.strokeStyle=`rgba(230,40,30,${(1-k).toFixed(2)})`;ctx.lineWidth=3;ctx.beginPath();ctx.ellipse(x,y,3*T*k,3*T*k*.55,0,0,7);ctx.stroke();ctx.fillStyle=`rgba(230,40,30,${(.25*(1-k)).toFixed(2)})`;ctx.fill()}
     else if(f.k==='boom'){ctx.fillStyle=`rgba(255,160,60,${1-f.t/.4})`;ctx.beginPath();ctx.arc(x,y,4+f.t*30,0,7);ctx.fill()}
     else if(f.k==='smoke'){ctx.fillStyle=`rgba(60,60,60,${.6*(1-f.t/1.6)})`;ctx.beginPath();ctx.arc(x,y-f.t*14,6+f.t*10,0,7);ctx.fill()}
     else if(f.k==='stuck'){ctx.strokeStyle=`rgba(230,220,190,${1-f.t/4})`;ctx.lineWidth=1.2;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x-Math.cos(f.a)*5,y-Math.sin(f.a)*5-3);ctx.stroke();ctx.lineWidth=1}
@@ -1602,6 +1605,7 @@ function render(){
     ctx.beginPath();ctx.moveTo(u.x*T,u.y*T);ctx.lineTo(u.order.x*T,u.order.y*T);for(const w of u.wq)ctx.lineTo(w.x*T,w.y*T);ctx.stroke();
     ctx.fillStyle='rgba(158,240,160,.9)';for(const w of [u.order,...u.wq]){ctx.beginPath();ctx.arc(w.x*T,w.y*T,3,0,7);ctx.fill()}}
   ctx.restore();
+  ctx.font='bold 10px sans-serif';ctx.textAlign='center';for(const e of ents){if(e.dead||e.expT==null||e.kind!=='unit'||!visibleEnt(e))continue;const r=Math.max(0,Math.ceil(e.expT-gameT));ctx.fillStyle=r<20?'#ff8a7a':'#ffe08a';ctx.fillText('⏳'+r,e.x*T,e.y*T-26)}ctx.textAlign='left';
   for(const e of ents){if(!(e.glowT>gameT)||e.dead||!visibleEnt(e))continue;const c=center(e),k=(e.glowT-gameT)/3;ctx.fillStyle='rgba(255,215,90,'+(.85*k).toFixed(2)+')';
     for(let i=0;i<10;i++){const a=i*2.4+e.id,ph=((gameT*1.3+i*.13)%1);ctx.fillRect(c.x*T+Math.cos(a)*12-1,c.y*T-ph*30+Math.sin(a)*4-1,2.5,2.5)}}
   // command marker
@@ -2243,6 +2247,18 @@ $('#btnCam').onclick=()=>{if(started)toggleFreeCam()};
 window.__freeCam=()=>freeCam;
 $('#verLink').onclick=()=>{const c=$('#credits');c.hidden=false;const r=c.querySelector('.roll');r.style.animation='none';void r.offsetWidth;r.style.animation=''};
 $('#credits').onclick=()=>{$('#credits').hidden=true};
+// Handelsrouten-Übersicht
+let tradeOpen=false;
+$('#btnTrade').onclick=()=>{tradeOpen=!tradeOpen;$('#tradePanel').hidden=!tradeOpen;if(tradeOpen)drawTrade()};
+$('#tradeClose').onclick=()=>{tradeOpen=false;$('#tradePanel').hidden=true};
+function drawTrade(){if(!tradeOpen)return;const c=$('#tradeCv'),g=c.getContext('2d'),S=c.width;g.clearRect(0,0,S,S);g.drawImage($('#minimap'),0,0,S,S);
+  const sc=S/W,routes=new Map();
+  for(const u of ents){if(u.dead||u.type!=='caravan'||!u.home||!u.dest)continue;if(u.owner!==0&&!visibleEnt(u))continue;const a=byId.get(u.home),b=byId.get(u.dest);if(!a||!b||a.dead||b.dead)continue;const k=a.id+'-'+b.id;if(!routes.has(k))routes.set(k,{a:center(a),b:center(b),o:u.owner,n:0});routes.get(k).n++}
+  let i=0;for(const r of routes.values()){const col=r.o===0?'#5fb0ff':'#ff6a5a';g.strokeStyle=col;g.lineWidth=2+Math.min(3,r.n);g.setLineDash([8,6]);g.lineDashOffset=-(performance.now()/40)%14;
+    g.beginPath();g.moveTo(r.a.x*sc,r.a.y*sc);g.lineTo(r.b.x*sc,r.b.y*sc);g.stroke();g.setLineDash([]);const an=Math.atan2(r.b.y-r.a.y,r.b.x-r.a.x),bx=r.b.x*sc,by=r.b.y*sc;
+    g.fillStyle=col;g.beginPath();g.moveTo(bx,by);g.lineTo(bx-12*Math.cos(an-.4),by-12*Math.sin(an-.4));g.lineTo(bx-12*Math.cos(an+.4),by-12*Math.sin(an+.4));g.fill();i++}
+  $('#tradeInfo').textContent=i?i+' aktive Handelsroute'+(i>1?'n':'')+'. Blau: deine, Rot: gegnerische.':'Keine aktiven Handelsrouten. Karawanen per Rechtsklick auf einen zweiten Markt schicken.';
+  requestAnimationFrame(drawTrade)}
 $('#startBtn').onclick=()=>{timeLimit=+$('#limitSel').value;useCustomMap=!!(CUSTOM_MAP&&$('#useCustom').checked);
   $('#startScreen').hidden=true;resize();newGame(chosenDiff,seed);started=true;paused=false;$('#btnPause').textContent='Pause';
 };

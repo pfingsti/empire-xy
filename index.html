@@ -186,6 +186,7 @@ label.opt{font-size:14px;padding:5px 12px}
 #credits .logo{font-size:56px;letter-spacing:.15em;margin-bottom:6px}#credits .logo b{color:#e9be72}
 #credits h4{margin:34px 0 4px;font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:#c9a35a}#credits p{margin:0;font-size:20px}#credits .tg{margin-top:40px;font-style:italic;color:#9c8c6a}
 .prio{display:block;margin-top:6px;font-size:12px;color:var(--muted)}.prio select{margin-left:6px;font-size:12px}
+#tradePanel{position:fixed;top:64px;right:12px;z-index:65;background:var(--panel,#1b2328);border:1px solid var(--bronze);border-radius:8px;padding:8px;width:min(340px,92vw)}#tradePanel canvas{width:100%;height:auto;display:block;image-rendering:pixelated}.tph{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
 </style>
 
 <div id="app">
@@ -201,6 +202,7 @@ label.opt{font-size:14px;padding:5px 12px}
     <span id="epochBox"><span id="epochName">Steinzeit</span><span id="epochBar"><b></b></span></span>
     <span class="spacer"></span>
     <span id="clock">0:00</span>
+    <button class="tbtn" id="btnTrade" title="Handelsrouten">Handelsrouten</button>
     <button class="tbtn" id="btnCam" title="Freie Kamera (Z)">Kamera</button>
     <button class="tbtn" id="btnTech" title="Technologiebaum (N)">Forschung</button>
     <button class="tbtn" id="btnBuild" title="Arbeiter wählen und Gebäude bauen">Bauen</button>
@@ -311,6 +313,7 @@ label.opt{font-size:14px;padding:5px 12px}
   </div>
 </div>
 
+<div id="tradePanel" hidden><div class="tph"><b>Handelsrouten</b><button class="tbtn" id="tradeClose">✕</button></div><canvas id="tradeCv" width="320" height="320"></canvas><p class="hint" id="tradeInfo"></p></div>
 <div id="credits" hidden><div class="roll">
 <div class="logo">EMPIRE <b>XY</b></div><p class="tg">Zehn Epochen. Ein Reich.</p>
 <h4>Spielidee und Bauherr</h4><p>Christian, Kaiser aller Epochen</p>
@@ -924,7 +927,7 @@ EmpireXY.register({
   id:'kern-festung',name:'Kern: Festungsbau',version:'1.0.0',core:true,
   description:'Mauern zum Ziehen und Torhäuser, die mit jeder Epoche massiver werden.',
   buildings:{
-    gate:{name:'Torhaus',size:1,hp:1100,cost:{stone:40,wood:20},time:14,sight:4,gate:true,slot:11,
+    gate:{name:'Torhaus',size:1,hp:1100,cost:{stone:40,wood:20},time:14,sight:4,gate:true,slot:11,minEpoch:1,
       desc:'Tor in der Mauer: eigene Einheiten gehen durch, Feinde nicht. Zuerst das Tor setzen, dann die Mauer darüber ziehen.',
       draw(g,b,a){
         const {x,y,s,ep,pc}=a,wood=ep<3,conc=ep>=7,front=wood?'#6b4a2a':conc?'#a9adae':a.wall,h=wood?24:30,top=y+s-h-6;
@@ -938,7 +941,7 @@ EmpireXY.register({
         if(!open){g.strokeStyle='#2a1b0d';g.lineWidth=1;g.beginPath();for(let i=x+10;i<x+s-8;i+=3){g.moveTo(i,top+10);g.lineTo(i,y+s-4)}g.stroke()}
         g.fillStyle=pc;g.fillRect(x+s/2-1,top-14,2,10);g.beginPath();g.moveTo(x+s/2+1,top-14);g.lineTo(x+s/2+8,top-11);g.lineTo(x+s/2+1,top-8);g.fill();
       }},
-    wall:{name:'Mauer',size:1,hp:600,cost:{stone:8},time:5,sight:2,line:true,slot:10,
+    wall:{name:'Mauer',size:1,hp:600,cost:{stone:8},time:5,sight:2,line:true,slot:10,minEpoch:1,
       desc:'Ziehen zum Bauen: Startpunkt klicken, Maus halten und loslassen. Kostet pro Feld.',
       draw(g,b,a){
         const {x,y,s,ep,pc}=a,wood=ep<3,conc=ep>=7,h=wood?18:conc?16:22;
@@ -1508,6 +1511,30 @@ EmpireXY.register({
     bigship:{label:'Linienschiff',cls:'ship',naval:true,from:'dock',minEpoch:5,names:['','','','','','Galeone','Linienschiff','Panzerschiff','Schlachtschiff','Flugzeugträger'],
       hp:420,atk:24,range:7.5,rate:3.4,speed:1.5,sight:9,cost:{wood:200,gold:150},time:32,r:.55,pop:3,proj:2,vsUnit:.6,vsBld:2.6,
       desc:'Schwimmende Festung, beschießt Gebäude an der Küste.',draw(g,u,api){ship(g,u,api,true)}},
+  },
+});
+})();
+
+// --- kern-soeldner.js
+// Kern-Baustein: Söldner vom Marktplatz (nur Gold, 120 s Dienstzeit) und Katapult Stufe 2.
+(function(){
+const N=n=>Array(10).fill(n),DUR=120;
+const desc=' Nur gegen Gold. Verlässt die Armee nach 120 Sekunden.';
+EmpireXY.register({
+  id:'kern-soeldner',name:'Kern: Söldner und Katapult Stufe 2',version:'1.0.0',core:true,
+  description:'Söldner im Marktplatz ab Epoche 4, Forschung für Flächenschaden der Katapulte.',
+  units:{
+    merc_sword:{label:'Söldner-Schwertkämpfer',from:'market',look:'infantry',cls:'infantry',names:N('Söldner-Schwertkämpfer'),hp:140,atk:16,range:.5,rate:1,speed:1.5,sight:6,cost:{gold:180},time:4,r:.32,pop:1,minEpoch:3,ai:false,bonus:{cavalry:1.5},desc:'Teuer und stark.'+desc},
+    merc_bow:{label:'Söldner-Bogenschütze',from:'market',look:'ranged',cls:'ranged',names:N('Söldner-Bogenschütze'),hp:70,atk:10,range:5.5,rate:1.4,speed:1.5,sight:8,cost:{gold:120},time:4,r:.3,pop:1,minEpoch:3,ai:false,desc:'Treffsicherer Fernkämpfer.'+desc},
+    merc_cav:{label:'Söldner-Kavallerie',from:'market',look:'cavalry',cls:'cavalry',names:N('Söldner-Reiter'),hp:150,atk:13,range:.6,rate:1.2,speed:2.6,sight:7,cost:{gold:160},time:4,r:.4,pop:1,minEpoch:3,ai:false,desc:'Schnelle Reiter.'+desc},
+  },
+  techs:{
+    siege_2:{name:'Katapult Stufe 2',at:'smith',epoch:3,requires:[],cost:{wood:250,gold:200},time:40,effect:{},line:'nahkampf',
+      desc:'Katapulte richten Flächenschaden an: 50 % Schaden an allen Feinden im Umkreis von 3 Feldern um den Einschlag.'},
+  },
+  hooks:{
+    tick(api){for(const u of api.ents){if(u.dead||u.kind!=='unit'||!/^merc_/.test(u.type))continue;if(u.expT==null)u.expT=api.time+DUR;
+      else if(api.time>=u.expT){api.kill(u);if(u.owner===0)api.toast('Ein Söldner hat seinen Dienst beendet und zieht ab.')}}},
   },
 });
 })();
@@ -2456,7 +2483,9 @@ function updProj(dt){
         if(e.dead||e.owner<0||e.owner===p.owner||e.kind==='res')continue;
         let dd;if(e.kind==='unit')dd=Math.hypot(e.x-p.tx,e.y-p.ty)-e.r;else{const cx=Math.max(e.x,Math.min(p.tx,e.x+e.size)),cy=Math.max(e.y,Math.min(p.ty,e.y+e.size));dd=Math.hypot(cx-p.tx,cy-p.ty)}
         if(dd<.9)damage(e,hitDmg(p.ut,p.atk,e)*(1-.5*Math.max(0,dd)/.9),src);
+        else if(dd<3&&players[p.owner]&&players[p.owner].techs.siege_2&&p.ut==='siege')damage(e,hitDmg(p.ut,p.atk,e)*.5,src);
       }
+      if(players[p.owner]&&players[p.owner].techs.siege_2&&p.ut==='siege')fx.push({x:p.tx,y:p.ty,t:0,k:'ring3'});
       continue;
     }
     const t=byId.get(p.tid);
@@ -2468,7 +2497,7 @@ function updProj(dt){
   }
   proj=proj.filter(p=>!p.done);
   for(const f of fx)f.t+=dt;
-  fx=fx.filter(f=>f.t<(f.k==='smoke'?1.6:f.k==='die'?1.2:f.k==='stuck'?4:.4));
+  fx=fx.filter(f=>f.t<(f.k==='smoke'?1.6:f.k==='die'?1.2:f.k==='stuck'?4:f.k==='ring3'?.6:.4));
 }
 
 // ================= separation =================
@@ -2686,7 +2715,7 @@ const API={
   get ents(){return ents},income(pl,r,v){income(pl,r,v)},get players(){return players},get time(){return gameT},
   spawnUnit,uCost,get aiS(){return aiS},water:(x,y)=>inb(x|0,y|0)&&terr[idx(x|0,y|0)]===1,get gate(){return gate},idx,W,placeBld,toast,damage,order,applyTech,techState,center,distEnt,alive,isMil,uStat,
   heal(e,amt){e.hp=Math.min(e.maxhp,e.hp+amt)},
-  revealAll(){exp.fill(1)},sel:()=>sel,
+  revealAll(){exp.fill(1)},sel:()=>sel,kill,
   fx(x,y,k){fx.push({x,y,t:0,k:k||'hit'})},
 };
 // ================= main step =================
@@ -3302,6 +3331,7 @@ function render(){
   for(const f of fx){
     if(f.t<0)continue;const x=f.x*T,y=f.y*T;
     if(f.k==='hit'){ctx.fillStyle=`rgba(255,230,180,${1-f.t/.4})`;ctx.beginPath();ctx.arc(x,y,2+f.t*10,0,7);ctx.fill()}
+    else if(f.k==='ring3'){const k=Math.min(1,f.t/.5);ctx.strokeStyle=`rgba(230,40,30,${(1-k).toFixed(2)})`;ctx.lineWidth=3;ctx.beginPath();ctx.ellipse(x,y,3*T*k,3*T*k*.55,0,0,7);ctx.stroke();ctx.fillStyle=`rgba(230,40,30,${(.25*(1-k)).toFixed(2)})`;ctx.fill()}
     else if(f.k==='boom'){ctx.fillStyle=`rgba(255,160,60,${1-f.t/.4})`;ctx.beginPath();ctx.arc(x,y,4+f.t*30,0,7);ctx.fill()}
     else if(f.k==='smoke'){ctx.fillStyle=`rgba(60,60,60,${.6*(1-f.t/1.6)})`;ctx.beginPath();ctx.arc(x,y-f.t*14,6+f.t*10,0,7);ctx.fill()}
     else if(f.k==='stuck'){ctx.strokeStyle=`rgba(230,220,190,${1-f.t/4})`;ctx.lineWidth=1.2;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x-Math.cos(f.a)*5,y-Math.sin(f.a)*5-3);ctx.stroke();ctx.lineWidth=1}
@@ -3331,6 +3361,7 @@ function render(){
     ctx.beginPath();ctx.moveTo(u.x*T,u.y*T);ctx.lineTo(u.order.x*T,u.order.y*T);for(const w of u.wq)ctx.lineTo(w.x*T,w.y*T);ctx.stroke();
     ctx.fillStyle='rgba(158,240,160,.9)';for(const w of [u.order,...u.wq]){ctx.beginPath();ctx.arc(w.x*T,w.y*T,3,0,7);ctx.fill()}}
   ctx.restore();
+  ctx.font='bold 10px sans-serif';ctx.textAlign='center';for(const e of ents){if(e.dead||e.expT==null||e.kind!=='unit'||!visibleEnt(e))continue;const r=Math.max(0,Math.ceil(e.expT-gameT));ctx.fillStyle=r<20?'#ff8a7a':'#ffe08a';ctx.fillText('⏳'+r,e.x*T,e.y*T-26)}ctx.textAlign='left';
   for(const e of ents){if(!(e.glowT>gameT)||e.dead||!visibleEnt(e))continue;const c=center(e),k=(e.glowT-gameT)/3;ctx.fillStyle='rgba(255,215,90,'+(.85*k).toFixed(2)+')';
     for(let i=0;i<10;i++){const a=i*2.4+e.id,ph=((gameT*1.3+i*.13)%1);ctx.fillRect(c.x*T+Math.cos(a)*12-1,c.y*T-ph*30+Math.sin(a)*4-1,2.5,2.5)}}
   // command marker
@@ -3972,6 +4003,18 @@ $('#btnCam').onclick=()=>{if(started)toggleFreeCam()};
 window.__freeCam=()=>freeCam;
 $('#verLink').onclick=()=>{const c=$('#credits');c.hidden=false;const r=c.querySelector('.roll');r.style.animation='none';void r.offsetWidth;r.style.animation=''};
 $('#credits').onclick=()=>{$('#credits').hidden=true};
+// Handelsrouten-Übersicht
+let tradeOpen=false;
+$('#btnTrade').onclick=()=>{tradeOpen=!tradeOpen;$('#tradePanel').hidden=!tradeOpen;if(tradeOpen)drawTrade()};
+$('#tradeClose').onclick=()=>{tradeOpen=false;$('#tradePanel').hidden=true};
+function drawTrade(){if(!tradeOpen)return;const c=$('#tradeCv'),g=c.getContext('2d'),S=c.width;g.clearRect(0,0,S,S);g.drawImage($('#minimap'),0,0,S,S);
+  const sc=S/W,routes=new Map();
+  for(const u of ents){if(u.dead||u.type!=='caravan'||!u.home||!u.dest)continue;if(u.owner!==0&&!visibleEnt(u))continue;const a=byId.get(u.home),b=byId.get(u.dest);if(!a||!b||a.dead||b.dead)continue;const k=a.id+'-'+b.id;if(!routes.has(k))routes.set(k,{a:center(a),b:center(b),o:u.owner,n:0});routes.get(k).n++}
+  let i=0;for(const r of routes.values()){const col=r.o===0?'#5fb0ff':'#ff6a5a';g.strokeStyle=col;g.lineWidth=2+Math.min(3,r.n);g.setLineDash([8,6]);g.lineDashOffset=-(performance.now()/40)%14;
+    g.beginPath();g.moveTo(r.a.x*sc,r.a.y*sc);g.lineTo(r.b.x*sc,r.b.y*sc);g.stroke();g.setLineDash([]);const an=Math.atan2(r.b.y-r.a.y,r.b.x-r.a.x),bx=r.b.x*sc,by=r.b.y*sc;
+    g.fillStyle=col;g.beginPath();g.moveTo(bx,by);g.lineTo(bx-12*Math.cos(an-.4),by-12*Math.sin(an-.4));g.lineTo(bx-12*Math.cos(an+.4),by-12*Math.sin(an+.4));g.fill();i++}
+  $('#tradeInfo').textContent=i?i+' aktive Handelsroute'+(i>1?'n':'')+'. Blau: deine, Rot: gegnerische.':'Keine aktiven Handelsrouten. Karawanen per Rechtsklick auf einen zweiten Markt schicken.';
+  requestAnimationFrame(drawTrade)}
 $('#startBtn').onclick=()=>{timeLimit=+$('#limitSel').value;useCustomMap=!!(CUSTOM_MAP&&$('#useCustom').checked);
   $('#startScreen').hidden=true;resize();newGame(chosenDiff,seed);started=true;paused=false;$('#btnPause').textContent='Pause';
 };
