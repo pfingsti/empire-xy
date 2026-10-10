@@ -846,11 +846,16 @@ function aiThink(){
     for(const a of army)if(a.order.t!=='attack'||!a.order.forced)if(!aiS.attacking||Math.hypot(a.x-home.x,a.y-home.y)<25)order(a,{t:'attack',target:threat.id,forced:true});
     if(army.length<3&&tcs.length)for(const w of workers)if(Math.hypot(w.x-threat.x,w.y-threat.y)<5&&threat.type==='worker')order(w,{t:'attack',target:threat.id,forced:true});
   }
+  // --- Verwundete (unter 30 % Leben) ziehen sich nach Hause zurück, Heiler und Burg pflegen sie dort
+  for(const a of army){if(a.retreat){if(a.hp>a.maxhp*.75||Math.hypot(a.x-home.x,a.y-home.y)<6&&a.hp>a.maxhp*.6)a.retreat=false;else continue}
+    if(a.hp<a.maxhp*.3&&Math.hypot(a.x-home.x,a.y-home.y)>10&&diff>0){a.retreat=true;a.waveAt=null;cmdMove([a],home.x+(rng()-.5)*4,home.y+4+(rng()-.5)*3,false)}}
+  // Rückzügler heilen langsam in der Heimat
+  for(const a of army)if(a.retreat&&Math.hypot(a.x-home.x,a.y-home.y)<7)a.hp=Math.min(a.maxhp,a.hp+a.maxhp*.02*DIFF[diff].think);
   // --- attack waves
   if(aiS.attacking){
     const out=army.filter(a=>a.waveAt||a.order.t==='amove'||a.order.t==='attack');
     if(out.length<Math.max(2,aiS.sent*.25)){aiS.attacking=false;aiS.nextAttack=gameT+70;for(const a of army)cmdMove([a],home.x+(rng()-.5)*6,home.y+6+(rng()-.5)*4,false)}
-    else for(const a of army)if(a.waveAt&&gameT>=a.waveAt.t){order(a,{t:'amove',x:a.waveAt.x+(rng()-.5)*2,y:a.waveAt.y+(rng()-.5)*2});a.waveAt=null}
+    else for(const a of army)if(a.retreat)continue;else if(a.waveAt&&gameT>=a.waveAt.t){order(a,{t:'amove',x:a.waveAt.x+(rng()-.5)*2,y:a.waveAt.y+(rng()-.5)*2});a.waveAt=null}
     else if(!a.waveAt&&(a.order.t==='idle'||a.order.t==='guard')){const t=playerTarget(a);if(t){const c=center(t);order(a,{t:'amove',x:c.x,y:c.y})}}
   }else if(gameT>=aiS.nextAttack&&army.length>=aiS.wave){
     const t=playerTarget(army[0]);
@@ -860,7 +865,9 @@ function aiThink(){
       const ranged=a=>(UNITS[a.type]&&UNITS[a.type].range>1.5);
       const rows=[army.filter(a=>!ranged(a)),army.filter(ranged)];
       rows.forEach((row,ri)=>row.forEach((a,k)=>{const off=(k-(row.length-1)/2)*.9,back=ri*1.6;
-        a.waveAt={x:c.x,y:c.y,t:gameT+14};cmdMove([a],sx0-uy*off-ux*back,sy0+ux*off-uy*back,false)}));
+        // jede dritte Einheit eines großen Heeres sammelt sich seitlich versetzt und fällt von der Flanke ein
+        const fl=army.length>=6&&k%3===2,side=fl?(k%2?1:-1)*9:0,fwd=fl?6:0;
+        a.waveAt={x:c.x,y:c.y,t:gameT+14};cmdMove([a],sx0-uy*(off+side)-ux*(back-fwd),sy0+ux*(off+side)-uy*(back-fwd),false)}));
       toast('Feindliche Armee sammelt sich!','warn');ping={x:army[0].x,y:army[0].y};pingT=3}
   }else{
     // rally idle army in front of home
@@ -871,7 +878,7 @@ function aiThink(){
 function mulCost(c,m){const r={};for(const k in c)r[k]=c[k]*m;return r}
 function playerTarget(from){
   let best=null,bd=1e9;
-  for(const e of ents)if(!e.dead&&e.owner===0&&e.kind==='bld'){const c=center(e),d=Math.hypot(c.x-from.x,c.y-from.y)+(e.type==='tc'?-6:0)+(e.type==='farm'?8:0);if(d<bd){bd=d;best=e}}
+  for(const e of ents)if(!e.dead&&e.owner===0&&e.kind==='bld'){const c=center(e),d=Math.hypot(c.x-from.x,c.y-from.y)+(e.type==='tc'?-6:0)+(e.type==='farm'?8:0)+(['camp','mill','mine','market','dock'].includes(e.type)?-8:0)+(['tower','castle','wall','gate'].includes(e.type)?10:0);if(d<bd){bd=d;best=e}}
   if(!best)for(const e of ents)if(!e.dead&&e.owner===0&&e.kind==='unit'){const d=Math.hypot(e.x-from.x,e.y-from.y);if(d<bd){bd=d;best=e}}
   return best;
 }
@@ -938,7 +945,9 @@ function endGame(win,text){
   $('#endTitle').textContent=win?'Sieg':'Niederlage';
   $('#endText').textContent=text+' Spielzeit '+fmtTime(gameT)+', erreichte Epoche: '+EPOCHS[players[0].epoch]+'.';
   const rows=[['Ausgebildet','trained'],['Gefallen / zerstört','lost'],['Besiegte Feinde','killed'],['Gesammelte Rohstoffe','gathered'],['Gebäude errichtet','built']];
-  $('#endStats').innerHTML='<span class="h"></span><span class="h">Du</span><span class="h">Gegner</span>'+rows.map(([l,k])=>`<span>${l}</span><span>${Math.round(players[0].st[k])}</span><span>${Math.round(players[1].st[k])}</span>`).join('');
+  const val=(pl,k)=>k==='techs'?Object.keys(pl.techs).length:k==='epoch'?EPOCHS[pl.epoch]:k==='score'?score(pl):Math.round(pl.st[k]||0);
+  rows.push(['Erforschte Techniken','techs'],['Erreichte Epoche','epoch'],['Punkte','score']);
+  $('#endStats').innerHTML='<span class="h"></span><span class="h">Du</span><span class="h">Gegner</span>'+rows.map(([l,k])=>`<span>${l}</span><span>${val(players[0],k)}</span><span>${val(players[1],k)}</span>`).join('');
   setTimeout(()=>{$('#endScreen').hidden=false},900);
 }
 const fmtTime=t=>{t=Math.floor(t);return Math.floor(t/60)+':'+String(t%60).padStart(2,'0')};
