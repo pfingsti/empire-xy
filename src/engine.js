@@ -1063,7 +1063,7 @@ function grade(c,sat,grain,seed){const g=c.getContext('2d'),W2=c.width,H2=c.heig
 function sprite(key,w,h,fn){
   let c=SPR.get(key);if(c)return c;
   c=document.createElement('canvas');c.width=w*SS;c.height=h*SS;const g=c.getContext('2d');g.scale(SS,SS);g.lineJoin='round';fn(g);
-  if(key.startsWith('b|'))grade(c,.8,14,key.length*31);else if(key.startsWith('stone')||key.startsWith('gold'))grade(c,.85,16,key.length*5);else if(key.startsWith('tree'))grade(c,.82,12,key.length*17);
+  if(key.startsWith('b|'))grade(c,.8,14,key.length*31);else if(key.startsWith('bush'))grade(c,.72,14,key.length*9);else if(key.startsWith('stone')||key.startsWith('gold'))grade(c,.85,16,key.length*5);else if(key.startsWith('tree'))grade(c,.82,12,key.length*17);
   c.lw=w;c.lh=h;SPR.set(key,c);return c;
 }
 function hex2rgb(h){if(h[0]!=='#')return[128,128,128];const n=parseInt(h.slice(1),16);return[n>>16,n>>8&255,n&255]}
@@ -1290,7 +1290,7 @@ function bldSprite(type,rep,owner){
         g.strokeStyle='rgba(255,255,255,.18)';g.lineWidth=1;g.beginPath();for(let i=1;i<4;i++){const lx=bx+2+i*(S-4)/4;g.moveTo(lx,t1+2);g.lineTo(lx,y1-4)}g.stroke();
         for(const tx of [bx+14,bx+S/2-6,bx+S/2+10,x1-14]){
           if(modern){g.fillStyle='#2b2b2b';g.beginPath();g.arc(tx,yy-6,2.6,0,7);g.fill();g.fillRect(tx-4,yy-3,8,10)}
-          else{g.fillStyle='#5a3f22';g.fillRect(tx-1,yy,2,9);g.fillStyle='#e6d7a8';g.beginPath();g.arc(tx,yy,6,0,7);g.fill();g.fillStyle='#b8322c';g.beginPath();g.arc(tx,yy,4,0,7);g.fill();g.fillStyle='#e6d7a8';g.beginPath();g.arc(tx,yy,2,0,7);g.fill()}}
+          else{g.fillStyle='#5a3f22';g.fillRect(tx-1,yy,2,9);g.fillStyle='#a8925e';g.beginPath();g.ellipse(tx,yy,4.6,4.2,0,0,7);g.fill();g.strokeStyle='rgba(80,60,30,.6)';g.lineWidth=.6;g.beginPath();for(let k=-3;k<=3;k+=1.5){g.moveTo(tx-4,yy+k);g.lineTo(tx+4,yy+k)}g.stroke();g.fillStyle='#6e2a22';g.beginPath();g.arc(tx,yy,1.4,0,7);g.fill()}}
         fence();banner(g,x1-6,t0-4,pc,16);
       }else if(type==='stable'){
         // langer, niedriger Stall mit Boxen, davor Koppel mit Pferden (modern: Garage mit Fahrzeugen)
