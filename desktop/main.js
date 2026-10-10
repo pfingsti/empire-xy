@@ -1,7 +1,8 @@
-// Empire XY – Desktop-Hülle: Fenster, Bausteine-Ordner mit Watcher, automatische Updates im Hintergrund
+// Empire XY – Desktop-Hülle: Fenster, Bausteine-Ordner mit Watcher, automatische Updates im Hintergrund, Steam
 const {app,BrowserWindow,ipcMain,shell,Menu}=require('electron');
 const path=require('path'),fs=require('fs');
 const {autoUpdater}=require('electron-updater');
+const steam=require('./steam');
 
 let win=null;
 const modsDir=()=>path.join(app.getPath('userData'),'bausteine');
@@ -40,7 +41,7 @@ function readToken(){
   return null;
 }
 function setupUpdater(){
-  if(!app.isPackaged)return;
+  if(!app.isPackaged||steam.isSteamBuild)return; // Steam-Fassung wird von Steam aktualisiert
   const token=readToken();
   if(!token){console.log('Kein Update-Schlüssel gefunden, Update-Watcher ist aus.');return}
   autoUpdater.setFeedURL({provider:'github',owner:'pfingsti',repo:'empire-xy',private:true,token});
@@ -56,9 +57,11 @@ function setupUpdater(){
 }
 ipcMain.on('update-install',()=>autoUpdater.quitAndInstall());
 
-if(!app.requestSingleInstanceLock())app.quit();
+if(steam.mustRestartThroughSteam())app.quit();
+else if(!app.requestSingleInstanceLock())app.quit();
 else{
   app.on('second-instance',()=>{if(win){if(win.isMinimized())win.restore();win.focus()}});
-  app.whenReady().then(()=>{createWindow();watchMods();setupUpdater()});
+  app.whenReady().then(()=>{steam.start();createWindow();watchMods();setupUpdater()});
   app.on('window-all-closed',()=>app.quit());
 }
+steam.enableOverlay(); // laut steamworks.js am Ende von main.js aufrufen
