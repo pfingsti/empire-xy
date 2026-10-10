@@ -69,8 +69,18 @@ function addRes(type,x,y){
 }
 function clearRes(x,y){const i=idx(x,y),id=block[i];if(id>0){const e=byId.get(id);if(e&&e.kind==='res'){e.dead=true;block[i]=0}}}
 
+let CUSTOM_MAP=null,useCustomMap=false;try{CUSTOM_MAP=JSON.parse(localStorage.getItem('empire-xy.karte')||'null')}catch(e){}
+function applyCustomMap(M){
+  for(let i=0;i<W*H;i++)terr[i]=M.terr[i]||0;
+  bases=[{x:M.starts[0][0],y:M.starts[0][1]},{x:M.starts[1][0],y:M.starts[1][1]}];
+  for(const b of bases)for(let y=b.y-1;y<b.y+5;y++)for(let x=b.x-1;x<b.x+5;x++)if(inb(x,y))terr[idx(x,y)]=0;
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=idx(x,y);if(terr[i]===1||terr[i]===3){block[i]=-1;continue}
+    if(terr[i]===0){let nearW=false;for(let oy=-1;oy<=1;oy++)for(let ox=-1;ox<=1;ox++){const xx=x+ox,yy=y+oy;if(inb(xx,yy)&&terr[idx(xx,yy)]===1)nearW=true}if(nearW)terr[i]=2}}
+  for(const [t,x,y] of M.res||[])if(inb(x,y)&&block[idx(x,y)]===0&&!bases.some(b=>x>=b.x-1&&x<b.x+5&&y>=b.y-1&&y<b.y+5))addRes(t,x,y);
+}
 function genMap(){
   terr.fill(0);block.fill(0);
+  if(CUSTOM_MAP&&useCustomMap){applyCustomMap(CUSTOM_MAP);return}
   const lake=makeNoise(10),forest=makeNoise(6),det=makeNoise(3);
   bases=[{x:9,y:H-12},{x:W-12,y:9}];
   const nearBase=(x,y,r)=>bases.some(b=>Math.hypot(x-b.x-1.5,y-b.y-1.5)<r);
@@ -179,6 +189,11 @@ function renderTerrain(){
   // water: soft highlight ripples
   for(let i=0;i<W*H*2;i++){const x=rng()*PW,y=rng()*PH;if(samp(water,x/T-.5,y/T-.5)<.75)continue;
     g.strokeStyle='rgba(200,235,240,.16)';g.lineWidth=1;g.beginPath();g.moveTo(x,y);g.quadraticCurveTo(x+5,y-2,x+10,y);g.stroke()}
+  // Wüste und Gebirge (aus dem Karteneditor)
+  for(let ty=0;ty<H;ty++)for(let tx=0;tx<W;tx++){const t=terr[idx(tx,ty)],x=tx*T,y=ty*T;
+    if(t===4){g.fillStyle='rgba(222,196,130,.85)';g.fillRect(x,y,T,T);g.fillStyle='rgba(180,150,90,.35)';for(let k=0;k<4;k++)g.fillRect(x+rng()*T,y+rng()*T,3,1)}
+    else if(t===3){g.fillStyle='#6f6a62';g.fillRect(x,y,T,T);g.fillStyle='#8d877c';g.beginPath();g.moveTo(x+2,y+T-2);g.lineTo(x+T*.45,y+3);g.lineTo(x+T-2,y+T-2);g.closePath();g.fill();
+      g.fillStyle='#e8ecee';g.beginPath();g.moveTo(x+T*.35,y+T*.3);g.lineTo(x+T*.45,y+3);g.lineTo(x+T*.56,y+T*.3);g.closePath();g.fill();g.fillStyle='rgba(0,0,0,.2)';g.beginPath();g.moveTo(x+T*.45,y+3);g.lineTo(x+T-2,y+T-2);g.lineTo(x+T*.5,y+T-2);g.closePath();g.fill()}}
 }
 
 function newPlayer(i,ai){return{i,ai,techs:{},fx:{gather:{},atk:{},hp:{},speed:{},range:{},carry:0,build:0,bldHp:0,bldAtk:0},res:{food:200,wood:200,stone:150,gold:100},epoch:0,pop:0,cap:0,advancing:false,wonderT:-1,defeated:false,
@@ -1797,7 +1812,7 @@ function updateTop(){
   if(rh.dataset.sig!==rsig){rh.dataset.sig=rsig;rh.hidden=!rq.length;rh.innerHTML=rq.map(r=>`<div class="rq" data-id="${r.id}"><span>${TECHS[r.id].name}</span><em></em><i><b></b></i></div>`).join('')}
   rq.forEach((r,i)=>{const row=rh.children[i];if(!row)return;row.querySelector('b').style.width=(r.f*100)+'%';row.querySelector('em').textContent=r.wait?'wartet':Math.floor(r.f*100)+'% · '+Math.ceil(r.left)+' s'});
   if(!$('#techScreen').hidden)$('#techCols').querySelectorAll('.tk.running').forEach(btn=>{const r=rq.find(x=>x.id===btn.dataset.id);const st=btn.querySelector('.st');if(r&&st)st.textContent=r.wait?'Wartet in Warteschlange':'Wird erforscht: '+Math.floor(r.f*100)+'%';let bar=btn.querySelector('.pb');if(!bar){bar=document.createElement('i');bar.className='pb';bar.innerHTML='<b></b>';btn.appendChild(bar)}bar.firstChild.style.width=(r?r.f*100:0)+'%'});
-  $('#clock').textContent=SEAS_I[SEASON]+' '+(WX.kind==='rain'?'🌧 ':WX.kind==='snow'?'❄ ':WX.night>.5?'☾ ':'☀ ')+(timeLimit?fmtTime(gameT)+' / '+timeLimit+':00':fmtTime(gameT));$('#clock').title=SEAS[SEASON]+' ('+SEAS_D[SEASON]+', wechselt alle 3 Minuten). '+WXN[WX.kind]+(WX.night>.5?', Nacht: weniger Sicht, der Gegner greift eher an':'');
+  $('#clock').textContent=(players[0].depotXfer>gameT?'⇄ ':'')+SEAS_I[SEASON]+' '+(WX.kind==='rain'?'🌧 ':WX.kind==='snow'?'❄ ':WX.night>.5?'☾ ':'☀ ')+(timeLimit?fmtTime(gameT)+' / '+timeLimit+':00':fmtTime(gameT));$('#clock').title=SEAS[SEASON]+' ('+SEAS_D[SEASON]+', wechselt alle 3 Minuten). '+WXN[WX.kind]+(WX.night>.5?', Nacht: weniger Sicht, der Gegner greift eher an':'');
   const idle=ents.filter(e=>e.owner===0&&e.type==='worker'&&e.order.t==='idle').length;$('#idleN').textContent=idle;
   const wb=$('#wonderBanner');const wt=players.find(p=>p.wonderT>0);
   const rc=players.find(p=>p.raceUntil>gameT);
@@ -2089,7 +2104,7 @@ function clearSave(){try{localStorage.removeItem(SAVE_KEY)}catch(e){}}
 function loadGame(d){
   syncRegistry();rng=mulberry32(d.seed);curSeed=d.seed;diff=d.diff;epStart=d.epStart||0;epEnd=d.epEnd!==undefined?d.epEnd:99;timeLimit=d.timeLimit||0;if(d.WX)WX=d.WX;
   terr=Uint8Array.from(d.terr);exp=Uint8Array.from(d.exp);vis=new Uint8Array(W*H);block=new Int32Array(W*H);gate=new Uint8Array(W*H);
-  for(let i=0;i<W*H;i++)if(terr[i]===1)block[i]=-1;
+  for(let i=0;i<W*H;i++)if(terr[i]===1||terr[i]===3)block[i]=-1;
   ents=d.ents.filter(e=>e.kind==='res'?RESDEF[e.type]:e.kind==='unit'?UNITS[e.type]:BLD[e.type]);byId=new Map();
   for(const e of ents){byId.set(e.id,e);
     if(e.kind==='res')block[idx(e.x,e.y)]=e.id;
@@ -2160,7 +2175,40 @@ try{const v=localStorage.getItem('empire-xy.volk');if(v&&CIVS[v])chosenCiv=v}cat
 $('#civSel').innerHTML=Object.entries(CIVS).map(([k,c])=>`<option value="${k}"${k===chosenCiv?' selected':''}>${c.name}: ${c.bonus}</option>`).join('');
 $('#civSel').onchange=()=>{chosenCiv=$('#civSel').value;try{localStorage.setItem('empire-xy.volk',chosenCiv)}catch(e){}};
 $('#limitSel').onchange=()=>{try{localStorage.setItem('empire-xy.limit',$('#limitSel').value)}catch(e){}};
-$('#startBtn').onclick=()=>{timeLimit=+$('#limitSel').value;
+// ===== Karteneditor =====
+(function(){
+  const cv=$('#edCanvas'),g=cv.getContext('2d'),S=720/W;let M=null,tool='grass',down=false;
+  const TOOLS=[['grass','Gras'],['water','Wasser'],['mount','Gebirge'],['forest','Wald'],['desert','Wüste'],['stone','Stein'],['gold','Gold'],['berry','Beeren'],['erase','Radierer'],['s0','Start 1 (du)'],['s1','Start 2 (KI)']];
+  const blank=()=>({v:1,w:W,h:H,terr:new Array(W*H).fill(0),res:[],starts:[[9,H-12],[W-12,9]]});
+  function fromGame(){return blank()}
+  function draw(){const C={0:'#5e8a3c',1:'#3d6e9c',2:'#c9b98a',3:'#7a746a',4:'#dcc48a'};
+    for(let y=0;y<H;y++)for(let x=0;x<W;x++){g.fillStyle=C[M.terr[y*W+x]]||C[0];g.fillRect(x*S,y*S,S,S)}
+    for(const [t,x,y] of M.res){g.fillStyle={tree:'#24502a',stone:'#b8b8b0',gold:'#e9c54a',berry:'#c0405a'}[t]||'#fff';g.fillRect(x*S+1,y*S+1,S-2,S-2)}
+    M.starts.forEach(([x,y],i)=>{g.fillStyle=i?'#d94a3a':'#3a7bd9';g.fillRect(x*S,y*S,4*S,4*S);g.fillStyle='#fff';g.font='bold 18px sans-serif';g.fillText(String(i+1),x*S+S*1.4,y*S+S*2.7)})}
+  function paint(e){const r=cv.getBoundingClientRect(),x=Math.floor((e.clientX-r.left)/r.width*W),y=Math.floor((e.clientY-r.top)/r.height*H);if(x<0||y<0||x>=W||y>=H)return;
+    const brush=['grass','water','mount','desert','erase'].includes(tool)?1:0;
+    for(let oy=-brush;oy<=brush;oy++)for(let ox=-brush;ox<=brush;ox++){const xx=x+ox,yy=y+oy;if(xx<0||yy<0||xx>=W||yy>=H)continue;const i=yy*W+xx;
+      const T2={grass:0,water:1,mount:3,desert:4}[tool];
+      if(T2!=null){M.terr[i]=T2;if(T2===1||T2===3)M.res=M.res.filter(r=>r[1]!==xx||r[2]!==yy)}
+      if(tool==='erase'){M.res=M.res.filter(r=>r[1]!==xx||r[2]!==yy);M.terr[i]=0}}
+    const RT={forest:'tree',stone:'stone',gold:'gold',berry:'berry'}[tool];
+    if(RT&&M.terr[y*W+x]!==1&&M.terr[y*W+x]!==3&&!M.res.some(r=>r[1]===x&&r[2]===y))M.res.push([RT,x,y]);
+    if(tool==='s0'||tool==='s1'){M.starts[tool==='s0'?0:1]=[Math.min(W-6,Math.max(2,x-1)),Math.min(H-6,Math.max(2,y-1))]}
+    draw()}
+  $('#edTools').innerHTML=TOOLS.map(([k,l])=>`<button class="tbtn" data-tool="${k}">${l}</button>`).join('');
+  const mark=()=>$('#edTools').querySelectorAll('button').forEach(b=>b.style.outline=b.dataset.tool===tool?'2px solid #e9be72':'');
+  $('#edTools').onclick=e=>{const b=e.target.closest('[data-tool]');if(b){tool=b.dataset.tool;mark()}};
+  cv.addEventListener('pointerdown',e=>{down=true;cv.setPointerCapture(e.pointerId);paint(e)});cv.addEventListener('pointermove',e=>{if(down&&!['s0','s1'].includes(tool))paint(e)});cv.addEventListener('pointerup',()=>down=false);
+  const custRow=()=>{$('#customRow').hidden=!CUSTOM_MAP;if(CUSTOM_MAP)$('#useCustom').checked=true};custRow();
+  $('#editBtn').onclick=()=>{M=CUSTOM_MAP?JSON.parse(JSON.stringify(CUSTOM_MAP)):fromGame();$('#startScreen').hidden=true;$('#editScreen').hidden=false;$('#editScreen').style.display='flex';mark();draw()};
+  $('#edNew').onclick=()=>{M=blank();draw()};
+  $('#edDone').onclick=()=>{CUSTOM_MAP=M;try{localStorage.setItem('empire-xy.karte',JSON.stringify(M))}catch(e){}$('#editScreen').hidden=true;$('#editScreen').style.display='';$('#startScreen').hidden=false;custRow()};
+  $('#edSave').onclick=()=>{const txt=JSON.stringify(M),fn='empire-xy-karte.json';const p=window.claude&&window.claude.use?window.claude.use('downloads').catch(()=>null):Promise.resolve(null);
+    p.then(dl=>{if(dl){dl.save({filename:fn,data:txt}).catch(()=>{});return}const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([txt],{type:'application/json'}));a.download=fn;document.body.appendChild(a);a.click();setTimeout(()=>a.remove(),1000)})};
+  $('#edLoad').onclick=()=>$('#edFile').click();
+  $('#edFile').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(d&&d.terr&&d.terr.length===W*H&&d.starts){M=d;draw()}}catch(err){}};r.readAsText(f);e.target.value=''};
+})();
+$('#startBtn').onclick=()=>{timeLimit=+$('#limitSel').value;useCustomMap=!!(CUSTOM_MAP&&$('#useCustom').checked);
   $('#startScreen').hidden=true;resize();newGame(chosenDiff,seed);started=true;paused=false;$('#btnPause').textContent='Pause';
 };
 $('#againBtn').onclick=()=>{showContinue();$('#endScreen').hidden=true;started=false;over=false;seed=(Math.random()*99999)|0;$('#seedN').textContent=seed;$('#startScreen').hidden=false};
@@ -2175,5 +2223,5 @@ function autoPlayer(){ // lets the player side be run by the same AI for soak te
   try{aiThink()}finally{window.__ai0=aiS;aiS=a;for(const e of ents)swap(e);players=save;players[0].i=0;players[1].i=1;bases=b}
 }
 window.__ex={start:(d,s)=>{newGame(d,s);started=true},step:n=>{for(let i=0;i<n&&!over;i++)step(DT)},select:a=>select(a),get:()=>({t:gameT,over,players,ents})};
-window.__spawn=(p,t,x,y)=>spawnUnit(p,t,x,y);window.__place=(p,t,x,y)=>placeBld(p,t,x,y,true);window.__can=(p,t,x,y)=>canPlace(p,t,x,y);window.__water=(x,y)=>terr[idx(x|0,y|0)]===1;window.__cam=(x,y)=>{cam.x=x*T;cam.y=y*T};window.__move=(u,x,y)=>cmdMove([u],x,y,false);window.__limit=m=>{timeLimit=m};window.__placeU=(p,t,x,y)=>placeBld(p,t,x,y,false);
+window.__spawn=(p,t,x,y)=>spawnUnit(p,t,x,y);window.__reveal=()=>{exp.fill(1);vis.fill(1)};window.__place=(p,t,x,y)=>placeBld(p,t,x,y,true);window.__can=(p,t,x,y)=>canPlace(p,t,x,y);window.__water=(x,y)=>terr[idx(x|0,y|0)]===1;window.__cam=(x,y)=>{cam.x=x*T;cam.y=y*T};window.__move=(u,x,y)=>cmdMove([u],x,y,false);window.__limit=m=>{timeLimit=m};window.__placeU=(p,t,x,y)=>placeBld(p,t,x,y,false);
 })();
