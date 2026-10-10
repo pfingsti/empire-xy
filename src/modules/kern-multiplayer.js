@@ -17,7 +17,7 @@ const XY=window.EmpireXY;
 const PROTO=1,TURN=.1,STEPS=3,DELAY=3,MAXLEAD=20,TIMEOUT=10000,MAXP=4;
 const CODECH='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const PEERJS='https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js';
-const G=()=>XY.game;
+const G=()=>XY.mp;
 const $=s=>document.querySelector(s);
 const esc=t=>String(t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const store={get(k,d){try{const v=localStorage.getItem('empire-xy.mp.'+k);return v==null?d:v}catch(e){return d}},set(k,v){try{localStorage.setItem('empire-xy.mp.'+k,v)}catch(e){}}};
