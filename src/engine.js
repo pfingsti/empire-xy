@@ -197,16 +197,28 @@ function newGame(d,seed){
   });
   epStart=Math.min(epStart,MAXEP());
   if(epStart>0)for(const pl of players){pl.epoch=epStart;for(const k in pl.res)pl.res[k]=Math.round(pl.res[k]*(1+epStart*.7))}
-  aiS={t:0,nextAttack:DIFF[d].firstAttack,wave:DIFF[d].wave,attacking:false,lastDef:0};
+  aiS={t:0,nextAttack:DIFF[d].firstAttack,wave:DIFF[d].wave,attacking:false,lastDef:0};WX={kind:'sun',until:150,speed:1,night:0};
+  // Völker mit eigenen Boni (wie in Age of Empires 2); der Gegner zieht ein zufälliges anderes Volk
+  players[0].civ=chosenCiv;const others=Object.keys(CIVS).filter(k=>k!==chosenCiv);players[1].civ=others[(rng()*others.length)|0];
+  for(const pl of players)CIVS[pl.civ].apply(pl.fx);
   recalcPop();updateVis(true);
   XY.emit('start',API);
   const tc=ents.find(e=>e.type==='tc'&&e.owner===0);centerOn(tc.x+1.5,tc.y+1.5);
   select([tc]);
   toast('Dein Volk erwacht in der Steinzeit. Sammle Nahrung und Holz.', 'good');
+  toast('Du führst die '+CIVS[players[0].civ].name+' ('+CIVS[players[0].civ].bonus+'). Gegner: '+CIVS[players[1].civ].name+'.');
 }
 
 // ================= entities =================
-function uStat(u){const d=UNITS[u.type],pl=players[u.owner],f=pl.fx,t=CLS(u.type),e=pl.epoch,m=1+.17*e;return{hp:Math.round(d.hp*m*(1+(f.hp[t]||0))),atk:d.atk*m*(1+(f.atk[t]||0)),range:d.range+(f.range[t]||0),rate:d.rate,speed:d.speed*(1+.03*e)*(1+(f.speed[t]||0)),sight:d.sight}}
+// Wetter und Tageszeit: Sonne, Regen (−20 % Tempo), Schnee (−10 %); ein Tag dauert 8 Minuten, nachts sinkt die Sicht
+let WX={kind:'sun',until:150,speed:1,night:0};
+const WXN={sun:'Sonnenschein',rain:'Regen: alle Truppen 20 % langsamer',snow:'Schneefall: alle Truppen 10 % langsamer'};
+function weatherTick(){
+  const ph=(gameT/480)%1;WX.night=Math.max(0,Math.min(1,(Math.cos(ph*Math.PI*2)*-1-.35)*1.6));// 0 Tag … 1 tiefe Nacht
+  if(gameT>=WX.until){const r=rng(),ep=players[0].epoch,old=WX.kind;WX.kind=r<.55?'sun':r<.82||ep>6?'rain':'snow';WX.until=gameT+90+rng()*150;
+    WX.speed=WX.kind==='rain'?.8:WX.kind==='snow'?.9:1;if(started&&old!==WX.kind)toast(WXN[WX.kind]+'.')}
+}
+function uStat(u){const d=UNITS[u.type],pl=players[u.owner],f=pl.fx,t=CLS(u.type),e=pl.epoch,m=1+.17*e;return{hp:Math.round(d.hp*m*(1+(f.hp[t]||0))),atk:d.atk*m*(1+(f.atk[t]||0)),range:d.range+(f.range[t]||0),rate:d.rate,speed:d.speed*(1+.03*e)*(1+(f.speed[t]||0))*(d.naval?1:WX.speed),sight:Math.max(2,d.sight-WX.night*2)}}
 function spawnUnit(p,type,x,y){
   const d=UNITS[type];
   const u=addEnt({kind:'unit',type,owner:p,x,y,r:d.r,hp:0,cd:0,ang:p?Math.PI*.75:-Math.PI*.25,order:{t:'idle'},path:null,pathCD:0,carry:0,ct:null,scan:rng()*.5,anim:rng()*6});
@@ -862,7 +874,7 @@ function aiThink(){
     if(out.length<Math.max(2,aiS.sent*.25)){aiS.attacking=false;aiS.nextAttack=gameT+70;for(const a of army)cmdMove([a],home.x+(rng()-.5)*6,home.y+6+(rng()-.5)*4,false)}
     else for(const a of army)if(a.retreat)continue;else if(a.waveAt&&gameT>=a.waveAt.t){order(a,{t:'amove',x:a.waveAt.x+(rng()-.5)*2,y:a.waveAt.y+(rng()-.5)*2});a.waveAt=null}
     else if(!a.waveAt&&(a.order.t==='idle'||a.order.t==='guard')){const t=playerTarget(a);if(t){const c=center(t);order(a,{t:'amove',x:c.x,y:c.y})}}
-  }else if(gameT>=aiS.nextAttack&&army.length>=aiS.wave){
+  }else if(gameT>=aiS.nextAttack-(WX.night>.6&&!(aiS.peaceUntil>gameT)?40:0)&&army.length>=aiS.wave&&!(aiS.peaceUntil>gameT)){
     const t=playerTarget(army[0]);
     if(t){aiS.attacking=true;aiS.sent=army.length;aiS.wave+=D.waveGrow;const c=center(t);
       // Formation: erst am Sammelpunkt aufstellen (Nahkampf vorn, Fernkampf hinten), dann losmarschieren
@@ -927,7 +939,7 @@ function step(dt){
   aiTimer-=dt;if(aiTimer<=0){aiTimer=DIFF[diff].think;aiThink();if(window.__autoplayer)autoPlayer()}
   visT-=dt;if(visT<=0){visT=.2;updateVis()}
   popT-=dt;if(popT<=0){popT=1;recalcPop();checkEnd()}
-  pingT-=dt;
+  pingT-=dt;weatherTick();
   XY.emit('tick',API,dt);
   if(timeLimit&&!over){const left=timeLimit*60-gameT;
     if(left<=60&&left+dt>60)toast('Noch eine Minute bis zum Zeitlimit!','warn');
@@ -1531,6 +1543,12 @@ function render(){
   if(marker&&marker.t>0){ctx.strokeStyle=marker.c;ctx.lineWidth=2;const r=(1-marker.t)*10+4;ctx.beginPath();ctx.ellipse(marker.x*T,marker.y*T,r,r*.55,0,0,7);ctx.stroke();ctx.lineWidth=1}
   // box
   ctx.setTransform(dpr,0,0,dpr,0,0);
+  if(WX.night>0){ctx.fillStyle=`rgba(10,18,48,${WX.night*.42})`;ctx.fillRect(0,0,viewW,viewH)}
+  if(WX.kind!=='sun'){const t=performance.now()/1000,n=WX.kind==='rain'?140:90;ctx.fillStyle=ctx.strokeStyle=WX.kind==='rain'?'rgba(190,210,235,.45)':'rgba(245,248,255,.85)';ctx.lineWidth=1;
+    if(WX.kind==='rain'){ctx.fillStyle='rgba(60,75,95,.12)';ctx.fillRect(0,0,viewW,viewH);ctx.beginPath()}
+    for(let i=0;i<n;i++){const sp=WX.kind==='rain'?620:60,x=((i*97.3+t*(WX.kind==='rain'?120:25))%(viewW+40))-20,y=((i*61.7+t*sp)%(viewH+40))-20;
+      if(WX.kind==='rain'){ctx.moveTo(x,y);ctx.lineTo(x-3,y+11)}else{ctx.fillRect(x+Math.sin(t+i)*6,y,2,2)}}
+    if(WX.kind==='rain')ctx.stroke()}
   const vg=ctx.createRadialGradient(viewW/2,viewH/2,Math.min(viewW,viewH)*.45,viewW/2,viewH/2,Math.max(viewW,viewH)*.75);
   vg.addColorStop(0,'rgba(0,0,0,0)');vg.addColorStop(1,'rgba(0,0,0,.35)');ctx.fillStyle=vg;ctx.fillRect(0,0,viewW,viewH);
   if(drag&&drag.box){ctx.strokeStyle='#9ef0a0';ctx.fillStyle='rgba(158,240,160,.08)';const x=Math.min(drag.sx,mouse.x),y=Math.min(drag.sy,mouse.y),w=Math.abs(mouse.x-drag.sx),h=Math.abs(mouse.y-drag.sy);ctx.fillRect(x,y,w,h);ctx.strokeRect(x+.5,y+.5,w,h)}
@@ -1738,7 +1756,7 @@ function updateTop(){
   if(rh.dataset.sig!==rsig){rh.dataset.sig=rsig;rh.hidden=!rq.length;rh.innerHTML=rq.map(r=>`<div class="rq" data-id="${r.id}"><span>${TECHS[r.id].name}</span><em></em><i><b></b></i></div>`).join('')}
   rq.forEach((r,i)=>{const row=rh.children[i];if(!row)return;row.querySelector('b').style.width=(r.f*100)+'%';row.querySelector('em').textContent=r.wait?'wartet':Math.floor(r.f*100)+'% · '+Math.ceil(r.left)+' s'});
   if(!$('#techScreen').hidden)$('#techCols').querySelectorAll('.tk.running').forEach(btn=>{const r=rq.find(x=>x.id===btn.dataset.id);const st=btn.querySelector('.st');if(r&&st)st.textContent=r.wait?'Wartet in Warteschlange':'Wird erforscht: '+Math.floor(r.f*100)+'%';let bar=btn.querySelector('.pb');if(!bar){bar=document.createElement('i');bar.className='pb';bar.innerHTML='<b></b>';btn.appendChild(bar)}bar.firstChild.style.width=(r?r.f*100:0)+'%'});
-  $('#clock').textContent=timeLimit?fmtTime(gameT)+' / '+timeLimit+':00':fmtTime(gameT);
+  $('#clock').textContent=(WX.kind==='rain'?'🌧 ':WX.kind==='snow'?'❄ ':WX.night>.5?'☾ ':'☀ ')+(timeLimit?fmtTime(gameT)+' / '+timeLimit+':00':fmtTime(gameT));$('#clock').title=WXN[WX.kind]+(WX.night>.5?', Nacht: weniger Sicht, der Gegner greift eher an':'');
   const idle=ents.filter(e=>e.owner===0&&e.type==='worker'&&e.order.t==='idle').length;$('#idleN').textContent=idle;
   const wb=$('#wonderBanner');const wt=players.find(p=>p.wonderT>0);
   if(wt){wb.hidden=false;wb.textContent=(wt.i===0?'Dein Weltwunder':'Feindliches Weltwunder')+': '+fmtTime(wt.wonderT)}else wb.hidden=true;
@@ -2011,7 +2029,7 @@ let curSeed=0,saveT=0;const SAVE_KEY='empire-xy.spielstand';
 function saveGame(key){
   if(!started||over||!ents)return false;key=typeof key==='string'?key:SAVE_KEY;
   try{
-    const data={v:1,seed:curSeed,diff,epStart,epEnd,timeLimit,gameT,nextId,bases,aiS,players,terr:Array.from(terr),exp:Array.from(exp),
+    const data={v:1,seed:curSeed,diff,epStart,epEnd,timeLimit,WX,gameT,nextId,bases,aiS,players,terr:Array.from(terr),exp:Array.from(exp),
       ents:ents.filter(e=>!e.dead),cam:{x:cam.x,y:cam.y,z:cam.z},saved:Date.now()};
     localStorage.setItem(key,JSON.stringify(data));return true;
   }catch(e){return false}
@@ -2019,7 +2037,7 @@ function saveGame(key){
 function readSave(key){try{const d=JSON.parse(localStorage.getItem(key||SAVE_KEY));return d&&d.v===1?d:null}catch(e){return null}}
 function clearSave(){try{localStorage.removeItem(SAVE_KEY)}catch(e){}}
 function loadGame(d){
-  syncRegistry();rng=mulberry32(d.seed);curSeed=d.seed;diff=d.diff;epStart=d.epStart||0;epEnd=d.epEnd!==undefined?d.epEnd:99;timeLimit=d.timeLimit||0;
+  syncRegistry();rng=mulberry32(d.seed);curSeed=d.seed;diff=d.diff;epStart=d.epStart||0;epEnd=d.epEnd!==undefined?d.epEnd:99;timeLimit=d.timeLimit||0;if(d.WX)WX=d.WX;
   terr=Uint8Array.from(d.terr);exp=Uint8Array.from(d.exp);vis=new Uint8Array(W*H);block=new Int32Array(W*H);gate=new Uint8Array(W*H);
   for(let i=0;i<W*H;i++)if(terr[i]===1)block[i]=-1;
   ents=d.ents.filter(e=>e.kind==='res'?RESDEF[e.type]:e.kind==='unit'?UNITS[e.type]:BLD[e.type]);byId=new Map();
@@ -2049,6 +2067,14 @@ $('#loadSlots').onclick=e=>{const b=e.target.closest('[data-load]');if(!b)return
 const EPOCHS_NAME=d=>{if(!XY.epochs.length)XY.build();const e=XY.epochs[d.players[0].epoch];return e?e.name:''};
 document.addEventListener('visibilitychange',()=>{if(document.hidden)saveGame()});
 window.addEventListener('beforeunload',saveGame);
+const CIVS={
+  roemer:{name:'Römer',bonus:'+20 % Leben für Fußtruppen und Gebäude',apply:f=>{f.hp.infantry=(f.hp.infantry||0)+.2;f.bldHp+=.2}},
+  mongolen:{name:'Mongolen',bonus:'+20 % Tempo für Reiter',apply:f=>{f.speed.cavalry=(f.speed.cavalry||0)+.2}},
+  azteken:{name:'Azteken',bonus:'+20 % Nahrung beim Sammeln',apply:f=>{f.gather.food=(f.gather.food||0)+.2}},
+  germanen:{name:'Germanen',bonus:'+20 % Holz beim Fällen',apply:f=>{f.gather.wood=(f.gather.wood||0)+.2}},
+  aegypter:{name:'Ägypter',bonus:'+20 % Stein und Gold',apply:f=>{f.gather.stone=(f.gather.stone||0)+.2;f.gather.gold=(f.gather.gold||0)+.2}},
+};
+let chosenCiv='roemer';
 let chosenDiff=1,seed=(Math.random()*99999)|0;
 // Start- und Endepoche wählen
 function fillEpochSelects(){
@@ -2070,6 +2096,9 @@ $('#continueBtn').onclick=()=>{
   try{loadGame(d);started=true;paused=false;$('#btnPause').textContent='Pause'}catch(e){clearSave();toast('Der Spielstand konnte nicht geladen werden.','warn');$('#startScreen').hidden=false;showContinue()}
 };
 try{const v=localStorage.getItem('empire-xy.limit');if(v)$('#limitSel').value=v}catch(e){}
+try{const v=localStorage.getItem('empire-xy.volk');if(v&&CIVS[v])chosenCiv=v}catch(e){}
+$('#civSel').innerHTML=Object.entries(CIVS).map(([k,c])=>`<option value="${k}"${k===chosenCiv?' selected':''}>${c.name}: ${c.bonus}</option>`).join('');
+$('#civSel').onchange=()=>{chosenCiv=$('#civSel').value;try{localStorage.setItem('empire-xy.volk',chosenCiv)}catch(e){}};
 $('#limitSel').onchange=()=>{try{localStorage.setItem('empire-xy.limit',$('#limitSel').value)}catch(e){}};
 $('#startBtn').onclick=()=>{timeLimit=+$('#limitSel').value;
   $('#startScreen').hidden=true;resize();newGame(chosenDiff,seed);started=true;paused=false;$('#btnPause').textContent='Pause';

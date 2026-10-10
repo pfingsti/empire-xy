@@ -29,6 +29,7 @@ button:focus-visible{outline:2px solid var(--bronze-hi);outline-offset:1px}
 #epochName{font-family:var(--f-display);font-size:15px;color:var(--bronze-hi);letter-spacing:.03em}
 #top .inc{font-size:10px;color:var(--ok);margin-left:3px;font-variant-numeric:tabular-nums;opacity:.85}
 @media (max-width:1350px){#top .inc,#r-goods{display:none}}
+@media (max-width:1450px){#top{gap:4px 9px}.tbtn{padding:3px 6px;font-size:12px}#epochBox{min-width:0}#epochBar{width:110px}}
 #r-goods{font-size:11px;line-height:1.15;max-width:140px;white-space:normal;opacity:.9}
 #researchHud{position:absolute;top:52px;right:10px;z-index:5;display:flex;flex-direction:column;gap:4px;min-width:190px;pointer-events:none}
 #researchHud .rq{background:rgba(20,16,10,.82);border:1px solid var(--line);border-radius:4px;padding:4px 7px;font-size:12px;display:grid;grid-template-columns:1fr auto;gap:2px 8px}
@@ -48,7 +49,7 @@ button:focus-visible{outline:2px solid var(--bronze-hi);outline-offset:1px}
 #epochBar b{display:block;height:100%;width:0;background:var(--bronze-hi)}
 .spacer{flex:1}
 #clock{color:var(--muted);min-width:48px;text-align:right}
-.tbtn{background:var(--panel-2);border:1px solid var(--line);border-radius:4px;padding:3px 10px;cursor:pointer;font-size:13px}
+.tbtn{background:var(--panel-2);border:1px solid var(--line);border-radius:4px;padding:3px 8px;cursor:pointer;font-size:13px}
 .tbtn:hover{border-color:var(--bronze)}
 
 /* battlefield */
@@ -223,6 +224,9 @@ label.opt{font-size:14px;padding:5px 12px}
     <div class="row"><span class="lbl">Epochen</span>
       <label class="epsel">von <select id="epStartSel" aria-label="Startepoche"></select></label>
       <label class="epsel">bis <select id="epEndSel" aria-label="Endepoche"></select></label>
+    </div>
+    <div class="row"><span class="lbl">Volk</span>
+      <label class="epsel"><select id="civSel" aria-label="Volk"></select></label>
     </div>
     <div class="row"><span class="lbl">Zeitlimit</span>
       <label class="epsel"><select id="limitSel" aria-label="Zeitlimit"><option value="0">ohne</option><option value="20">20 Min.</option><option value="40">40 Min.</option><option value="60">60 Min.</option></select></label>
