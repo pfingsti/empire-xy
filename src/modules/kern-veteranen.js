@@ -15,7 +15,10 @@ function camp(g,b,a){
   g.fillStyle='#e9be72';g.beginPath();g.arc(x+s/2,base-34,4,0,7);g.fill();g.fillStyle=pc;g.fillRect(x+4,base-12,4,4);
 }
 function offer(api,b){
-  if(!b.offer||api.time>b.offerT){const pool=MERC.filter(t=>EmpireXY.units[t]);const pick=[];while(pick.length<3){const t=pool[Math.floor(Math.random()*pool.length)];if(!pick.includes(t))pick.push(t)}b.offer=pick;b.offerT=api.time+90}
+  if(!b.offer||api.time>b.offerT){const pool=MERC.filter(t=>EmpireXY.units[t]);const pick=[];
+    // Angebot hängt nur vom Gebäude und der Zeit ab, damit es im Mehrspieler auf allen Rechnern gleich ist
+    const slot=Math.floor(api.time/90);let sd=(b.id*7919+slot*104729)%2147483647||1;const rnd=()=>(sd=sd*16807%2147483647)/2147483647;
+    while(pick.length<Math.min(3,pool.length)){const t=pool[Math.floor(rnd()*pool.length)];if(!pick.includes(t))pick.push(t)}b.offer=pick;b.offerT=(slot+1)*90}
   return b.offer;
 }
 EmpireXY.register({
@@ -29,9 +32,9 @@ EmpireXY.register({
   buildings:{
     mercs:{name:'Söldnerlager',size:3,hp:1200,cost:{wood:300,gold:300},time:40,sight:6,minEpoch:2,slot:25,draw:camp,ai:{minWorkers:30},
       desc:'Drei wechselnde Söldnertruppen, sofort einsatzbereit, aber dreimal so teuer.',
-      cmds:(b,api)=>offer(api,b).map(t=>{const base=api.uCost(0,t),c={};for(const k in base)c[k]=base[k]*3;const U=EmpireXY.units?EmpireXY.units[t]:null;
-        return {label:'Söldner: '+((U&&U.label)||t),cost:c,desc:'Sofort verfügbar. Das Angebot wechselt alle 90 Sekunden.',act:()=>{const pl=api.players[0];if(pl.pop+1>pl.cap){for(const k in c)pl.res[k]+=c[k];api.toast('Kein Wohnraum frei.','warn');return}
-          const ct=api.center(b),u=api.spawnUnit(0,t,ct.x,ct.y+b.size/2+.8);if(u){u.merc=1;api.toast('Söldner angeheuert.','good')}}}})},
+      cmds:(b,api)=>offer(api,b).map(t=>{const base=api.uCost(b.owner,t),c={};for(const k in base)c[k]=base[k]*3;const U=EmpireXY.units?EmpireXY.units[t]:null;
+        return {label:'Söldner: '+((U&&U.label)||t),cost:c,desc:'Sofort verfügbar. Das Angebot wechselt alle 90 Sekunden.',act:()=>{const pl=api.players[api.me];if(pl.pop+1>pl.cap){for(const k in c)pl.res[k]+=c[k];api.toast('Kein Wohnraum frei.','warn');return}
+          const ct=api.center(b),u=api.spawnUnit(b.owner,t,ct.x,ct.y+b.size/2+.8);if(u){u.merc=1;api.toast('Söldner angeheuert.','good')}}}})},
   },
   hooks:{
     tick(api,dt){
@@ -43,7 +46,7 @@ EmpireXY.register({
         if(!w){u.digT=0;if(api.players[u.owner].ai&&u.order.t==='idle'){let bw=null,bd=1e9;for(const e of ents)if(e.kind==='bld'&&e.type==='wall'&&!e.dead&&e.owner!==u.owner){const d=Math.hypot(e.x-u.x,e.y-u.y);if(d<bd){bd=d;bw=e}}if(bw)api.order(u,{t:'move',x:bw.x+.5,y:bw.y+1.5})}continue}
         u.digT=(u.digT||0)+dt;
         if(u.digT>=30){u.digT=0;for(const e of ents)if(e.kind==='bld'&&(e.type==='wall'||e.type==='gate')&&!e.dead&&e.owner!==u.owner&&Math.hypot(e.x+.5-u.x,e.y+.5-u.y)<2.6){api.fx(e.x+.5,e.y+.5,'boom');api.damage(e,99999,u)}
-          if(u.owner===0)api.toast('Der Tunnel ist eingestürzt und hat die Mauer mitgerissen!','good');else api.toast('Feindliche Mineure haben unsere Mauer zum Einsturz gebracht!','warn');api.damage(u,99999,null)}
+          if(u.owner===api.me)api.toast('Der Tunnel ist eingestürzt und hat die Mauer mitgerissen!','good');else api.toast('Feindliche Mineure haben unsere Mauer zum Einsturz gebracht!','warn');api.damage(u,99999,null)}
       }
       for(const pl of api.players){if(!pl.ai||pl.defeated||pl.epoch<3)continue;pl.sapT=(pl.sapT||0)-dt;if(pl.sapT>0)continue;pl.sapT=40;
         const ws=ents.find(e=>e.kind==='bld'&&e.type==='workshop'&&e.owner===pl.i&&e.built&&!e.dead);

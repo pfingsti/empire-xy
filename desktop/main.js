@@ -10,7 +10,7 @@ const send=(ch,data)=>{if(win&&!win.isDestroyed())win.webContents.send(ch,data)}
 function createWindow(){
   win=new BrowserWindow({
     width:1400,height:900,minWidth:960,minHeight:600,backgroundColor:'#0e1316',title:'Empire XY',
-    webPreferences:{preload:path.join(__dirname,'preload.js'),contextIsolation:true,sandbox:false},
+    webPreferences:{preload:path.join(__dirname,'preload.js'),contextIsolation:true,sandbox:false,backgroundThrottling:false},
   });
   Menu.setApplicationMenu(null);
   win.loadFile(path.join(__dirname,'app','index.html'));

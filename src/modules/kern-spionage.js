@@ -16,13 +16,13 @@ EmpireXY.register({
           let tgt=null;for(const b of api.ents)if(!b.dead&&b.kind==='bld'&&b.built&&b.owner!==u.owner&&b.owner>=0&&TARGETS.includes(b.type)){const c=api.center(b);if(Math.hypot(c.x-u.x,c.y-u.y)<b.size/2+1.8){tgt=b;break}}
           if(tgt&&!(tgt.sabotUntil>now)&&!(u.sabCD>now)){u.sabT=(u.sabT||0)+dt;
             if(u.sabT>=3){u.sabT=0;u.sabCD=now+45;tgt.sabotUntil=now+60;
-              if(u.owner===0)api.toast('Sabotage geglückt: Das feindliche Gebäude arbeitet 60 Sekunden nur halb so schnell.','good');
-              else if(tgt.owner===0)api.toast('Sabotage! Ein feindlicher Späher hat ein Gebäude lahmgelegt.','warn')}}
+              if(u.owner===api.me)api.toast('Sabotage geglückt: Das feindliche Gebäude arbeitet 60 Sekunden nur halb so schnell.','good');
+              else if(tgt.owner===api.me)api.toast('Sabotage! Ein feindlicher Späher hat ein Gebäude lahmgelegt.','warn')}}
           else u.sabT=0;
         }
         // Die KI schickt ihre Späher ab und zu auf Sabotage-Mission
-        if(u.owner===1&&u.order.t==='idle'&&!(u.missionT>now)){u.missionT=now+70;
-          const opts=api.ents.filter(b=>!b.dead&&b.kind==='bld'&&b.owner===0&&b.built&&TARGETS.includes(b.type));
+        if(api.players[u.owner].ai&&u.order.t==='idle'&&!(u.missionT>now)){u.missionT=now+70;
+          const opts=api.ents.filter(b=>!b.dead&&b.kind==='bld'&&b.owner!==u.owner&&b.owner>=0&&b.built&&TARGETS.includes(b.type));
           if(opts.length){const b=opts[(Math.random()*opts.length)|0],c=api.center(b);api.order(u,{t:'move',x:c.x+b.size/2+.6,y:c.y})}}
       }
     },

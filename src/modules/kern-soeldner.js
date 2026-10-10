@@ -16,7 +16,7 @@ EmpireXY.register({
   },
   hooks:{
     tick(api){for(const u of api.ents){if(u.dead||u.kind!=='unit'||!/^merc_/.test(u.type))continue;if(u.expT==null)u.expT=api.time+DUR;
-      else if(api.time>=u.expT){api.kill(u);if(u.owner===0)api.toast('Ein Söldner hat seinen Dienst beendet und zieht ab.')}}},
+      else if(api.time>=u.expT){api.kill(u);if(u.owner===api.me)api.toast('Ein Söldner hat seinen Dienst beendet und zieht ab.')}}},
   },
 });
 })();
