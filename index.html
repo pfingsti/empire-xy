@@ -1983,9 +1983,9 @@ function renderTerrain(){
     g.strokeStyle=rng()<.55?`rgba(${150+rng()*40|0},${185+rng()*30|0},${90+rng()*20|0},.45)`:'rgba(28,52,22,.35)';
     g.lineWidth=1;g.beginPath();g.moveTo(x,y);g.quadraticCurveTo(x+lean*.3,y-l*.6,x+lean,y-l);g.stroke();
   }
-  const FLOW=['#f3e27a','#f4f1e6','#c9a2e0','#e88a7a'];
+  const FLOW=['#cfc27a','#d8d4c6','#a99cb4','#b98a78'];
   for(let i=0;i<W*H*.6;i++){const x=rng()*PW,y=rng()*PH;if(!isGrass(x,y))continue;const c=FLOW[rng()*4|0];
-    for(let k=0;k<3;k++){g.fillStyle=c;g.beginPath();g.arc(x+(rng()-.5)*8,y+(rng()-.5)*6,1.3,0,7);g.fill()}}
+    const show=(i%4)===0;for(let k=0;k<3;k++){const fx=x+(rng()-.5)*8,fy=y+(rng()-.5)*6;if(show){g.fillStyle=c;g.globalAlpha=.7;g.beginPath();g.arc(fx,fy,.9,0,7);g.fill();g.globalAlpha=1}}}
   for(let i=0;i<W*H*.8;i++){const x=rng()*PW,y=rng()*PH,tx=x/T|0,ty=y/T|0;if(!inb(tx,ty)||terr[idx(tx,ty)]===1)continue;
     if(terr[idx(tx,ty)]===2||samp(worn,x/T-.5,y/T-.5)>.5){g.fillStyle='rgba(90,80,64,.55)';g.beginPath();g.ellipse(x,y,1.6+rng()*1.4,1.1+rng(),0,0,7);g.fill();g.fillStyle='rgba(230,220,200,.35)';g.fillRect(x-1,y-1,1,1)}}
   g.lineCap='butt';
@@ -1997,6 +1997,7 @@ function renderTerrain(){
     if(t===4){g.fillStyle='rgba(222,196,130,.85)';g.fillRect(x,y,T,T);g.fillStyle='rgba(180,150,90,.35)';for(let k=0;k<4;k++)g.fillRect(x+rng()*T,y+rng()*T,3,1)}
     else if(t===3){g.fillStyle='#6f6a62';g.fillRect(x,y,T,T);g.fillStyle='#8d877c';g.beginPath();g.moveTo(x+2,y+T-2);g.lineTo(x+T*.45,y+3);g.lineTo(x+T-2,y+T-2);g.closePath();g.fill();
       g.fillStyle='#e8ecee';g.beginPath();g.moveTo(x+T*.35,y+T*.3);g.lineTo(x+T*.45,y+3);g.lineTo(x+T*.56,y+T*.3);g.closePath();g.fill();g.fillStyle='rgba(0,0,0,.2)';g.beginPath();g.moveTo(x+T*.45,y+3);g.lineTo(x+T-2,y+T-2);g.lineTo(x+T*.5,y+T-2);g.closePath();g.fill()}}
+  grade(terrC,.78,8,13);
 }
 
 function newPlayer(i,ai){return{i,ai,techs:{},fx:{gather:{},atk:{},hp:{},speed:{},range:{},carry:0,build:0,bldHp:0,bldAtk:0},res:{food:200,wood:200,stone:150,gold:100},epoch:0,pop:0,cap:0,advancing:false,wonderT:-1,defeated:false,
@@ -2850,9 +2851,16 @@ function visibleEnt(e){
 
 // ================= sprites: trees, rocks, buildings (cached, drawn at 2x) =================
 const SPR=new Map(),SS=2;
+// Realismus-Farbkorrektur: entsättigt, leicht warm, mehr Kontrast, feine Materialkörnung
+function grade(c,sat,grain,seed){const g=c.getContext('2d'),W2=c.width,H2=c.height;let im;try{im=g.getImageData(0,0,W2,H2)}catch(e){return}const d=im.data;let r=(seed||7)>>>0;
+  for(let i=0;i<d.length;i+=4){if(d[i+3]===0)continue;r=(r*1664525+1013904223)>>>0;const n=((r>>>24)/255-.5)*grain;
+    const R0=d[i],G0=d[i+1],B0=d[i+2],L=.3*R0+.59*G0+.11*B0;let R1=L+(R0-L)*sat,G1=L+(G0-L)*sat,B1=L+(B0-L)*sat;
+    R1=(R1-128)*1.06+128+4+n;G1=(G1-128)*1.06+128+1+n;B1=(B1-128)*1.06+128-4+n;d[i]=R1<0?0:R1>255?255:R1;d[i+1]=G1<0?0:G1>255?255:G1;d[i+2]=B1<0?0:B1>255?255:B1}
+  g.putImageData(im,0,0)}
 function sprite(key,w,h,fn){
   let c=SPR.get(key);if(c)return c;
   c=document.createElement('canvas');c.width=w*SS;c.height=h*SS;const g=c.getContext('2d');g.scale(SS,SS);g.lineJoin='round';fn(g);
+  if(key.startsWith('b|'))grade(c,.8,14,key.length*31);else if(key.startsWith('tree'))grade(c,.82,12,key.length*17);
   c.lw=w;c.lh=h;SPR.set(key,c);return c;
 }
 function hex2rgb(h){if(h[0]!=='#')return[128,128,128];const n=parseInt(h.slice(1),16);return[n>>16,n>>8&255,n&255]}
@@ -2921,7 +2929,7 @@ function drawRes(g,r){
     g.drawImage(bushSprite(r.v),x,y,32,32);
     const n=Math.ceil(r.amount/r.max*10);
     for(let i=0;i<n;i++){const a=i*2.4+r.v*6,rr=2.5+(i%3)*2.6,bx=x+16+Math.cos(a)*rr*1.2,by=y+15+Math.sin(a)*rr*.85;
-      g.fillStyle='#8e1d2c';g.beginPath();g.arc(bx+.4,by+.4,2.1,0,7);g.fill();g.fillStyle='#d8344a';g.beginPath();g.arc(bx,by,1.8,0,7);g.fill();g.fillStyle='rgba(255,255,255,.7)';g.fillRect(bx-1,by-1,1,1)}
+      g.fillStyle='#8e1d2c';g.beginPath();g.arc(bx+.3,by+.3,1.4,0,7);g.fill();g.fillStyle='#9e2a3a';g.beginPath();g.arc(bx,by,1.15,0,7);g.fill();g.fillStyle='rgba(255,255,255,.35)';g.fillRect(bx-1,by-1,1,1)}
     return}
   const f=.6+.4*r.amount/r.max,s=rockSprite(r.type,r.v);
   g.drawImage(s,x+16-20*f,y+30-32*f,40*f,36*f);
