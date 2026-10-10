@@ -1452,7 +1452,11 @@ function humanoid(g,u,ep,pc,dk){
     if(ep===0){g.strokeStyle='#8a6a40';g.lineWidth=1;const sp=gameT*(u.swing>0?20:4);g.beginPath();g.moveTo(x+ca*4,by);g.lineTo(x+ca*4+Math.cos(sp)*6,by+Math.sin(sp)*4);g.stroke()}
     else if(ep<=2){g.strokeStyle='#5a3d22';g.lineWidth=1.8;g.beginPath();g.arc(x+ca*4,by+sa*3-1,9,a-1.15,a+1.15);g.stroke();
       g.strokeStyle='rgba(240,230,210,.8)';g.lineWidth=.7;g.beginPath();const pull=u.swing>0?0:3;g.moveTo(x+ca*4+Math.cos(a-1.15)*9,by+sa*3-1+Math.sin(a-1.15)*9);g.lineTo(x+ca*(4-pull),by+sa*(3-pull)-1);g.lineTo(x+ca*4+Math.cos(a+1.15)*9,by+sa*3-1+Math.sin(a+1.15)*9);g.stroke();
-      g.fillStyle='#6b4a2a';g.fillRect(x-ca*5-2,by-sa*5-6,3,7)}
+      // Köcher aus Leder mit Pfeilfedern, Griffwicklung und eingelegter Pfeil beim Spannen
+      const qx=x-ca*5-1,qy=by-sa*5-6;g.fillStyle='#5b3f26';g.beginPath();g.moveTo(qx-1.6,qy);g.lineTo(qx+1.6,qy);g.lineTo(qx+1.2,qy+8);g.lineTo(qx-1.2,qy+8);g.closePath();g.fill();
+      g.fillStyle='#3e2b1a';g.fillRect(qx-1.6,qy+2,3.2,.8);g.fillStyle='#d8d2c4';for(const o of [-1,0,1]){g.beginPath();g.moveTo(qx+o,qy-3);g.lineTo(qx+o-.7,qy);g.lineTo(qx+o+.7,qy);g.fill()}
+      g.fillStyle='#2e2016';g.beginPath();g.arc(x+ca*4+Math.cos(a)*9,by+sa*3-1+Math.sin(a)*9,1.3,0,7);g.fill();
+      if(u.swing<=0&&u.order&&u.order.type==='attack'){g.strokeStyle='#8a6a44';g.lineWidth=.8;g.beginPath();g.moveTo(x+ca*1,by+sa*1-1);g.lineTo(x+ca*14,by+sa*11-1);g.stroke();g.fillStyle='#5c6266';g.beginPath();g.arc(x+ca*14,by+sa*11-1,.9,0,7);g.fill()}}
     else{g.strokeStyle='#2b2b2b';g.lineWidth=2.4;g.beginPath();g.moveTo(x-ca*2,by-sa*2);g.lineTo(x+ca*15,by+sa*11-2);g.stroke();g.strokeStyle='#6b4a2a';g.lineWidth=3;g.beginPath();g.moveTo(x-ca*3,by-sa*3);g.lineTo(x+ca*3,by+sa*2);g.stroke();
       if(u.swing>.12){g.fillStyle='#ffd27a';g.beginPath();g.arc(x+ca*17,by+sa*13-2,3.5,0,7);g.fill();g.fillStyle='rgba(220,220,220,.5)';g.beginPath();g.arc(x+ca*20,by+sa*15-4,4,0,7);g.fill()}}
   }
