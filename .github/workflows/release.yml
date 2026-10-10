@@ -25,3 +25,10 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npm run release
+      - name: Browser-Version ans Release hängen
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cp desktop/app/index.html "Empire-XY-Browser.html"
+          gh release upload "${{ github.ref_name }}" "Empire-XY-Browser.html" --clobber --repo "${{ github.repository }}"

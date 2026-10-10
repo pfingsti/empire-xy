@@ -1,7 +1,7 @@
 {
   "name": "empire-xy",
   "productName": "Empire XY",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Echtzeitstrategie durch fünf Epochen, erweiterbar mit Bausteinen",
   "author": "Christian",
   "main": "main.js",

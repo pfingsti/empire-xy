@@ -44,9 +44,10 @@ Laden: im Browser über „Baustein laden“ im Hauptmenü. In der Desktop-App l
 ## Desktop-App und Updates
 
 - Installer bauen: `cd desktop && npm install && npm run dist` (unter Linux wird dafür Wine gebraucht).
-- Update-Watcher: Die App prüft beim Start und danach alle 30 Minuten die GitHub Releases von `pfingsti/empire-xy`. Neue Versionen werden im Hintergrund geladen und beim nächsten Neustart installiert.
+- Update-Watcher: Die App prüft bei jedem Start sofort und danach alle 30 Minuten die GitHub Releases von `pfingsti/empire-xy`. Ein beim Start gefundenes Update wird geladen, still installiert und das Spiel startet neu. Später gefundene Updates werden beim Beenden installiert.
 - Weil das Repository privat ist, braucht die App einen Lese-Schlüssel. Lege auf GitHub einen fine-grained Token mit nur „Contents: read“ für dieses Repository an und speichere ihn als Repository-Secret `UPDATE_READ_TOKEN`. Der Release-Workflow schreibt ihn beim Bauen in die App.
 - Neue Version veröffentlichen: in `desktop/package.json` die Version erhöhen, committen, Tag setzen (`git tag v1.0.1 && git push --tags`). GitHub baut und veröffentlicht den Installer, alle installierten Spiele aktualisieren sich danach selbst.
+- Testversion auf dem Desktop: Die Desktop-App legt bei jedem Start (also auch nach jedem Update) die passende Browser-Version als `Empire XY (Browser).html` nach `Desktop\claude\Empire XY\` (Fallback `D:\Desktop\claude\Empire XY\`). Zusätzlich hängt der Release-Workflow sie als `Empire-XY-Browser.html` an jedes Release.
 
 ## Mehrspieler
 
