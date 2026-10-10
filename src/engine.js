@@ -1173,8 +1173,14 @@ function stumpSprite(){return sprite('stump',32,32,g=>{g.fillStyle='rgba(0,0,0,.
   g.fillStyle='#5a3c24';g.fillRect(11,15,10,7);g.fillStyle='#c8a46a';g.beginPath();g.ellipse(16,15,5,2.5,0,0,7);g.fill();g.strokeStyle='#8a6a40';g.beginPath();g.ellipse(16,15,2.5,1.2,0,0,7);g.stroke();
   g.fillStyle='#6e4a2b';g.fillRect(3,22,13,3);g.fillRect(5,19,12,3);g.fillStyle='#c8a46a';g.fillRect(15,22,2,3);g.fillRect(16,19,2,3)})}
 function bushSprite(v){return sprite('bush'+(v*4|0),32,32,g=>{
-  g.fillStyle='rgba(0,0,0,.25)';g.beginPath();g.ellipse(17,24,13,5,0,0,7);g.fill();
-  for(const [x,y,r] of [[10,17,7],[22,16,7],[16,11,7],[16,19,7]])blob(g,x,y,r,'#5f9a3e','#3d7029','#244a19');})}
+  const r=mulberry32((v*4|0)+31);g.fillStyle='rgba(8,14,6,.3)';g.beginPath();g.ellipse(18,24,13,4.5,0,0,7);g.fill();
+  // Strauch aus vielen Blattbüscheln: dunkles Inneres, Lichtseite oben links, einzelne Zweige am Fuß
+  g.strokeStyle='#3e2c1c';g.lineWidth=.8;g.beginPath();for(let k=0;k<4;k++){const bx=11+k*3.5;g.moveTo(bx,24);g.lineTo(bx+(r()-.5)*4,19)}g.stroke();
+  const cl=[];for(let k=0;k<7;k++)cl.push([16+(r()-.5)*15,16+(r()-.5)*9,4+r()*3]);
+  for(const [x,y,rr] of cl){g.fillStyle='#1f3416';g.beginPath();g.ellipse(x+.8,y+1,rr+1,rr*.8+1,0,0,7);g.fill()}
+  for(let k=0;k<260;k++){const c=cl[k%cl.length],an=r()*6.283,d=Math.sqrt(r())*c[2],x=c[0]+Math.cos(an)*d,y=c[1]+Math.sin(an)*d*.8,lt=(c[0]-x+c[1]-y)/(c[2]*2)+.5;
+    g.fillStyle=lt>.75?'#6e8c44':lt>.4?'#47652e':'#2a4120';g.globalAlpha=.6+r()*.4;g.beginPath();g.ellipse(x,y,1+r()*.9,.7+r()*.5,r()*3,0,7);g.fill()}
+  g.globalAlpha=1;})}
 function rockSprite(kind,v){return sprite(kind+(v*3|0),40,36,g=>{
   const r=mulberry32((v*3|0)+(kind==='gold'?11:5));const gold=kind==='gold';
   g.fillStyle='rgba(10,12,8,.32)';g.beginPath();g.ellipse(22,29,17,6,0,0,7);g.fill();
@@ -1212,8 +1218,10 @@ function drawRes(g,r){
   if(r.type==='berry'){
     g.drawImage(bushSprite(r.v),x,y,32,32);
     const n=Math.ceil(r.amount/r.max*10);
-    for(let i=0;i<n;i++){const a=i*2.4+r.v*6,rr=2.5+(i%3)*2.6,bx=x+16+Math.cos(a)*rr*1.2,by=y+15+Math.sin(a)*rr*.85;
-      g.fillStyle='#8e1d2c';g.beginPath();g.arc(bx+.3,by+.3,1.4,0,7);g.fill();g.fillStyle='#9e2a3a';g.beginPath();g.arc(bx,by,1.15,0,7);g.fill();g.fillStyle='rgba(255,255,255,.35)';g.fillRect(bx-1,by-1,1,1)}
+    // Beeren in kleinen Dolden, teils im Laub verborgen, matt mit winzigem Glanzpunkt
+    for(let i=0;i<n;i++){const a=i*2.4+r.v*6,rr=2+(i%3)*2.4,bx=x+16+Math.cos(a)*rr*1.25,by=y+15+Math.sin(a)*rr*.8;
+      for(let k=0;k<3;k++){const ox=bx+(k-1)*1.3,oy=by+(k===1?-1:0);g.fillStyle='#4a1018';g.beginPath();g.arc(ox+.25,oy+.3,.95,0,7);g.fill();g.fillStyle=k===1?'#8a2230':'#741a26';g.beginPath();g.arc(ox,oy,.8,0,7);g.fill()}
+      g.fillStyle='rgba(255,235,235,.4)';g.fillRect(bx-.5,by-1.4,.6,.5)}
     return}
   const f=.6+.4*r.amount/r.max,s=rockSprite(r.type,r.v);
   g.drawImage(s,x+16-20*f,y+30-32*f,40*f,36*f);
@@ -1621,7 +1629,14 @@ function drawUnitRaw(g,u){
   if(LOOK(u.type)==='cavalry'){
     const ph=u.moving?Math.sin(gameT*16+u.anim):0;
     g.save();g.translate(x,y);g.rotate(a);
-    if(ep===1){g.fillStyle='#3a2a1a';g.fillRect(-19,-9,4,18);g.fillStyle='#7a5530';g.fillRect(-17,-7,8,14);g.strokeStyle=pc;g.lineWidth=1.5;g.strokeRect(-17,-7,8,14);g.fillStyle='#3a2a1a';g.beginPath();g.ellipse(-17,-9,3,1.5,0,0,7);g.ellipse(-17,9,3,1.5,0,0,7);g.fill()}
+    if(ep===1){// Streitwagen: Achse, Speichenräder von oben, geflochtener Wagenkorb mit Lederrand, Deichsel
+      g.fillStyle='rgba(8,14,6,.3)';g.beginPath();g.ellipse(-14,1.5,7,8,0,0,7);g.fill();
+      g.fillStyle='#3a2a1a';g.fillRect(-15,-9,1.6,18);g.fillRect(-14,-.6,14,1.2);
+      for(const sy of [-9,9]){g.fillStyle='#4a3420';g.beginPath();g.ellipse(-14.2,sy,3.6,1.2,0,0,7);g.fill();g.strokeStyle='rgba(20,12,6,.6)';g.lineWidth=.4;g.beginPath();for(let k=-3;k<=3;k+=1.5){g.moveTo(-14.2+k,sy-1);g.lineTo(-14.2+k,sy+1)}g.stroke()}
+      const wg=g.createLinearGradient(-19,-7,-9,7);wg.addColorStop(0,'#9a7a4c');wg.addColorStop(1,'#5a4026');g.fillStyle=wg;g.beginPath();g.moveTo(-19,-6);g.lineTo(-12,-6);g.quadraticCurveTo(-8,0,-12,6);g.lineTo(-19,6);g.closePath();g.fill();
+      g.strokeStyle='rgba(40,26,12,.5)';g.lineWidth=.4;g.beginPath();for(let k=-5;k<=5;k+=1.6){g.moveTo(-19,k);g.lineTo(-11,k)}g.stroke();
+      g.strokeStyle='#4a2e1a';g.lineWidth=1;g.beginPath();g.moveTo(-19,-6);g.lineTo(-12,-6);g.quadraticCurveTo(-8,0,-12,6);g.lineTo(-19,6);g.stroke();
+      g.fillStyle=pc;g.globalAlpha=.7;g.fillRect(-13.5,-2,1.4,4);g.globalAlpha=1}
     g.fillStyle='#3a2716';for(const [lx,ly] of [[6,-3],[6,3],[-6,-3],[-6,3]]){g.beginPath();g.ellipse(lx+(lx>0?ph:-ph)*2.5,ly*1.3,2.2,1.4,0,0,7);g.fill()}
     {const hc=['#6b4a30','#4a3324','#7d5a3a','#3a2c22'][u.id%4],hg=g.createLinearGradient(0,-5,0,5);hg.addColorStop(0,shade(hc,25));hg.addColorStop(.5,hc);hg.addColorStop(1,shade(hc,-35));
      g.strokeStyle='#2a1c12';g.lineWidth=1.6;g.beginPath();g.moveTo(-11,0);g.quadraticCurveTo(-15,ph*1.5,-17,1+ph);g.stroke();// Schweif
@@ -2560,5 +2575,5 @@ function autoPlayer(){ // lets the player side be run by the same AI for soak te
 }
 window.__rc=(x,y,sh)=>{shiftHeld=!!sh;rightCommand(x,y);shiftHeld=false};
 window.__ex={start:(d,s)=>{newGame(d,s);started=true},step:n=>{for(let i=0;i<n&&!over;i++)step(DT)},select:a=>select(a),get:()=>({t:gameT,over,players,ents})};
-window.__bldDraw=(t,g,x,y,ep,o)=>{const D=BLD[t],s=D.size*T;if(!D.draw){const c=bldSprite(t,ep,o);g.drawImage(c,x-4,y-36,c.lw,c.lh);return}D.draw(g,{type:t,owner:o,built:true,size:D.size},{x,y,s,lift:Math.min(12,s*.18),ep,pc:PCOL[o],wall:WALL[ep],roof:ROOF[ep],roofHi:ROOF_HI[ep],...DRAW_API})};window.__tree=v=>treeSprite(v);window.__rock=(k,v)=>rockSprite(k,v);window.__spawn=(p,t,x,y)=>spawnUnit(p,t,x,y);window.__reveal=()=>{exp.fill(1);vis.fill(1)};window.__place=(p,t,x,y)=>placeBld(p,t,x,y,true);window.__can=(p,t,x,y)=>canPlace(p,t,x,y);window.__water=(x,y)=>terr[idx(x|0,y|0)]===1;window.__cam=(x,y)=>{cam.x=x*T;cam.y=y*T};window.__move=(u,x,y)=>cmdMove([u],x,y,false);window.__limit=m=>{timeLimit=m};window.__placeU=(p,t,x,y)=>placeBld(p,t,x,y,false);
+window.__bldDraw=(t,g,x,y,ep,o)=>{const D=BLD[t],s=D.size*T;if(!D.draw){const c=bldSprite(t,ep,o);g.drawImage(c,x-4,y-36,c.lw,c.lh);return}D.draw(g,{type:t,owner:o,built:true,size:D.size},{x,y,s,lift:Math.min(12,s*.18),ep,pc:PCOL[o],wall:WALL[ep],roof:ROOF[ep],roofHi:ROOF_HI[ep],...DRAW_API})};window.__look=(x,y,z)=>{zoomT=0;cam.z=z;cam.x=x*T-viewW/(2*z);cam.y=y*T-viewH/(2*z)};window.__tree=v=>treeSprite(v);window.__rock=(k,v)=>rockSprite(k,v);window.__spawn=(p,t,x,y)=>spawnUnit(p,t,x,y);window.__reveal=()=>{exp.fill(1);vis.fill(1)};window.__place=(p,t,x,y)=>placeBld(p,t,x,y,true);window.__can=(p,t,x,y)=>canPlace(p,t,x,y);window.__water=(x,y)=>terr[idx(x|0,y|0)]===1;window.__cam=(x,y)=>{cam.x=x*T;cam.y=y*T};window.__move=(u,x,y)=>cmdMove([u],x,y,false);window.__limit=m=>{timeLimit=m};window.__placeU=(p,t,x,y)=>placeBld(p,t,x,y,false);
 })();
