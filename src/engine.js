@@ -238,6 +238,7 @@ function placeBld(p,type,x,y,done){
 function canPlace(p,type,x,y){
   const d=BLD[type];
   if(x<1||y<1||x+d.size>W-1||y+d.size>H-1)return false;
+  if(d.unique&&ents.some(e=>e.type===type&&!e.dead))return false;if(d.maxEpoch!=null&&players[p].epoch>d.maxEpoch)return false;
   if(d.monument&&ents.some(e=>e.type===type&&!e.dead&&(e.mep??players[e.owner].epoch)===players[p].epoch))return false;
   if(d.water){const i=idx(x,y);if(terr[i]!==1||block[i]!==-1||(p===0&&!exp[i]))return false;for(const e of ents)if(e.type==='bridge'&&!e.dead&&e.x===x&&e.y===y)return false;return true}
   for(let yy=y;yy<y+d.size;yy++)for(let xx=x;xx<x+d.size;xx++){
@@ -456,7 +457,7 @@ function enemyNear(u,radius,wantBld){
 const vetRank=u=>(u.kills||0)>=5?2:(u.kills||0)>=2?1:0,vetMul=u=>u&&u.rank?(u.rank===2?1.15:1.05):1;
 function damage(t,dmg,src){
   if(t.dead)return;
-  if(src&&src.buffUntil>gameT)dmg*=1.2;if(src&&src.templeT>gameT)dmg*=1.1;if(src&&src.form===2)dmg*=1.3;if(t.form===1)dmg*=UNITS[t.type]&&UNITS[t.type].shield?.5:.7;if(src&&src.owner>=0&&players[src.owner]&&players[src.owner].raceUntil>gameT)dmg*=1.1;if(t.campT>gameT)dmg*=.6;else if(t.form===2)dmg*=1.2;if(src&&src.owner!=null&&players[src.owner]&&players[src.owner].monAtk)dmg*=1+players[src.owner].monAtk;if(src&&src.kind==='unit'&&t.kind==='unit'&&t.hp>0&&t.hp<=dmg*vetMul(src)){src.kills=(src.kills||0)+1;const r=vetRank(src);if(r>(src.rank||0)){src.rank=r;if(src.type!=='hero'){src.maxhp=Math.round(src.maxhp*(r===1?1.05:1.1));if(src.owner===0&&r===2)toast(uname(UNITS[src.type],players[0].epoch)+' ist jetzt ein Veteran.','good')}}}
+  if(src&&src.buffUntil>gameT)dmg*=1.2;if(src&&src.templeT>gameT)dmg*=1.1;if(src&&src.form===2)dmg*=1.3;if(src&&src.owner>=0&&players[src.owner]&&players[src.owner].templar&&(src.type==='knight'||CLS(src.type)==='cavalry'))dmg*=1.3;if(t.form===1)dmg*=UNITS[t.type]&&UNITS[t.type].shield?.5:.7;if(src&&src.owner>=0&&players[src.owner]&&players[src.owner].raceUntil>gameT)dmg*=1.1;if(t.campT>gameT)dmg*=.6;else if(t.form===2)dmg*=1.2;if(src&&src.owner!=null&&players[src.owner]&&players[src.owner].monAtk)dmg*=1+players[src.owner].monAtk;if(src&&src.kind==='unit'&&t.kind==='unit'&&t.hp>0&&t.hp<=dmg*vetMul(src)){src.kills=(src.kills||0)+1;const r=vetRank(src);if(r>(src.rank||0)){src.rank=r;if(src.type!=='hero'){src.maxhp=Math.round(src.maxhp*(r===1?1.05:1.1));if(src.owner===0&&r===2)toast(uname(UNITS[src.type],players[0].epoch)+' ist jetzt ein Veteran.','good')}}}
   if(src)dmg*=vetMul(src);if(t.rank)dmg/=t.rank===2?1.15:1.05;if(src&&src.vetAuraT>gameT&&!src.rank)dmg*=1.08;
   t.hp-=dmg;t.hitT=gameT;t.revealT=gameT+6;if(src)src.revealT=gameT+6;if(visibleEnt(t))sfx(dmg>20?'boom':src&&src.kind==='unit'&&uStat(src).range<1.5&&!['siege'].includes(CLS(src.type))?'sword':'hit');
   fx.push({x:center(t).x+(rng()-.5)*.4,y:center(t).y+(rng()-.5)*.4,t:0,k:'hit'});
@@ -618,7 +619,7 @@ function updBld(b,dt){
   }
   const q=b.queue[0];if(!q)return;const sdt=(b.sabotUntil>gameT?dt*.5:dt)*(players[b.owner].crowdMul||1)*(players[b.owner].monProd||1)*(SEASON===3?.8:1);// sabotiert: halbe Produktion
   if(q.tech){
-    q.t+=sdt*(pl.raceUntil>gameT?2:1);
+    q.t+=sdt*(pl.raceUntil>gameT?2:1)*(pl.lodge?1.25:1);
     if(q.t>=q.total){b.queue.shift();applyTech(pl,q.tech);
       if(b.owner===0)toast('Forschung abgeschlossen: '+TECHS[q.tech].name+'.','good');uiDirty=true}
     return;
@@ -934,7 +935,7 @@ function findSpot(p,type,near,minR,maxR){
 // ================= module API =================
 const API={
   get ents(){return ents},income(pl,r,v){income(pl,r,v)},get players(){return players},get time(){return gameT},
-  spawnUnit,uCost,water:(x,y)=>inb(x|0,y|0)&&terr[idx(x|0,y|0)]===1,get gate(){return gate},idx,W,placeBld,toast,damage,order,applyTech,techState,center,distEnt,alive,isMil,uStat,
+  spawnUnit,uCost,get aiS(){return aiS},water:(x,y)=>inb(x|0,y|0)&&terr[idx(x|0,y|0)]===1,get gate(){return gate},idx,W,placeBld,toast,damage,order,applyTech,techState,center,distEnt,alive,isMil,uStat,
   heal(e,amt){e.hp=Math.min(e.maxhp,e.hp+amt)},
   revealAll(){exp.fill(1)},
   fx(x,y,k){fx.push({x,y,t:0,k:k||'hit'})},
