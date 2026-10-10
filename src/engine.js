@@ -1522,7 +1522,10 @@ function drawUnitRaw(g,u){
     if(ep===2){g.fillStyle=pc;g.beginPath();g.moveTo(rx+Math.cos(a)*14,ry+Math.sin(a)*11-3);g.lineTo(rx+Math.cos(a)*10,ry+Math.sin(a)*8-7);g.lineTo(rx+Math.cos(a)*10,ry+Math.sin(a)*8-2);g.fill()}
   }else if(LOOK(u.type)==='siege'){
     g.save();g.translate(x,y);g.rotate(a);
-    const wheel=(wx,wy,r)=>{g.fillStyle='#3a2a1a';g.beginPath();g.ellipse(wx,wy,r,r*.45,0,0,7);g.fill();g.strokeStyle='#7a5530';g.lineWidth=1;g.stroke()};
+    const wheel=(wx,wy,r)=>{// Speichenrad mit Eisenreifen, dreht sich beim Fahren
+      const rot=u.moving?gameT*6:0;g.fillStyle='#2e2418';g.beginPath();g.ellipse(wx,wy,r,r*.45,0,0,7);g.fill();g.strokeStyle='#55585a';g.lineWidth=1.1;g.stroke();
+      g.strokeStyle='#6b4c2c';g.lineWidth=.8;for(let k=0;k<4;k++){const q=rot+k*Math.PI/4;g.beginPath();g.moveTo(wx-Math.cos(q)*r*.9,wy-Math.sin(q)*r*.4);g.lineTo(wx+Math.cos(q)*r*.9,wy+Math.sin(q)*r*.4);g.stroke()}
+      g.fillStyle='#3d3f40';g.beginPath();g.arc(wx,wy,1,0,7);g.fill()};
     const re=players[u.owner].epoch;
     if(re>=9&&u.type!=='ram'&&u.type!=='bolt'){// Moderne: Kampfpanzer mit Ketten und Drehturm
       g.fillStyle='#262a20';g.fillRect(-15,-10,30,5);g.fillRect(-15,5,30,5);
@@ -1541,7 +1544,12 @@ function drawUnitRaw(g,u){
       g.fillStyle=gr;g.fillRect(-6+rec,-br,bl,br*2);g.fillStyle='#1c1e20';g.fillRect(bl-7+rec,-br-.8,2,br*2+1.6);
       if(u.swing>.18){g.fillStyle='#ffd27a';g.beginPath();g.arc(bl-3,0,5,0,7);g.fill();g.fillStyle='rgba(210,210,210,.6)';g.beginPath();g.arc(bl+3,0,6,0,7);g.fill()}
     }else{
-      g.fillStyle='#6e4a2b';g.fillRect(-12,-7,22,14);g.fillStyle='#8a6440';g.fillRect(-12,-7,22,3);g.strokeStyle=OUT;g.strokeRect(-12,-7,22,14);
+      // Holzrahmen aus Bohlen mit Maserung und Eisenbeschlägen
+      const wg=g.createLinearGradient(0,-7,0,7);wg.addColorStop(0,'#86633f');wg.addColorStop(1,'#4e3620');g.fillStyle=wg;g.fillRect(-12,-7,22,14);
+      g.strokeStyle='rgba(40,26,14,.55)';g.lineWidth=.6;for(let k=-4;k<=4;k+=2.8){g.beginPath();g.moveTo(-12,k);g.lineTo(10,k+.4);g.stroke()}
+      g.strokeStyle='rgba(160,125,85,.35)';for(let k=-5;k<=5;k+=2.8){g.beginPath();g.moveTo(-11,k);g.quadraticCurveTo(-1,k+.8,9,k);g.stroke()}
+      g.fillStyle='#4a4d50';for(const [cx,cy] of [[-12,-7],[8,-7],[-12,5],[8,5]])g.fillRect(cx,cy,2.4,2.4);
+      g.fillStyle='rgba(0,0,0,.25)';g.fillRect(-12,5,22,2);
       wheel(-8,-8,4);wheel(-8,8,4);wheel(6,-8,4);wheel(6,8,4);
       g.fillStyle='#5a3f22';g.fillRect(-2,-6,3,12);
       const sw=u.swing>0?Math.sin(u.swing/.25*Math.PI)*1.6:0,ang=Math.PI*.9-sw;
