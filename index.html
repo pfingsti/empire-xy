@@ -2921,9 +2921,9 @@ function addRes(type,x,y){
   if(!inb(x,y)||block[idx(x,y)]!==0||terr[idx(x,y)]===1)return null;
   const d=RESDEF[type];
   const r=addEnt({kind:'res',type,rt:d.rt,x,y,size:1,amount:d.amt,max:d.amt,v:rng(),owner:-1});
-  block[idx(x,y)]=r.id;return r;
+  block[idx(x,y)]=r.id;if(type==='tree')treeShadowDirty(x,y);return r;
 }
-function clearRes(x,y){const i=idx(x,y),id=block[i];if(id>0){const e=byId.get(id);if(e&&e.kind==='res'){e.dead=true;block[i]=0}}}
+function clearRes(x,y){const i=idx(x,y),id=block[i];if(id>0){const e=byId.get(id);if(e&&e.kind==='res'){e.dead=true;block[i]=0;treeShadowDirty(x,y)}}}
 
 let CUSTOM_MAP=null,useCustomMap=false;try{CUSTOM_MAP=JSON.parse(localStorage.getItem('empire-xy.karte')||'null')}catch(e){}
 function applyCustomMap(M){
@@ -3083,7 +3083,7 @@ function newGame(d,seed,mp){
   aiTimer=0;popT=0;pathT=0;visT=0;SEASON=0;lastAlarm=-99;
   syncRegistry();
   rng=mulberry32(seed);diff=d;curSeed=seed;
-  ents=[];corpses=[];stumpDecals=[];byId=new Map();nextId=1;block=new Int32Array(W*H);gate=new Uint8Array(W*H);terr=new Uint8Array(W*H);vis=new Uint8Array(W*H);exp=new Uint8Array(W*H);
+  ents=[];corpses=[];stumpDecals=[];resetTreeShadows();byId=new Map();nextId=1;block=new Int32Array(W*H);gate=new Uint8Array(W*H);terr=new Uint8Array(W*H);vis=new Uint8Array(W*H);exp=new Uint8Array(W*H);
   proj=[];fx=[];sel=[];gameT=0;capT.length=0;over=false;placing=null;aMode=false;groups={};
   players=MP?MP.players.map((p,i)=>Object.assign(newPlayer(i,!!p.ai),{name:p.name},p.ai?{aiDiff:Math.max(0,Math.min(2,p.diff|0)),aiT:0}:{})):[newPlayer(0,false),newPlayer(1,true)];
   genMap();renderTerrain();
@@ -3149,8 +3149,8 @@ function canPlace(p,type,x,y){
   for(let yy=y;yy<y+d.size;yy++)for(let xx=x;xx<x+d.size;xx++){
     const i=idx(xx,yy);if((block[i]!==0&&!stumpAt(i))||terr[i]===1)return false;
     if(p===ME&&!CMDX&&!exp[i])return false;
-    for(const e of ents)if(e.kind==='bld'&&BLD[e.type].walk&&!e.dead&&xx>=e.x&&xx<e.x+e.size&&yy>=e.y&&yy<e.y+e.size)return false;
   }
+  for(const e of ents)if(e.kind==='bld'&&!e.dead&&BLD[e.type].walk&&e.x<x+d.size&&e.x+e.size>x&&e.y<y+d.size&&e.y+e.size>y)return false;
   if(d.shore){let w=0;for(let yy=y-1;yy<=y+d.size;yy++)for(let xx=x-1;xx<=x+d.size;xx++)if(inb(xx,yy)&&terr[idx(xx,yy)]===1)w++;if(w<2)return false}
   return true;
 }
@@ -3398,7 +3398,7 @@ function kill(e,src){
     if(e.queue.some(q=>q.ep))players[e.owner].advancing=false;
     for(let k=0;k<6;k++)fx.push({x:e.x+rng()*e.size,y:e.y+rng()*e.size,t:-k*.1,k:'smoke'});
     if(e.type==='wonder')players[e.owner].wonderT=-1;
-  }else if(e.kind==='res'){block[idx(e.x,e.y)]=0;if(e.type==='tree'&&e.amount<=.001){stumpDecals.push({x:e.x,y:e.y});if(stumpDecals.length>500)stumpDecals.shift()}}
+  }else if(e.kind==='res'){block[idx(e.x,e.y)]=0;treeShadowDirty(e.x,e.y);if(e.type==='tree'&&e.amount<=.001){stumpDecals.push({x:e.x,y:e.y});if(stumpDecals.length>500)stumpDecals.shift()}}
   else{fx.push({x:e.x,y:e.y,t:0,k:'die',c:PCOL[e.owner]})}
   if(e.owner>=0&&e.kind!=='res'){players[e.owner].st.lost++;if(src&&src.owner>=0)players[src.owner].st.killed++}
   recalcPop();
@@ -3485,7 +3485,7 @@ function updUnit(u,dt){
         const rate={wood:.85,food:r.kind==='bld'?.6:.95,stone:.65,gold:.65}[o.rt]*(players[u.owner].moodMul||1)*(players[u.owner].toolMul||1)*(r.kind==='bld'?farmBoost(r):1)*(1+.06*players[u.owner].epoch)*(1+(players[u.owner].fx.gather[o.rt]||0))*(players[u.owner].ai?DIFF[aiDiffOf(u.owner)].gather:1)*(SEASON===0&&o.rt==='food'?1.3:SEASON===2&&o.rt==='wood'?1.25:1);
         const amt=Math.min(rate*dt,r.kind==='res'?r.amount:99);
         u.carry+=amt;u.ct=o.rt;u.working=true;if(u.owner===ME&&visibleEnt(u)&&onScreen(u))sfx(o.rt==='wood'?'chop':o.rt==='food'?'':'mine');
-        if(r.kind==='res'){r.amount-=amt;if(r.amount<=0.001)kill(r)}
+        if(r.kind==='res'){if(r.amount>=r.max&&r.type==='tree')treeShadowDirty(r.x,r.y);r.amount-=amt;if(r.amount<=0.001)kill(r)}
       }else approach(u,r,dt);
       break;}
     case 'return':{
@@ -4100,6 +4100,7 @@ function drawRes(g,r){
     if(r.amount<r.max){const s=stumpSprite();g.drawImage(s,x,y,32,32);return}
     const s=treeSprite(r.v),t=performance.now()/1000,wind=WX.kind==='storm'?3:WX.kind==='rain'?1.6:1,hit=r.hitT>gameT?Math.sin(t*40)*.05:0;
     const sw=(Math.sin(t*1.3+r.x*.7+r.y*.4)*.025+Math.sin(t*2.9+r.x)*.01)*wind+hit;
+    if(g===ctx){const z=cam.z*dpr;g.setTransform(z,0,0,z,(x+16-cam.x)*z,(y+28-cam.y)*z);g.transform(1,0,sw,1,0,0);g.drawImage(s,-24,-60,48,64);g.setTransform(z,0,0,z,-cam.x*z,-cam.y*z);return}
     g.save();g.translate(x+16,y+28);g.transform(1,0,sw,1,0,0);g.drawImage(s,-24,-60,48,64);g.restore();return}
   if(r.type==='berry'){
     g.drawImage(bushSprite(r.v),x,y,32,32);
@@ -4611,12 +4612,12 @@ function render(){
     if(age>.35)ctx.filter='saturate(.55) brightness(.8)';drawUnit(ctx,c);ctx.restore()}
   // Sonnenschatten (wie in Empire Earth 2): Silhouetten wandern mit dem Sonnenstand über den Tag
   {const dp=(gameT%240)/120;if(dp<1&&WX.night<.9){const k=(dp-.5)*-2.2,sy=.38+.5*Math.abs(dp-.5),al=(.3*(1-WX.night)*(WX.kind==='sun'?1:.55)).toFixed(3);
-    ctx.save();ctx.globalAlpha=+al;
+    ctx.save();ctx.globalAlpha=+al;drawTreeShadows(Math.round(dp*48),tx0,ty0,tx1,ty1);ctx.transform(1,0,k,sy,0,0);
     for(const e of list){let spr,bx,by,dx,dy,w,h;
       if(e.kind==='bld'&&e.built&&!BLD[e.type].draw&&!BLD[e.type].line){const sp=bldSprite(e.type,players[e.owner].epoch,e.owner);spr=shadowSprite(sp,'b'+e.type+players[e.owner].epoch+e.owner);bx=e.x*T+e.size*T/2;by=e.y*T+e.size*T-4;dx=e.x*T-4-bx;dy=e.y*T-36-by;w=sp.lw;h=sp.lh}
-      else if(e.kind==='res'&&e.type==='tree'&&!(e.amount<e.max)){const sp=treeSprite(e.v);spr=shadowSprite(sp,'t'+e.v);bx=e.x*T+16;by=e.y*T+28;dx=-24;dy=-60;w=48;h=64}
       else continue;
-      const z=cam.z*dpr;ctx.setTransform(z,0,0,z,(bx-cam.x)*z,(by-cam.y)*z);ctx.transform(1,0,k,sy,0,0);ctx.drawImage(spr,dx,dy,w,h)}
+      // eine Scherung für alle: Fußpunkt b in den gescherten Raum umrechnen statt pro Objekt die Matrix neu zu setzen
+      ctx.drawImage(spr,bx-k*by/sy+dx,by/sy+dy,w,h)}
     ctx.restore()}}
   for(const e of list){if(e.kind==='res')drawRes(ctx,e);else if(e.kind==='bld'){drawBld(ctx,e);if(e.built&&FLAGB[e.type])drawFlag(ctx,e)}
     else if(e.hitT&&gameT-e.hitT<.1){ctx.save();ctx.filter='brightness(1.9)';drawUnit(ctx,e);ctx.restore()}else drawUnit(ctx,e)}
@@ -4713,12 +4714,36 @@ function render(){
     for(let i=0;i<n;i++){const sp=WX.kind==='rain'?620:60,x=((i*97.3+t*(WX.kind==='rain'?120:25))%(viewW+40))-20,y=((i*61.7+t*sp)%(viewH+40))-20;
       if(WX.kind==='rain'){ctx.moveTo(x,y);ctx.lineTo(x-3,y+11)}else{ctx.fillRect(x+Math.sin(t+i)*6,y,2,2)}}
     if(WX.kind==='rain')ctx.stroke()}
-  const vg=ctx.createRadialGradient(viewW/2,viewH/2,Math.min(viewW,viewH)*.45,viewW/2,viewH/2,Math.max(viewW,viewH)*.75);
-  vg.addColorStop(0,'rgba(0,0,0,0)');vg.addColorStop(1,'rgba(0,0,0,.35)');ctx.fillStyle=vg;ctx.fillRect(0,0,viewW,viewH);
+  if(!vigC||vigC.w!==viewW||vigC.h!==viewH){const vg=ctx.createRadialGradient(viewW/2,viewH/2,Math.min(viewW,viewH)*.45,viewW/2,viewH/2,Math.max(viewW,viewH)*.75);
+    vg.addColorStop(0,'rgba(0,0,0,0)');vg.addColorStop(1,'rgba(0,0,0,.35)');vigC={w:viewW,h:viewH,g:vg}}
+  ctx.fillStyle=vigC.g;ctx.fillRect(0,0,viewW,viewH);
   if(drag&&drag.box){ctx.strokeStyle='#9ef0a0';ctx.fillStyle='rgba(158,240,160,.08)';const x=Math.min(drag.sx,mouse.x),y=Math.min(drag.sy,mouse.y),w=Math.abs(mouse.x-drag.sx),h=Math.abs(mouse.y-drag.sy);ctx.fillRect(x,y,w,h);ctx.strokeRect(x+.5,y+.5,w,h)}
   if(paused&&started&&!over){ctx.fillStyle='rgba(0,0,0,.4)';ctx.fillRect(0,0,viewW,viewH);ctx.fillStyle='#e9be72';ctx.font='600 32px "Alegreya SC",Georgia,serif';ctx.textAlign='center';ctx.fillText('Pause',viewW/2,viewH/2);ctx.textAlign='left'}
 }
-let marker=null;
+let marker=null,vigC=null;
+// Baumschatten: je 8x8 Felder vorgezeichnet und nur neu gezeichnet, wenn die Sonne einen Schritt weiterwandert,
+// ein Baum gefällt wird oder neues Land erkundet ist. Spart hunderte gescherte Einzelbilder pro Bild.
+const SHC=8,SHPX=96,SHPY=48,shadowCache=new Map();let shadowVer=new Int32Array(Math.ceil(W/SHC)*Math.ceil(H/SHC));
+function treeShadowDirty(x,y){shadowVer[((y/SHC)|0)*Math.ceil(W/SHC)+((x/SHC)|0)]++}
+function resetTreeShadows(){shadowCache.clear();shadowVer=new Int32Array(Math.ceil(W/SHC)*Math.ceil(H/SHC))}
+function drawTreeShadows(step,tx0,ty0,tx1,ty1){
+  const CW=Math.ceil(W/SHC),k=(step/48-.5)*-2.2,sy=.38+.5*Math.abs(step/48-.5);
+  for(let cy=Math.max(0,Math.floor((ty0-2)/SHC));cy<=Math.min(Math.ceil(H/SHC)-1,Math.floor((ty1+2)/SHC));cy++)
+  for(let cx=Math.max(0,Math.floor((tx0-3)/SHC));cx<=Math.min(CW-1,Math.floor((tx1+3)/SHC));cx++){
+    let ex=0;for(let y=cy*SHC;y<Math.min(H,cy*SHC+SHC);y++)for(let x=cx*SHC;x<Math.min(W,cx*SHC+SHC);x++)ex+=exp[idx(x,y)];
+    const id=cy*CW+cx,key=step+':'+shadowVer[id]+':'+ex;let c=shadowCache.get(id);
+    if(!c||c.key!==key){
+      if(!c){if(shadowCache.size>90)shadowCache.delete(shadowCache.keys().next().value);c={cv:document.createElement('canvas')};c.cv.width=SHC*T+SHPX*2;c.cv.height=SHC*T+SHPY*2}
+      c.key=key;shadowCache.delete(id);shadowCache.set(id,c);
+      const g=c.cv.getContext('2d');g.setTransform(1,0,0,1,0,0);g.clearRect(0,0,c.cv.width,c.cv.height);
+      const ox=cx*SHC*T-SHPX,oy=cy*SHC*T-SHPY;g.setTransform(1,0,k,sy,0,0);
+      for(let y=cy*SHC;y<Math.min(H,cy*SHC+SHC);y++)for(let x=cx*SHC;x<Math.min(W,cx*SHC+SHC);x++){const i=idx(x,y);if(!exp[i]||block[i]<=0)continue;const e=byId.get(block[i]);
+        if(!e||e.dead||e.kind!=='res'||e.type!=='tree'||e.amount<e.max)continue;
+        const bx=x*T+16-ox,by=y*T+28-oy;g.drawImage(shadowSprite(treeSprite(e.v),'t'+e.v),bx-k*by/sy-24,by/sy-60,48,64)}
+    }
+    ctx.drawImage(c.cv,cx*SHC*T-SHPX,cy*SHC*T-SHPY);
+  }
+}
 
 function renderMini(){
   if(!ents)return;
@@ -5303,7 +5328,7 @@ XY.mp={
 function mpUi(){const mp=!!MP;$('#btnTribute').hidden=mp;$('#btnSave').hidden=mp;document.querySelectorAll('[data-speed]').forEach(b=>b.disabled=mp);if(mp){gameSpeed=1;document.querySelectorAll('[data-speed]').forEach(b=>b.classList.toggle('on',b.dataset.speed==='1'))}}
 
 // ================= main loop =================
-let last=performance.now(),acc=0;
+let last=performance.now(),acc=0,topT=0,miniT=0;// HUD und Minikarte 10-15 Mal pro Sekunde statt in jedem Bild
 let gameSpeed=1;
 document.querySelectorAll('[data-speed]').forEach(b=>b.onclick=()=>{gameSpeed=+b.dataset.speed;document.querySelectorAll('[data-speed]').forEach(x=>x.classList.toggle('on',x===b))});
 window.__speed=()=>gameSpeed;
@@ -5329,10 +5354,10 @@ function frame(now){
     const key=selKey();
     if(key!==uiKey||uiDirty){uiKey=key;uiDirty=false;buildInfo();buildCmds();hideTip()}
     uiT-=dt;if(uiT<=0){uiT=.2;refreshInfo();refreshCmds()}
-    updateTop();
+    topT-=dt;if(topT<=0){topT=.1;updateTop()}
     updateCursor(dt);
   }
-  render();renderMini();
+  render();miniT-=dt;if(miniT<=0||mmDrag){miniT=1/15;renderMini()}
   requestAnimationFrame(frame);
 }
 
@@ -5363,7 +5388,7 @@ function loadGame(d){
     if(e.kind==='unit')e.path=null;
     if(e.kind==='bld')e.queue=e.queue.filter(q=>q.ep||(q.tech&&TECHS[q.tech])||(q.u&&UNITS[q.u]));}
   nextId=d.nextId;bases=d.bases;aiS=d.aiS;players=d.players;gameT=d.gameT;capT.length=0;
-  proj=[];fx=[];sel=[];stumpDecals=[];over=false;placing=null;aMode=false;groups={};
+  proj=[];fx=[];sel=[];stumpDecals=[];resetTreeShadows();over=false;placing=null;aMode=false;groups={};
   renderTerrain();recalcPop();updateVis(true);
   if(d.cam){zoomT=0;cam.z=d.cam.z;cam.x=d.cam.x;cam.y=d.cam.y;clampCam()}
   XY.emit('load',API,d);
