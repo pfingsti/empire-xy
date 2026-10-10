@@ -1139,28 +1139,32 @@ function treeSprite(v){
     const r=mulberry32(vi*7+(kind==='pine'?1:kind==='birch'?2:3));
     g.fillStyle='rgba(10,20,8,.28)';g.beginPath();g.ellipse(30,56,15,6,-.2,0,7);g.fill();
     if(kind==='pine'){
-      g.fillStyle='#4b3220';g.fillRect(22,46,5,10);
-      const tiers=[[24,8,10],[24,20,14],[24,33,17]];
-      const cols=vi%2?['#3f7a4a','#2a5c38','#1a3d26']:['#4a8350','#2f6340','#1d4229'];
-      for(const [cx,ty,hw] of tiers){
-        g.fillStyle=cols[2];g.beginPath();g.moveTo(cx,ty-1);g.lineTo(cx+hw+1,ty+16);g.lineTo(cx-hw-1,ty+16);g.closePath();g.fill();
-        g.fillStyle=cols[1];g.beginPath();g.moveTo(cx,ty);g.lineTo(cx+hw,ty+15);g.lineTo(cx-hw,ty+15);g.closePath();g.fill();
-        g.fillStyle=cols[0];g.beginPath();g.moveTo(cx,ty);g.lineTo(cx-hw,ty+15);g.lineTo(cx-1,ty+13);g.closePath();g.fill();
-        g.lineWidth=.6;for(let k=0;k<hw*3;k++){const yy=ty+3+r()*12,w=hw*(yy-ty)/15,xx=cx+(r()*2-1)*w;g.strokeStyle=xx<cx?cols[0]:cols[2];g.beginPath();g.moveTo(xx,yy);g.lineTo(xx+(xx<cx?-1.5:1.5),yy+2);g.stroke()}
-      }
+      // Fichte: Stamm mit Rindenfurchen, viele hängende Astetagen mit gezackter Unterkante und Nadelstrichen, Licht von oben links
+      const tg=g.createLinearGradient(22,0,27,0);tg.addColorStop(0,'#6a4a30');tg.addColorStop(1,'#33241a');g.fillStyle=tg;g.beginPath();g.moveTo(22,57);g.lineTo(23.4,10);g.lineTo(25,10);g.lineTo(27,57);g.closePath();g.fill();
+      g.strokeStyle='rgba(20,12,6,.45)';g.lineWidth=.4;g.beginPath();for(let k=0;k<6;k++){const yy=46+r()*10;g.moveTo(22.6,yy);g.lineTo(26.4,yy+.6)}g.stroke();
+      const cols=vi%2?['#58744a','#3a5636','#22341f','#16241a']:['#5f7a4c','#40603a','#273d24','#18281a'];
+      const L=10;for(let k=0;k<L;k++){const y=6+k*4.1+r(),hw=2.2+k*1.55+(r()-.5)*1.4,dr=2.4+k*.35;
+        for(const sd of [-1,1]){const tip=[24+sd*hw,y+dr+1.5],pts=[[24,y-1.2],[24+sd*hw*.55,y+dr*.3],tip];
+          // gezackte Unterkante zurück zum Stamm
+          const n=4;for(let q=1;q<=n;q++){const t=q/n,xx=24+sd*hw*(1-t),yy=y+dr+2.4-t*1.4+(q%2?1.4:0);pts.push([xx,yy])}
+          g.fillStyle=cols[3];g.beginPath();pts.forEach((p,i)=>i?g.lineTo(p[0]+sd*.6,p[1]+1):g.moveTo(p[0],p[1]+1));g.closePath();g.fill();
+          g.fillStyle=sd<0?cols[k<3?0:1]:cols[2];g.beginPath();pts.forEach((p,i)=>i?g.lineTo(p[0],p[1]):g.moveTo(p[0],p[1]));g.closePath();g.fill();
+          g.lineWidth=.55;for(let q=0;q<4+k;q++){const t=r(),xx=24+sd*hw*t,yy=y+dr*t*.8+r()*2;g.strokeStyle=sd<0&&r()<.6?'rgba(150,176,110,.55)':'rgba(10,20,10,.4)';g.beginPath();g.moveTo(xx,yy);g.lineTo(xx+sd*1.3,yy+1.8);g.stroke()}}}
+      g.fillStyle=cols[1];g.beginPath();g.moveTo(24,2);g.lineTo(25.6,9);g.lineTo(22.4,9);g.closePath();g.fill();
     }else{
       const trunk=kind==='birch'?'#d9d4c4':'#5a3c24';
       g.fillStyle=trunk;g.beginPath();g.moveTo(21,56);g.lineTo(23,36);g.lineTo(27,36);g.lineTo(28,56);g.closePath();g.fill();
       if(kind==='birch'){g.fillStyle='#3a3a36';for(let i=0;i<4;i++)g.fillRect(22+r()*4,40+i*4,2,1)}
       else{g.fillStyle='rgba(0,0,0,.25)';g.fillRect(26,38,2,18)}
-      const pal=kind==='birch'?['#b7cf6a','#86a845','#54772c']:vi===5?['#d2a64a','#a87a2e','#6e4a1c']:vi%2?['#8cbc58','#5a8f38','#335e24']:['#7fb24e','#4f8432','#2c5420'];
+      const pal=kind==='birch'?['#a8bf66','#78963e','#4a6828']:vi===5?['#d2a64a','#a87a2e','#6e4a1c']:vi%2?['#7e9f52','#4f7836','#2b4620']:['#7aa04a','#4a7432','#284420'];
       const blobs=[];for(let i=0;i<6;i++)blobs.push([24+(r()-.5)*18,22+(r()-.5)*16,7+r()*5]);
+      g.strokeStyle=trunk;g.lineCap='round';for(const [ex,ey,w] of [[15,24,1.6],[33,22,1.6],[24,16,1.4],[19,30,1.1],[30,31,1.1]]){g.lineWidth=w;g.beginPath();g.moveTo(24.5,38);g.quadraticCurveTo(24+(ex-24)*.3,32,ex,ey);g.stroke()}g.lineCap='butt';
       for(const [x,y,rr] of blobs){g.fillStyle=pal[2];g.beginPath();g.arc(x+1,y+1.5,rr+1.5,0,7);g.fill()}
       for(const [x,y,rr] of blobs.sort((a,b)=>a[1]-b[1]))blob(g,x,y,rr,pal[0],pal[1],pal[2]);
       // Laubstruktur: viele kleine Blattbüschel, oben links im Licht, unten rechts im Schatten
       for(let i=0;i<220;i++){const b=blobs[i%blobs.length],an=r()*6.283,d=Math.sqrt(r())*b[2],x=b[0]+Math.cos(an)*d,y=b[1]+Math.sin(an)*d,lt=(b[0]-x+b[1]-y)/(b[2]*2)+.5;
         g.fillStyle=lt>.75?pal[0]:lt>.4?pal[1]:pal[2];g.globalAlpha=.55+r()*.4;g.beginPath();g.ellipse(x,y,1.1+r()*1.1,.8+r()*.7,r()*3,0,7);g.fill()}
-      g.globalAlpha=1;g.fillStyle='rgba(10,20,8,.35)';for(let i=0;i<8;i++){const b=blobs[i%blobs.length];g.beginPath();g.arc(b[0]+(r()-.3)*b[2],b[1]+(r()-.2)*b[2]*.8,.9+r(),0,7);g.fill()}
+      g.globalAlpha=1;g.fillStyle='rgba(10,20,8,.16)';for(let i=0;i<8;i++){const b=blobs[i%blobs.length];g.beginPath();g.ellipse(b[0]+(r()-.3)*b[2],b[1]+(r()-.2)*b[2]*.8+1,1.6+r(),.7,0,0,7);g.fill()}
       g.fillStyle='rgba(255,255,220,.18)';for(let i=0;i<8;i++){g.beginPath();g.arc(18+r()*12,12+r()*12,1.5,0,7);g.fill()}
     }
   });
@@ -2556,5 +2560,5 @@ function autoPlayer(){ // lets the player side be run by the same AI for soak te
 }
 window.__rc=(x,y,sh)=>{shiftHeld=!!sh;rightCommand(x,y);shiftHeld=false};
 window.__ex={start:(d,s)=>{newGame(d,s);started=true},step:n=>{for(let i=0;i<n&&!over;i++)step(DT)},select:a=>select(a),get:()=>({t:gameT,over,players,ents})};
-window.__bldDraw=(t,g,x,y,ep,o)=>{const D=BLD[t],s=D.size*T;if(!D.draw){const c=bldSprite(t,ep,o);g.drawImage(c,x-4,y-36,c.lw,c.lh);return}D.draw(g,{type:t,owner:o,built:true,size:D.size},{x,y,s,lift:Math.min(12,s*.18),ep,pc:PCOL[o],wall:WALL[ep],roof:ROOF[ep],roofHi:ROOF_HI[ep],...DRAW_API})};window.__spawn=(p,t,x,y)=>spawnUnit(p,t,x,y);window.__reveal=()=>{exp.fill(1);vis.fill(1)};window.__place=(p,t,x,y)=>placeBld(p,t,x,y,true);window.__can=(p,t,x,y)=>canPlace(p,t,x,y);window.__water=(x,y)=>terr[idx(x|0,y|0)]===1;window.__cam=(x,y)=>{cam.x=x*T;cam.y=y*T};window.__move=(u,x,y)=>cmdMove([u],x,y,false);window.__limit=m=>{timeLimit=m};window.__placeU=(p,t,x,y)=>placeBld(p,t,x,y,false);
+window.__bldDraw=(t,g,x,y,ep,o)=>{const D=BLD[t],s=D.size*T;if(!D.draw){const c=bldSprite(t,ep,o);g.drawImage(c,x-4,y-36,c.lw,c.lh);return}D.draw(g,{type:t,owner:o,built:true,size:D.size},{x,y,s,lift:Math.min(12,s*.18),ep,pc:PCOL[o],wall:WALL[ep],roof:ROOF[ep],roofHi:ROOF_HI[ep],...DRAW_API})};window.__tree=v=>treeSprite(v);window.__rock=(k,v)=>rockSprite(k,v);window.__spawn=(p,t,x,y)=>spawnUnit(p,t,x,y);window.__reveal=()=>{exp.fill(1);vis.fill(1)};window.__place=(p,t,x,y)=>placeBld(p,t,x,y,true);window.__can=(p,t,x,y)=>canPlace(p,t,x,y);window.__water=(x,y)=>terr[idx(x|0,y|0)]===1;window.__cam=(x,y)=>{cam.x=x*T;cam.y=y*T};window.__move=(u,x,y)=>cmdMove([u],x,y,false);window.__limit=m=>{timeLimit=m};window.__placeU=(p,t,x,y)=>placeBld(p,t,x,y,false);
 })();
