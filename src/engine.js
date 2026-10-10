@@ -1565,10 +1565,132 @@ function drawFlag(g,b){// wehende Stoff-Fahne in Spielerfarbe, Wind wie bei den 
   g.closePath();g.fillStyle=c;g.globalAlpha=.92;g.fill();
   g.globalAlpha=.22;g.fillStyle='#000';g.beginPath();for(let i=0;i<=8;i++){const u=i/8;g.lineTo(x+u*w,y-h*.15+10+Math.sin(t-u*4)*u*2.5-(Math.cos(t-u*4)>0?3:0))}g.lineTo(x,y-h*.15+10);g.fill();
   g.restore()}
+// ================= Baustein-Gebäude im Stil der Kerngebäude (Schrägansicht, Material je Epoche, Kleinteile) =================
+// Ersetzt die flachen Platzhalter der Bausteine: das Bild wird als Sprite gecacht, Bewegtes (Glut, Sägeblatt, Mühlflügel) kommt live darüber.
+const BGFX={},BGFX_LIVE={};
+const BG=(()=>{
+  const crate=(g,x,y,w)=>{g.fillStyle='rgba(8,14,6,.3)';g.fillRect(x+2,y-1,w+2,2.4);g.fillStyle='#8a6a3e';g.fillRect(x,y-w,w,w);g.fillStyle='#64482a';g.fillRect(x+w,y-w-1,1.8,w+1);g.fillStyle='#a8865a';g.fillRect(x,y-w-1.4,w+1.8,1.4);
+    g.strokeStyle='rgba(40,24,10,.45)';g.lineWidth=.5;g.beginPath();g.moveTo(x,y-w);g.lineTo(x+w,y);g.moveTo(x,y-w*.5);g.lineTo(x+w,y-w*.5);g.stroke()};
+  const barrel=(g,x,y)=>{g.fillStyle='rgba(8,14,6,.3)';g.beginPath();g.ellipse(x+1.5,y,3,1,0,0,7);g.fill();const bg=g.createLinearGradient(x-2.4,0,x+2.4,0);bg.addColorStop(0,'#8a6440');bg.addColorStop(1,'#4a3220');g.fillStyle=bg;g.beginPath();g.ellipse(x,y-3,2.4,3.4,0,0,7);g.fill();
+    g.fillStyle='#3a3a3a';g.fillRect(x-2.3,y-5,4.6,.6);g.fillRect(x-2.3,y-1.6,4.6,.6);g.fillStyle='#9a7a50';g.beginPath();g.ellipse(x,y-6.2,2,.8,0,0,7);g.fill()};
+  const sack=(g,x,y,c)=>{g.fillStyle='rgba(8,14,6,.25)';g.beginPath();g.ellipse(x+1,y,3,1,0,0,7);g.fill();g.fillStyle=c||'#c8b48a';g.beginPath();g.moveTo(x-2.6,y);g.quadraticCurveTo(x-3,y-4,x-1,y-5);g.lineTo(x+1,y-5);g.quadraticCurveTo(x+3,y-4,x+2.6,y);g.closePath();g.fill();
+    g.fillStyle='rgba(0,0,0,.18)';g.fillRect(x+.6,y-4.6,1.8,4.4);g.strokeStyle='#6a5a3a';g.lineWidth=.5;g.beginPath();g.moveTo(x-1.2,y-4.4);g.lineTo(x+1.2,y-4.4);g.stroke()};
+  const logs=(g,x,y,n,c)=>{for(let r=0;r<n;r++)for(let k=0;k<n+1-r;k++){const lx=x+k*2.6+r*1.3,ly=y-r*2.3;g.fillStyle='#4a3420';g.beginPath();g.arc(lx,ly,1.35,0,7);g.fill();g.fillStyle=c||((k+r)%2?'#b48e5c':'#a27c4c');g.beginPath();g.arc(lx-.2,ly-.2,.9,0,7);g.fill()}};
+  const planks=(g,x,y,w,n)=>{g.fillStyle='rgba(8,14,6,.3)';g.fillRect(x+2,y-1,w,2.4);for(let k=0;k<n;k++){g.fillStyle=k%2?'#c49a62':'#b08850';g.fillRect(x+k*.5,y-1.4-k*1.4,w,1.3);g.fillStyle='rgba(0,0,0,.2)';g.fillRect(x+k*.5+w-1.4,y-1.4-k*1.4,1.4,1.3)}};
+  const blocks=(g,x,y,c)=>{for(let r=0;r<3;r++)for(let k=0;k<3-r;k++){const bx=x+k*6+r*3,by=y-r*4.2;g.fillStyle=shade(c,-10);g.fillRect(bx,by-4,5.4,4);g.fillStyle=shade(c,18);g.fillRect(bx,by-4.6,5.4,.8);g.fillStyle=shade(c,-40);g.fillRect(bx+5.4,by-4.4,.8,4.4)}};
+  const chimney=(g,x,y,h,col,smoke)=>{g.fillStyle=shade(col,-10);g.fillRect(x,y-h,4.4,h);g.fillStyle=shade(col,-45);g.fillRect(x+3,y-h,1.4,h);g.fillStyle='#2a2622';g.fillRect(x-.5,y-h-1.2,5.4,1.6);
+    if(smoke)for(let k=0;k<4;k++){const sg=g.createRadialGradient(x+2+k*2.4,y-h-4-k*4,0,x+2+k*2.4,y-h-4-k*4,2.4+k*1.2);sg.addColorStop(0,`rgba(200,196,188,${.4-k*.08})`);sg.addColorStop(1,'rgba(200,196,188,0)');g.fillStyle=sg;g.beginPath();g.arc(x+2+k*2.4,y-h-4-k*4,2.4+k*1.2,0,7);g.fill()}};
+  const shed=(g,x0,y0,x1,y1,h,roof,post)=>{// offener Schuppen: Pfosten und Pultdach in Schrägansicht
+    g.fillStyle='rgba(8,14,6,.3)';g.beginPath();g.moveTo(x0+4,y1+2);g.lineTo(x1+10,y1+2);g.lineTo(x1+10,y0+4);g.lineTo(x1,y0);g.lineTo(x1,y1);g.closePath();g.fill();
+    g.fillStyle='rgba(0,0,0,.18)';g.fillRect(x0,y0,x1-x0,y1-y0);
+    for(const px of [x0+1,x1-3,(x0+x1)/2-1])for(const py of [y0+1,y1]){g.fillStyle=post||'#4a3220';g.fillRect(px,py-h,2.2,h);g.fillStyle='rgba(255,230,190,.18)';g.fillRect(px,py-h,.7,h)}
+    const rg=g.createLinearGradient(0,y0-h-6,0,y1-h);rg.addColorStop(0,shade(roof,25));rg.addColorStop(1,shade(roof,-15));g.fillStyle=rg;g.beginPath();g.moveTo(x0-2,y1-h+2);g.lineTo(x1+2,y1-h+2);g.lineTo(x1+2,y0-h-4);g.lineTo(x0-2,y0-h-4);g.closePath();g.fill();
+    g.strokeStyle='rgba(0,0,0,.22)';g.lineWidth=.6;g.beginPath();for(let k=y0-h-1;k<y1-h+2;k+=2.6){g.moveTo(x0-2,k);g.lineTo(x1+2,k)}g.stroke();g.fillStyle='rgba(0,0,0,.32)';g.fillRect(x0-2,y1-h+2,x1-x0+4,1.6);g.fillStyle=shade(roof,-40);g.beginPath();g.moveTo(x1+2,y1-h+2);g.lineTo(x1+5,y1-h);g.lineTo(x1+5,y0-h-6);g.lineTo(x1+2,y0-h-4);g.closePath();g.fill()};
+  const ground=(g,x0,y0,x1,y1,c)=>{g.fillStyle=c||'rgba(112,92,62,.45)';g.beginPath();g.ellipse((x0+x1)/2,(y0+y1)/2,(x1-x0)/2,(y1-y0)/2,0,0,7);g.fill()};
+  const sign=(g,x,y,pc,ic)=>{g.strokeStyle='#3a2a1a';g.lineWidth=.9;g.beginPath();g.moveTo(x,y);g.lineTo(x+6,y);g.stroke();g.strokeStyle='#5a5a5a';g.lineWidth=.3;g.beginPath();g.moveTo(x+2,y);g.lineTo(x+2,y+1.5);g.moveTo(x+5.5,y);g.lineTo(x+5.5,y+1.5);g.stroke();
+    g.fillStyle='#6a4a2a';g.fillRect(x+1.2,y+1.5,5,4);g.fillStyle=pc;g.fillRect(x+1.6,y+1.9,4.2,.9);if(ic){g.fillStyle=ic;g.beginPath();g.arc(x+3.7,y+3.8,1.1,0,7);g.fill()}};
+  return {crate,barrel,sack,logs,planks,blocks,chimney,shed,ground,sign};
+})();
+const BO=(s)=>({bx:4,by:40,x1:4+s,y1:40+s});
+BGFX.bakery=(g,s,ep,pc,a)=>{const {bx,by,x1,y1}=BO(s),mat=MAT[Math.min(ep,MAT.length-1)];
+  BG.ground(g,bx+2,y1-14,x1-2,y1+2);
+  hall(g,bx+3,by+6,x1-20,y1-8,11,mat,a.wall,a.roof,ep>=2,6);BG.chimney(g,x1-34,by+14,10,'#8a7a68',true);
+  // Backofen: gemauerte Kuppel mit Ofenloch, Holzstapel daneben
+  const ox=x1-12,oy=y1-6;g.fillStyle='rgba(8,14,6,.3)';g.beginPath();g.ellipse(ox+4,oy+1,10,3,0,0,7);g.fill();
+  const og=g.createRadialGradient(ox-3,oy-9,1,ox,oy-4,10);og.addColorStop(0,'#c4865a');og.addColorStop(1,'#6a3e24');g.fillStyle=og;g.beginPath();g.ellipse(ox,oy,9,9,0,Math.PI,0);g.fill();g.fillRect(ox-9,oy,18,1.4);
+  g.strokeStyle='rgba(40,20,10,.35)';g.lineWidth=.5;g.beginPath();for(let k=2;k<9;k+=2.4){g.moveTo(ox-Math.sqrt(81-k*k),oy-k);g.lineTo(ox+Math.sqrt(81-k*k),oy-k)}g.stroke();
+  g.fillStyle='#1a100a';g.beginPath();g.ellipse(ox-1,oy,3,3.4,0,Math.PI,0);g.fill();BG.logs(g,ox-8,oy+8,2);
+  BG.sack(g,bx+10,y1-1);BG.sack(g,bx+15,y1);BG.sack(g,bx+12.5,y1-4,'#d2c09a');
+  g.fillStyle='#6a4a2a';g.fillRect(bx+20,y1-6,10,1.4);g.fillRect(bx+21,y1-4.6,1,4.6);g.fillRect(bx+28,y1-4.6,1,4.6);for(let k=0;k<3;k++){g.fillStyle='#b8823e';g.beginPath();g.ellipse(bx+22.5+k*2.6,y1-7.2,1.3,.9,0,0,7);g.fill()}
+  BG.sign(g,bx+3,by+22,pc,'#c8913e')};
+BGFX_LIVE.bakery=(g,b,a)=>{const ox=a.x+a.s-12,oy=a.y+a.s-6,gl=b.baking?.55+Math.sin(a.time*9)*.25:.12;g.fillStyle=`rgba(255,150,50,${gl.toFixed(2)})`;g.beginPath();g.ellipse(ox-1,oy,2.4,2.8,0,Math.PI,0);g.fill()};
+BGFX.smith=(g,s,ep,pc,a)=>{const {bx,by,x1,y1}=BO(s),mat=MAT[Math.min(ep,MAT.length-1)];
+  BG.ground(g,bx+4,y1-16,x1,y1+2,'rgba(70,62,52,.5)');
+  hall(g,bx+3,by+4,x1-24,y1-12,11,mat,a.wall,a.roof,ep>=2,6);BG.chimney(g,bx+14,by+12,14,'#6a6058',true);
+  // offene Esse unter dem Pultdach, Amboss, Wassertrog, Werkzeugwand
+  BG.shed(g,x1-26,y1-22,x1-3,y1-4,13,a.roof);
+  g.fillStyle='#5a5048';g.fillRect(x1-22,y1-12,9,7);g.fillStyle='#3a322c';g.fillRect(x1-22,y1-12.8,9,1.2);g.fillStyle='#1a1410';g.fillRect(x1-20,y1-11,5,2);
+  g.fillStyle='#2e2e32';g.beginPath();g.moveTo(x1-11,y1-8);g.lineTo(x1-4,y1-8);g.lineTo(x1-5,y1-6.6);g.lineTo(x1-8,y1-6.6);g.lineTo(x1-8,y1-5);g.lineTo(x1-10,y1-5);g.lineTo(x1-10,y1-6.6);g.lineTo(x1-12.4,y1-7);g.closePath();g.fill();g.fillStyle='rgba(255,255,255,.25)';g.fillRect(x1-11,y1-8,6,.5);
+  g.fillStyle='#4a3420';g.fillRect(x1-10.5,y1-5,4,4.4);
+  g.fillStyle='#5a4028';g.fillRect(bx+6,y1-6,11,4);g.fillStyle='#3a5a6a';g.fillRect(bx+7,y1-5.4,9,1.6);
+  g.strokeStyle='#3a3a3a';g.lineWidth=.7;g.beginPath();for(let k=0;k<4;k++){g.moveTo(x1-25+k*2,y1-21);g.lineTo(x1-25+k*2,y1-16)}g.stroke();
+  BG.sign(g,bx+2,by+20,pc,'#4a4a4e');BG.barrel(g,bx+22,y1-1)};
+BGFX_LIVE.smith=(g,b,a)=>{const x1=a.x+a.s,y1=a.y+a.s,h=b.forging?.7+Math.sin(a.time*11)*.2:.18;g.fillStyle=`rgba(255,120,40,${h.toFixed(2)})`;g.fillRect(x1-20,y1-11,5,2);
+  if(b.forging&&Math.sin(a.time*6)>.6){g.fillStyle='rgba(255,220,140,.9)';for(let k=0;k<3;k++)g.fillRect(x1-10+k*1.5,y1-10-k,.8,.8)}};
+BGFX.sawmill=(g,s,ep,pc,a)=>{const {bx,by,x1,y1}=BO(s);
+  BG.ground(g,bx+2,y1-24,x1,y1+2,'rgba(150,120,80,.4)');
+  BG.logs(g,bx+4,y1-20,3,'#b48e5c');
+  BG.shed(g,bx+16,y1-28,x1-4,y1-8,15,a.roof,ep>=7?'#5a5e62':null);
+  // Sägebock mit eingespanntem Stamm, Sägemehl, Bretterstapel
+  g.fillStyle='#4a3220';g.fillRect(bx+22,y1-15,24,2);g.fillRect(bx+23,y1-13,1.6,4);g.fillRect(bx+43,y1-13,1.6,4);
+  g.fillStyle='#8a6a40';g.fillRect(bx+20,y1-18.4,28,3.2);g.fillStyle='#c4a070';g.beginPath();g.ellipse(bx+48,y1-16.8,1,1.6,0,0,7);g.fill();
+  g.fillStyle='rgba(220,190,130,.6)';g.beginPath();g.ellipse(bx+34,y1-8,7,1.6,0,0,7);g.fill();
+  BG.planks(g,bx+8,y1-1,16,5);BG.planks(g,x1-24,y1,18,4);BG.sign(g,bx+2,by+28,pc,'#b08850')};
+BGFX_LIVE.sawmill=(g,b,a)=>{const cx=a.x+34,cy=a.y+a.s-14,r=a.time*(b.sawing?8:0);g.strokeStyle='#b8bcc0';g.lineWidth=1.2;g.beginPath();g.arc(cx,cy,4,r,r+5.6);g.stroke();g.fillStyle='#55585c';g.beginPath();g.arc(cx,cy,1,0,7);g.fill()};
+BGFX.mason=(g,s,ep,pc,a)=>{const {bx,by,x1,y1}=BO(s),mat=MAT[Math.min(ep,MAT.length-1)];
+  BG.ground(g,bx+2,y1-22,x1,y1+2,'rgba(170,164,150,.45)');
+  hall(g,bx+3,by+4,bx+s*.55,y1-14,10,mat,a.wall,a.roof,ep>=2,6);
+  BG.blocks(g,x1-24,y1-2,'#a9a69c');BG.blocks(g,bx+6,y1,'#b4ae9e');
+  // Säulentrommel, Werkbank, Dreibein-Hebezeug
+  g.fillStyle='#bab4a4';g.fillRect(x1-28,y1-20,6,6);g.fillStyle='#d2ccbc';g.beginPath();g.ellipse(x1-25,y1-20,3,1,0,0,7);g.fill();g.fillStyle='rgba(0,0,0,.2)';g.fillRect(x1-24,y1-20,2,6);
+  g.strokeStyle='#4a3220';g.lineWidth=1.2;g.beginPath();g.moveTo(x1-14,y1-12);g.lineTo(x1-9,y1-34);g.lineTo(x1-4,y1-12);g.moveTo(x1-9,y1-34);g.lineTo(x1-7,y1-14);g.stroke();
+  g.strokeStyle='#2a2018';g.lineWidth=.4;g.beginPath();g.moveTo(x1-9,y1-34);g.lineTo(x1-9,y1-22);g.stroke();g.fillStyle='#a9a69c';g.fillRect(x1-11.5,y1-22,5,3.6);
+  g.fillStyle='rgba(220,216,206,.6)';for(let k=0;k<8;k++){g.beginPath();g.arc(bx+s*.5+k*2.6,y1-10+(k%3),.6,0,7);g.fill()}
+  BG.sign(g,bx+2,by+20,pc,'#a9a69c')};
+BGFX.mine=(g,s,ep,pc,a)=>{const {bx,by,x1,y1}=BO(s),cx=bx+s*.42;
+  // Felshügel aus Facetten, Stolleneingang mit Türstock, Gleis mit Lore, Abraumhalde
+  g.fillStyle='rgba(8,14,6,.3)';g.beginPath();g.ellipse(cx+8,y1,s*.48,7,0,0,7);g.fill();
+  const P=[[bx,y1],[bx+6,y1-20],[bx+16,y1-34],[cx+4,y1-40],[x1-14,y1-30],[x1-4,y1-14],[x1,y1]];
+  const fc=['#7e766a','#948a7c','#a49a8a','#8a8274','#6a6258','#5a544c'];
+  for(let k=0;k<P.length-1;k++){g.fillStyle=fc[k];g.beginPath();g.moveTo(cx,y1-10);g.lineTo(P[k][0],P[k][1]);g.lineTo(P[k+1][0],P[k+1][1]);g.closePath();g.fill()}
+  g.strokeStyle='rgba(30,26,20,.25)';g.lineWidth=.5;g.beginPath();for(const p of P){g.moveTo(cx,y1-10);g.lineTo(p[0],p[1])}g.stroke();
+  g.fillStyle='rgba(90,110,60,.55)';for(const [gx,gy,r] of [[bx+12,y1-28,4],[cx+2,y1-37,3],[x1-12,y1-26,3.4]]){g.beginPath();g.ellipse(gx,gy,r,r*.5,0,0,7);g.fill()}
+  g.fillStyle='#120e0a';g.beginPath();g.moveTo(cx-6,y1-1);g.lineTo(cx-6,y1-12);g.lineTo(cx+6,y1-12);g.lineTo(cx+6,y1-1);g.closePath();g.fill();
+  g.fillStyle='#5a3f22';g.fillRect(cx-7.6,y1-13,2.2,12.4);g.fillRect(cx+5.4,y1-13,2.2,12.4);g.fillRect(cx-8.4,y1-14.6,16.8,2.4);g.fillStyle='rgba(255,230,190,.2)';g.fillRect(cx-8.4,y1-14.6,16.8,.6);
+  g.strokeStyle='#4a4a4a';g.lineWidth=.6;g.beginPath();g.moveTo(cx-3,y1-1);g.lineTo(cx+8,y1+3);g.moveTo(cx+3,y1-1);g.lineTo(cx+14,y1+3);g.stroke();g.strokeStyle='#5a3f22';g.lineWidth=.8;g.beginPath();for(let k=0;k<4;k++){g.moveTo(cx-2+k*3.4,y1-.4+k*1.2);g.lineTo(cx+4+k*3.4,y1-.4+k*1.2)}g.stroke();
+  g.fillStyle='#4a4038';g.fillRect(cx+9,y1-4,8,4);g.fillStyle='#1a1a1a';g.beginPath();g.arc(cx+10.5,y1+.2,1.1,0,7);g.arc(cx+15.5,y1+.2,1.1,0,7);g.fill();g.fillStyle='#8a5a3a';for(let k=0;k<3;k++){g.beginPath();g.arc(cx+11+k*2.4,y1-4.6,1.3,0,7);g.fill()}
+  g.fillStyle='#7a6a58';g.beginPath();g.moveTo(x1-14,y1+2);g.quadraticCurveTo(x1-6,y1-8,x1+2,y1+2);g.fill();g.fillStyle='rgba(0,0,0,.2)';g.beginPath();g.moveTo(x1-6,y1-5);g.quadraticCurveTo(x1-2,y1-2,x1+2,y1+2);g.lineTo(x1-6,y1+2);g.fill();
+  if(ep>=7){// Förderturm
+    const fx=bx+8;g.strokeStyle='#3a3e42';g.lineWidth=1.4;g.beginPath();g.moveTo(fx,y1-2);g.lineTo(fx+5,y1-46);g.lineTo(fx+10,y1-2);g.moveTo(fx+5,y1-46);g.lineTo(fx+16,y1-8);g.stroke();g.lineWidth=.5;g.beginPath();for(let k=6;k<44;k+=6){g.moveTo(fx+k*.11,y1-2-k);g.lineTo(fx+10-(k+6)*.11,y1-8-k)}g.stroke();
+    g.strokeStyle='#2a2e32';g.lineWidth=.8;g.beginPath();g.arc(fx+5,y1-46,3.4,0,7);g.stroke()}
+  else{g.fillStyle='#e8c060';g.fillRect(cx+6.6,y1-11.6,1.6,2);g.fillStyle='rgba(255,200,90,.3)';g.beginPath();g.arc(cx+7.4,y1-10.6,2.4,0,7);g.fill()}
+  a.banner(g,cx+2,y1-38,pc,12)};
+BGFX.warehouse=(g,s,ep,pc,a)=>{const {bx,by,x1,y1}=BO(s),mat=MAT[Math.min(ep,MAT.length-1)];
+  BG.ground(g,bx+2,y1-10,x1,y1+3);
+  hall(g,bx+2,by+2,x1-2,y1-6,14,mat,a.wall,a.roof,false,12);
+  // Ladeluke mit Seilwinde unter dem Giebel, Rampe, Fracht davor
+  g.fillStyle='#3a2a1a';g.fillRect(bx+s*.35,by+16,6,5);g.strokeStyle='#2a2018';g.lineWidth=.9;g.beginPath();g.moveTo(bx+s*.35+3,by+12);g.lineTo(bx+s*.35+3,by+24);g.stroke();
+  g.fillStyle='#7a5a36';g.beginPath();g.moveTo(bx+s*.3,y1-6);g.lineTo(bx+s*.5,y1-6);g.lineTo(bx+s*.54,y1-1);g.lineTo(bx+s*.26,y1-1);g.closePath();g.fill();
+  BG.crate(g,bx+4,y1,5);BG.crate(g,bx+10,y1+1,4.5);BG.crate(g,bx+6.5,y1-5,4);BG.barrel(g,x1-14,y1);BG.barrel(g,x1-9,y1+1);BG.sack(g,bx+s*.6,y1+1);
+  a.banner(g,x1-6,by+4,pc,14)};
+BGFX.mill=(g,s,ep,pc,a)=>{const {bx,by,x1,y1}=BO(s),cx=bx+s*.48;
+  if(ep>=7){// Getreidesilos mit Elevatorturm
+    for(const [sx,h] of [[bx+8,40],[bx+24,46],[bx+40,40]]){g.fillStyle='rgba(8,14,6,.3)';g.beginPath();g.ellipse(sx+12,y1,9,3,0,0,7);g.fill();
+      const sg=g.createLinearGradient(sx,0,sx+14,0);sg.addColorStop(0,'#d8dad6');sg.addColorStop(.6,'#b8bcbd');sg.addColorStop(1,'#80868a');g.fillStyle=sg;g.fillRect(sx,y1-h,14,h);g.beginPath();g.ellipse(sx+7,y1,7,2.4,0,0,Math.PI);g.fill();
+      g.fillStyle='#9aa0a2';g.beginPath();g.moveTo(sx-.5,y1-h);g.lineTo(sx+7,y1-h-5);g.lineTo(sx+14.5,y1-h);g.closePath();g.fill();g.strokeStyle='rgba(0,0,0,.12)';g.lineWidth=.5;g.beginPath();for(let k=y1-h+5;k<y1;k+=5){g.moveTo(sx,k);g.lineTo(sx+14,k)}g.stroke()}
+    g.fillStyle=pc;g.fillRect(bx+26,y1-30,10,3);return}
+  // Turmwindmühle: verjüngter Turm aus Stein (früh Holzbock), drehbare Haube; Flügel werden live gezeichnet
+  g.fillStyle='rgba(8,14,6,.3)';g.beginPath();g.ellipse(cx+10,y1,16,5,0,0,7);g.fill();BG.ground(g,bx+2,y1-8,x1-2,y1+4);
+  const tg=g.createLinearGradient(cx-10,0,cx+10,0);tg.addColorStop(0,ep>=3?'#cfc6b2':'#9a7a52');tg.addColorStop(.55,ep>=3?'#b0a690':'#7a5a36');tg.addColorStop(1,ep>=3?'#6e6656':'#4a3420');g.fillStyle=tg;
+  g.beginPath();g.moveTo(cx-11,y1-2);g.lineTo(cx-7,y1-40);g.lineTo(cx+7,y1-40);g.lineTo(cx+11,y1-2);g.quadraticCurveTo(cx,y1+1.4,cx-11,y1-2);g.fill();
+  g.strokeStyle=ep>=3?'rgba(40,34,24,.25)':'rgba(30,20,10,.35)';g.lineWidth=.5;g.beginPath();for(let k=4;k<38;k+=3.2){const w=11-k*.1;g.moveTo(cx-w,y1-2-k);g.lineTo(cx+w,y1-2-k)}g.stroke();
+  g.fillStyle='#2a1e14';g.beginPath();g.moveTo(cx-2.6,y1-1);g.lineTo(cx-2.6,y1-8);g.quadraticCurveTo(cx,y1-10,cx+2.6,y1-8);g.lineTo(cx+2.6,y1-1);g.fill();
+  for(const wy of [y1-20,y1-31]){g.fillStyle='#1e1812';g.fillRect(cx-1.2,wy,2.4,3.2)}
+  g.fillStyle=a.roof;g.beginPath();g.moveTo(cx-9,y1-40);g.quadraticCurveTo(cx-6,y1-52,cx,y1-53);g.quadraticCurveTo(cx+6,y1-52,cx+9,y1-40);g.closePath();g.fill();g.fillStyle='rgba(0,0,0,.25)';g.beginPath();g.moveTo(cx+2,y1-52.6);g.quadraticCurveTo(cx+6,y1-52,cx+9,y1-40);g.lineTo(cx+2,y1-40);g.fill();
+  g.fillStyle='#4a3220';g.fillRect(cx-9.4,y1-40.6,18.8,1.4);
+  BG.sack(g,x1-12,y1);BG.sack(g,x1-7,y1+1);BG.sack(g,x1-9.5,y1-3.6);BG.planks(g,bx+4,y1+1,8,2)};
+BGFX_LIVE.mill=(g,b,a)=>{if(a.ep>=7)return;const cx=a.x+a.s*.48,cy=a.y+a.s-46,r=a.time*(b.built?1.2:0)+b.id;
+  g.save();g.translate(cx,cy);g.fillStyle='#3a2a1a';g.beginPath();g.arc(0,0,1.8,0,7);g.fill();
+  for(let k=0;k<4;k++){const q=r+k*Math.PI/2;g.save();g.rotate(q);g.strokeStyle='#4a3220';g.lineWidth=1.2;g.beginPath();g.moveTo(0,0);g.lineTo(0,-22);g.stroke();
+    g.fillStyle='rgba(232,224,204,.88)';g.fillRect(.8,-21,4.4,15);g.strokeStyle='rgba(74,50,32,.55)';g.lineWidth=.35;g.beginPath();for(let j=-19;j<-6;j+=2.6){g.moveTo(.8,j);g.lineTo(5.2,j)}g.moveTo(3,-21);g.lineTo(3,-6);g.stroke();g.restore()}
+  g.restore()};
+function modDraw(g,b,a){const F=BGFX[b.type];
+  if(F){const c=sprite('b|'+b.type+'|'+a.ep+'|'+b.owner,a.s+28,a.s+56,g2=>F(g2,a.s,a.ep,a.pc,a));g.drawImage(c,a.x-4,a.y-40,c.lw,c.lh);if(BGFX_LIVE[b.type])BGFX_LIVE[b.type](g,b,a);return}
+  BLD[b.type].draw(g,b,a)}
 function drawBld(g,b){drawBld0(g,b);if(aiS&&aiS.married&&b.type==='tc'){const x=(b.x+b.size/2)*T,y=b.y*T-30+Math.sin(gameT*3)*2;g.fillStyle='#e0546a';g.beginPath();g.moveTo(x,y+7);g.bezierCurveTo(x-10,y-1,x-5,y-8,x,y-3);g.bezierCurveTo(x+5,y-8,x+10,y-1,x,y+7);g.fill()}}
 function drawBld0(g,b){
   const D=BLD[b.type],x=b.x*T,y=b.y*T,s=b.size*T,ep=players[b.owner].epoch,pc=PCOL[b.owner];
-  if(D.draw){g.save();try{D.draw(g,b,{x,y,s,lift:Math.min(12,s*.18),ep,pc,wall:WALL[ep],roof:ROOF[ep],roofHi:ROOF_HI[ep],...DRAW_API})}catch(e){}g.restore();if(!b.built)drawProg(g,b,x,y,s);return}
+  if(D.draw){g.save();try{modDraw(g,b,{x,y,s,lift:Math.min(12,s*.18),ep,pc,wall:WALL[ep],roof:ROOF[ep],roofHi:ROOF_HI[ep],...DRAW_API})}catch(e){}g.restore();if(!b.built)drawProg(g,b,x,y,s);return}
   const spr=bldSprite(b.type,ep,b.owner);
   if(!b.built){
     // foundation, scaffolding and the building rising from the ground
@@ -2785,5 +2907,5 @@ function autoPlayer(){ // lets the player side be run by the same AI for soak te
 }
 window.__rc=(x,y,sh)=>{shiftHeld=!!sh;rightCommand(x,y);shiftHeld=false};
 window.__ex={start:(d,s)=>{newGame(d,s);started=true},step:n=>{for(let i=0;i<n&&!over;i++)step(DT)},select:a=>select(a),get:()=>({t:gameT,over,players,ents})};
-window.__bldDraw=(t,g,x,y,ep,o)=>{const D=BLD[t],s=D.size*T;if(!D.draw){const c=bldSprite(t,ep,o);g.drawImage(c,x-4,y-36,c.lw,c.lh);return}D.draw(g,{type:t,owner:o,built:true,size:D.size},{x,y,s,lift:Math.min(12,s*.18),ep,pc:PCOL[o],wall:WALL[ep],roof:ROOF[ep],roofHi:ROOF_HI[ep],...DRAW_API})};window.__look=(x,y,z)=>{zoomT=0;cam.z=z;cam.x=x*T-viewW/(2*z);cam.y=y*T-viewH/(2*z)};window.__tree=v=>treeSprite(v);window.__rock=(k,v)=>rockSprite(k,v);window.__spawn=(p,t,x,y)=>spawnUnit(p,t,x,y);window.__reveal=()=>{exp.fill(1);vis.fill(1)};window.__place=(p,t,x,y)=>placeBld(p,t,x,y,true);window.__can=(p,t,x,y)=>canPlace(p,t,x,y);window.__water=(x,y)=>terr[idx(x|0,y|0)]===1;window.__cam=(x,y)=>{cam.x=x*T;cam.y=y*T};window.__move=(u,x,y)=>cmdMove([u],x,y,false);window.__limit=m=>{timeLimit=m};window.__placeU=(p,t,x,y)=>placeBld(p,t,x,y,false);
+window.__bldDraw=(t,g,x,y,ep,o)=>{const D=BLD[t],s=D.size*T;if(!D.draw){const c=bldSprite(t,ep,o);g.drawImage(c,x-4,y-36,c.lw,c.lh);return}modDraw(g,{type:t,owner:o,built:true,size:D.size,id:1},{x,y,s,lift:Math.min(12,s*.18),ep,pc:PCOL[o],wall:WALL[ep],roof:ROOF[ep],roofHi:ROOF_HI[ep],...DRAW_API})};window.__look=(x,y,z)=>{zoomT=0;cam.z=z;cam.x=x*T-viewW/(2*z);cam.y=y*T-viewH/(2*z)};window.__tree=v=>treeSprite(v);window.__rock=(k,v)=>rockSprite(k,v);window.__spawn=(p,t,x,y)=>spawnUnit(p,t,x,y);window.__reveal=()=>{exp.fill(1);vis.fill(1)};window.__place=(p,t,x,y)=>placeBld(p,t,x,y,true);window.__can=(p,t,x,y)=>canPlace(p,t,x,y);window.__water=(x,y)=>terr[idx(x|0,y|0)]===1;window.__cam=(x,y)=>{cam.x=x*T;cam.y=y*T};window.__move=(u,x,y)=>cmdMove([u],x,y,false);window.__limit=m=>{timeLimit=m};window.__placeU=(p,t,x,y)=>placeBld(p,t,x,y,false);
 })();
