@@ -453,9 +453,11 @@ function enemyNear(u,radius,wantBld){
 }
 
 // ================= combat =================
+const vetRank=u=>(u.kills||0)>=5?2:(u.kills||0)>=2?1:0,vetMul=u=>u&&u.rank?(u.rank===2?1.15:1.05):1;
 function damage(t,dmg,src){
   if(t.dead)return;
-  if(src&&src.buffUntil>gameT)dmg*=1.2;if(src&&src.templeT>gameT)dmg*=1.1;if(src&&src.form===2)dmg*=1.3;if(t.form===1)dmg*=.7;if(t.campT>gameT)dmg*=.6;else if(t.form===2)dmg*=1.2;if(src&&src.owner!=null&&players[src.owner]&&players[src.owner].monAtk)dmg*=1+players[src.owner].monAtk;if(src&&src.type==='hero'&&t.kind==='unit'&&t.hp>0&&t.hp<=dmg)src.kills=(src.kills||0)+1;
+  if(src&&src.buffUntil>gameT)dmg*=1.2;if(src&&src.templeT>gameT)dmg*=1.1;if(src&&src.form===2)dmg*=1.3;if(t.form===1)dmg*=.7;if(t.campT>gameT)dmg*=.6;else if(t.form===2)dmg*=1.2;if(src&&src.owner!=null&&players[src.owner]&&players[src.owner].monAtk)dmg*=1+players[src.owner].monAtk;if(src&&src.kind==='unit'&&t.kind==='unit'&&t.hp>0&&t.hp<=dmg*vetMul(src)){src.kills=(src.kills||0)+1;const r=vetRank(src);if(r>(src.rank||0)){src.rank=r;if(src.type!=='hero'){src.maxhp=Math.round(src.maxhp*(r===1?1.05:1.1));if(src.owner===0&&r===2)toast(uname(UNITS[src.type],players[0].epoch)+' ist jetzt ein Veteran.','good')}}}
+  if(src)dmg*=vetMul(src);if(t.rank)dmg/=t.rank===2?1.15:1.05;if(src&&src.vetAuraT>gameT&&!src.rank)dmg*=1.08;
   t.hp-=dmg;t.hitT=gameT;t.revealT=gameT+6;if(src)src.revealT=gameT+6;if(visibleEnt(t))sfx(dmg>20?'boom':src&&src.kind==='unit'&&uStat(src).range<1.5&&!['siege'].includes(CLS(src.type))?'sword':'hit');
   fx.push({x:center(t).x+(rng()-.5)*.4,y:center(t).y+(rng()-.5)*.4,t:0,k:'hit'});
   if(t.owner===0&&gameT-lastAlarm>20&&src){lastAlarm=gameT;toast('Wir werden angegriffen!','warn');ping=center(t);pingT=3}
@@ -931,7 +933,7 @@ function findSpot(p,type,near,minR,maxR){
 // ================= module API =================
 const API={
   get ents(){return ents},income(pl,r,v){income(pl,r,v)},get players(){return players},get time(){return gameT},
-  spawnUnit,get gate(){return gate},idx,W,placeBld,toast,damage,order,applyTech,techState,center,distEnt,alive,isMil,uStat,
+  spawnUnit,uCost,get gate(){return gate},idx,W,placeBld,toast,damage,order,applyTech,techState,center,distEnt,alive,isMil,uStat,
   heal(e,amt){e.hp=Math.min(e.maxhp,e.hp+amt)},
   revealAll(){exp.fill(1)},
   fx(x,y,k){fx.push({x,y,t:0,k:k||'hit'})},
@@ -1387,6 +1389,7 @@ function epochDress(g,re,x,by,hx,hy,pc){
 function drawUnit(g,u){
   const UD=UNITS[u.type],k=(UD.scale||1.32)*Math.sqrt((UD.r||.3)/.3),x=u.x*T,y=u.y*T;
   g.save();g.translate(x,y);g.scale(k,k);g.translate(-x,-y);drawUnitRaw(g,u);g.restore();
+  if(u.rank&&u.type!=='hero'){const xx=u.x*T+u.r*T*1.2,yy=u.y*T-u.r*T*2.6;g.fillStyle=u.rank===2?'#f2cf4f':'#c9ccd0';for(let i=0;i<u.rank;i++){g.beginPath();g.moveTo(xx-4,yy+i*3.5);g.lineTo(xx,yy+2.5+i*3.5);g.lineTo(xx+4,yy+i*3.5);g.lineTo(xx+4,yy+1.5+i*3.5);g.lineTo(xx,yy+4+i*3.5);g.lineTo(xx-4,yy+1.5+i*3.5);g.closePath();g.fill()}}
   if(u.form){const yy=u.y*T+u.r*T*1.6,xx=u.x*T;g.fillStyle=['','#6fa0d8','#e07a4a','#8fd06a'][u.form];if(u.form===1)g.fillRect(xx-5,yy,10,3);else if(u.form===2){g.beginPath();g.moveTo(xx-5,yy+3);g.lineTo(xx,yy-2);g.lineTo(xx+5,yy+3);g.closePath();g.fill()}else{for(let i=-1;i<=1;i++)g.fillRect(xx+i*4-1,yy,2,3)}}
 }
 function drawUnitRaw(g,u){
