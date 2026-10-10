@@ -1647,6 +1647,10 @@ function render(){
       const L=(x,y)=>inb(x,y)&&terr[idx(x,y)]!==1;ctx.beginPath();
       if(L(tx,ty-1)){ctx.moveTo(tx*T+2,ty*T+3+w);ctx.lineTo(tx*T+T-2,ty*T+3+w)}if(L(tx,ty+1)){ctx.moveTo(tx*T+2,ty*T+T-3-w);ctx.lineTo(tx*T+T-2,ty*T+T-3-w)}
       if(L(tx-1,ty)){ctx.moveTo(tx*T+3+w,ty*T+2);ctx.lineTo(tx*T+3+w,ty*T+T-2)}if(L(tx+1,ty)){ctx.moveTo(tx*T+T-3-w,ty*T+2);ctx.lineTo(tx*T+T-3-w,ty*T+T-2)}ctx.stroke()}
+    {// Wellenkämme mit dunkler Rückseite, die mit der Strömung treiben
+      const dr=((now*6+ph*T)%T),cx=tx*T+dr,cy=ty*T+((h>>9)%T);ctx.lineWidth=1;
+      ctx.strokeStyle='rgba(20,40,55,.18)';ctx.beginPath();ctx.arc(cx,cy+1.2,5,Math.PI*1.15,Math.PI*1.85);ctx.stroke();
+      ctx.strokeStyle=`rgba(220,238,245,${(.28*(1-WX.night*.6)).toFixed(2)})`;ctx.beginPath();ctx.arc(cx,cy,5,Math.PI*1.2,Math.PI*1.8);ctx.stroke()}
     const al=Math.pow(Math.max(0,Math.sin(now*1.3+ph*6.28)),6)*.55;if(al<.03)continue;
     const sx=tx*T+(h%23),sy=ty*T+((h>>5)%27);ctx.strokeStyle=`rgba(225,245,250,${al})`;ctx.lineWidth=1.4;ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(sx+6,sy-1);ctx.stroke();
   }
@@ -2442,6 +2446,7 @@ function drawTrade(){if(!tradeOpen)return;const c=$('#tradeCv'),g=c.getContext('
 $('#startBtn').onclick=()=>{timeLimit=+$('#limitSel').value;useCustomMap=!!(CUSTOM_MAP&&$('#useCustom').checked);
   $('#startScreen').hidden=true;resize();newGame(chosenDiff,seed);started=true;paused=false;$('#btnPause').textContent='Pause';
 };
+$('#btnMenu').onclick=()=>{if(!started||over)return;saveGame();started=false;paused=true;['#endScreen','#credits','#tradePanel'].forEach(q=>{const e=$(q);if(e)e.hidden=true});showContinue();$('#startScreen').hidden=false;toast('Spiel gespeichert. Mit „Weiterspielen“ geht es weiter.','good')};
 $('#againBtn').onclick=()=>{showContinue();$('#endScreen').hidden=true;started=false;over=false;seed=(Math.random()*99999)|0;$('#seedN').textContent=seed;$('#startScreen').hidden=false};
 window.addEventListener('resize',resize);
 resize();showContinue();requestAnimationFrame(frame);
