@@ -32,6 +32,26 @@ ipcMain.on('mods-list',e=>{e.returnValue=listMods()});
 ipcMain.on('mods-save',(e,{name,code})=>{ensureModsDir();fs.writeFileSync(path.join(modsDir(),path.basename(name)),code);e.returnValue=true});
 ipcMain.on('mods-open',()=>{ensureModsDir();shell.openPath(modsDir())});
 
+// ---- Testversion: die mitgelieferte Browser-Version liegt immer aktuell im Desktop-Ordner "claude\Empire XY"
+// Läuft bei jedem Start, also auch direkt nach jedem installierten Update.
+function desktopTestDir(){
+  const cands=[path.join(app.getPath('desktop'),'claude'),'D:\\Desktop\\claude'];
+  const base=cands.find(p=>{try{return fs.statSync(p).isDirectory()}catch(e){return false}})||cands[0];
+  return path.join(base,'Empire XY');
+}
+function syncBrowserCopy(){
+  if(!app.isPackaged)return;
+  try{
+    const src=path.join(__dirname,'app','index.html'),dir=desktopTestDir(),dst=path.join(dir,'Empire XY (Browser).html');
+    const code=fs.readFileSync(src);
+    try{if(fs.readFileSync(dst).equals(code))return}catch(e){}
+    fs.mkdirSync(dir,{recursive:true});
+    fs.writeFileSync(dst,code);
+    fs.writeFileSync(path.join(dir,'VERSION.txt'),'Empire XY '+app.getVersion()+'\r\n');
+    console.log('Browser-Version aktualisiert:',dst);
+  }catch(e){console.log('Browser-Version nicht kopiert:',e&&e.message)}
+}
+
 // ---- automatische Updates aus den GitHub Releases (privates Repository)
 function readToken(){
   for(const p of [path.join(process.resourcesPath||'','update-token.txt'),path.join(app.getPath('userData'),'update-token.txt')]){
@@ -59,6 +79,6 @@ ipcMain.on('update-install',()=>autoUpdater.quitAndInstall());
 if(!app.requestSingleInstanceLock())app.quit();
 else{
   app.on('second-instance',()=>{if(win){if(win.isMinimized())win.restore();win.focus()}});
-  app.whenReady().then(()=>{createWindow();watchMods();setupUpdater()});
+  app.whenReady().then(()=>{createWindow();watchMods();syncBrowserCopy();setupUpdater()});
   app.on('window-all-closed',()=>app.quit());
 }
