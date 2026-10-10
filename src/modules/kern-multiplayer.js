@@ -106,6 +106,7 @@ function onHostMsg(p,m){
   if(!S||!m||typeof m!=='object')return;
   if(p.pending){
     if(m.t!=='hello')return;
+    if(S.phase==='lobby'&&S.players.length>=MAXP){const k=S.players.map(x=>!!x.ai).lastIndexOf(true);if(k>0)S.players.splice(k,1)}
     const why=S.phase!=='lobby'?'Das Spiel läuft bereits.':S.players.length>=MAXP?'Das Spiel ist voll (höchstens '+MAXP+' Spieler).':m.ver!==PROTO?'Andere Spielversion. Bitte beide auf denselben Stand bringen.':null;
     const mine=modSig(),theirs=Array.isArray(m.mods)?m.mods:[];
     const diff=mine.filter(x=>!theirs.includes(x)).concat(theirs.filter(x=>!mine.includes(x)));
@@ -130,16 +131,29 @@ function dropPlayer(p){
 }
 function lobbyUpdate(){
   if(!S||!S.host)return;
-  const list=S.players.map(p=>({name:p.name,civ:p.civ,ready:p.ready,host:!!p.host,ping:p.ping}));
-  S.players.forEach((p,i)=>{const o={t:'lobby',you:i,code:S.code,players:list,settings:S.settings};if(p.conn)p.conn.send(o);else onClientMsg(o)});
+  const list=S.players.map(p=>({name:p.name,civ:p.civ,ready:p.ready,host:!!p.host,ping:p.ping,ai:!!p.ai,diff:p.diff|0}));
+  S.players.forEach((p,i)=>{const o={t:'lobby',you:i,code:S.code,players:list,settings:S.settings};if(p.conn)p.conn.send(o);else if(p.host)onClientMsg(o)});
+}
+// KI-Gegner auf freien Plätzen: nur der Gastgeber fügt sie hinzu; sie rechnen auf allen Rechnern im selben Takt mit
+const AIDIFF=['Leicht','Normal','Schwer'];
+const aiName=d=>'KI ('+AIDIFF[d]+')';
+function addAI(){
+  if(!S||!S.host||S.phase!=='lobby'||S.players.length>=MAXP)return;
+  const used=S.players.map(p=>p.civ),free=civs().map(c=>c[0]).filter(k=>!used.includes(k)),pool=free.length?free:civs().map(c=>c[0]);
+  const d=+store.get('aidiff',1)||0;
+  S.players.push({name:aiName(d),civ:pool[Math.random()*pool.length|0],ready:true,ai:true,diff:d,conn:null,ping:0});lobbyUpdate();
+}
+function setAI(i,o){const p=S&&S.host&&S.phase==='lobby'&&S.players[i];if(!p||!p.ai)return;
+  if(o.remove){S.players.splice(i,1)}else{if(o.civ)p.civ=o.civ;if(o.diff!=null){p.diff=o.diff;p.name=aiName(o.diff);store.set('aidiff',o.diff)}}
+  lobbyUpdate()
 }
 function sysChat(text){const o={t:'chat',from:'',slot:-1,text};sendAll(o);onClientMsg(o)}
 function startGame(){
   if(!S||!S.host||S.phase!=='lobby')return;
   if(S.players.length<2){ui.status('Mindestens zwei Spieler werden gebraucht.',true);return}
   if(!S.players.every(p=>p.ready)){ui.status('Noch nicht alle Spieler sind bereit.',true);return}
-  const cfg={seed:(Math.random()*99999)|0,players:S.players.map(p=>({name:p.name,civ:p.civ})),epStart:S.settings.epStart,epEnd:S.settings.epEnd,timeLimit:S.settings.limit};
-  S.players.forEach((p,i)=>{const o={t:'start',cfg:Object.assign({},cfg,{me:i})};if(p.conn)p.conn.send(o);else onClientMsg(o)});
+  const cfg={seed:(Math.random()*99999)|0,players:S.players.map(p=>p.ai?{name:p.name,civ:p.civ,ai:true,diff:p.diff|0}:{name:p.name,civ:p.civ}),epStart:S.settings.epStart,epEnd:S.settings.epEnd,timeLimit:S.settings.limit};
+  S.players.forEach((p,i)=>{const o={t:'start',cfg:Object.assign({},cfg,{me:i})};if(p.conn)p.conn.send(o);else if(p.host)onClientMsg(o)});
   // die ersten Takte sind leer, damit Befehle einen kleinen Vorlauf haben
   for(let n=0;n<DELAY;n++){const o={t:'turn',n,cmds:[]};sendAll(o);S.turns.set(n,[])}
   S.gen=DELAY;
@@ -244,7 +258,7 @@ const CSS=`
 .mpCodeBig{font-family:var(--f-display);font-size:30px;letter-spacing:.2em;color:var(--bronze-hi)}
 #mpPlayers{display:flex;flex-direction:column;gap:6px;margin:0;padding:0;list-style:none}
 #mpPlayers li{display:grid;grid-template-columns:14px 1fr auto auto;gap:10px;align-items:center;background:var(--panel-2);border:1px solid var(--line);border-radius:4px;padding:6px 10px}
-#mpPlayers li.empty{opacity:.45}
+#mpPlayers li.empty{opacity:.45}#mpPlayers li.empty.canai{opacity:.85}
 #mpPlayers .sw{width:14px;height:14px;border-radius:3px}
 #mpPlayers .st{font-size:13px;color:var(--muted)}#mpPlayers .st.ok{color:var(--ok)}
 #mpPlayers select{max-width:210px}
@@ -321,10 +335,18 @@ const ui={
     if(!S||$('#mpLobby').hidden)return;const L=S.lobby;if(!L)return;
     $('#mpCodeShow').textContent=L.code;
     $('#mpPlayers').innerHTML=Array.from({length:MAXP},(_,i)=>{const p=L.players[i];
-      if(!p)return `<li class="empty"><span class="sw" style="background:${pc(i)}"></span><span>Freier Platz</span><span></span><span></span></li>`;
+      if(!p)return `<li class="empty${S.host?' canai':''}"><span class="sw" style="background:${pc(i)}"></span><span>Freier Platz</span><span></span>${S.host&&i===L.players.length?`<button class="opt" id="mpAddAi" title="Ein computergesteuerter Gegner übernimmt diesen Platz.">KI hinzufügen</button>`:'<span></span>'}</li>`;
+      if(p.ai){const ed=S.host;
+        const civ=ed?`<select data-aiciv="${i}" aria-label="Volk der KI">${civs().map(([k,c])=>`<option value="${k}"${k===p.civ?' selected':''}>${esc(c.name)}</option>`).join('')}</select>`:`<span>${esc(civName(p.civ))}</span>`;
+        const df=ed?`<span class="st ok"><select data-aidiff="${i}" aria-label="Stärke der KI">${AIDIFF.map((n,k)=>`<option value="${k}"${k===(p.diff|0)?' selected':''}>${n}</option>`).join('')}</select> <button class="opt" data-aidel="${i}" title="KI entfernen">✕</button></span>`:`<span class="st ok">${AIDIFF[p.diff|0]}</span>`;
+        return `<li><span class="sw" style="background:${pc(i)}"></span><span>Computer${ed?'':' · '+AIDIFF[p.diff|0]}</span>${civ}${df}</li>`}
       const civ=i===S.me?`<select id="mpCiv" aria-label="Dein Volk">${civs().map(([k,c])=>`<option value="${k}"${k===p.civ?' selected':''}>${esc(c.name)}</option>`).join('')}</select>`:`<span>${esc(civName(p.civ))}</span>`;
       return `<li><span class="sw" style="background:${pc(i)}"></span><span>${esc(p.name)}${p.host?' (Gastgeber)':''}${i===S.me?' · du':''}</span>${civ}<span class="st${p.ready?' ok':''}">${p.host?'':p.ready?'bereit':'wartet'}${p.ping&&i!==S.me?' · '+p.ping+' ms':''}</span></li>`}).join('');
     const cs=$('#mpCiv');if(cs)cs.onchange=()=>{store.set('civ',cs.value);toHost({t:'set',civ:cs.value})};
+    const ab=$('#mpAddAi');if(ab)ab.onclick=()=>addAI();
+    document.querySelectorAll('[data-aiciv]').forEach(x=>x.onchange=()=>setAI(+x.dataset.aiciv,{civ:x.value}));
+    document.querySelectorAll('[data-aidiff]').forEach(x=>x.onchange=()=>setAI(+x.dataset.aidiff,{diff:+x.value}));
+    document.querySelectorAll('[data-aidel]').forEach(x=>x.onclick=()=>setAI(+x.dataset.aidel,{remove:true}));
     // Einstellungen: der Gastgeber wählt Epochen und Zeitlimit
     const eps=[...($('#epStartSel')||{options:[]}).options].map(o=>o.textContent),st=S.settings;
     const sel=(id,opts,v)=>`<select id="${id}"${S.host?'':' disabled'}>${opts.map(([k,n])=>`<option value="${k}"${+k===+v?' selected':''}>${esc(n)}</option>`).join('')}</select>`;
@@ -332,7 +354,7 @@ const ui={
     if(S.host){const upd=()=>{let a=+$('#mpEpS').value,b=+$('#mpEpE').value;if(b<a)b=a;S.settings={epStart:a,epEnd:b,limit:+$('#mpLim').value};lobbyUpdate()};['#mpEpS','#mpEpE','#mpLim'].forEach(s=>$(s).onchange=upd)}
     const me=L.players[S.me];
     $('#mpStart').hidden=!S.host;$('#mpReady').hidden=S.host;$('#mpReady').textContent=me&&me.ready?'Doch nicht bereit':'Bereit';
-    if(S.host){const ok=L.players.length>=2&&L.players.every(p=>p.ready);$('#mpStart').disabled=!ok;ui.status(L.players.length<2?'Warte auf Mitspieler. Schicke ihnen den Raum-Code.':ok?'Alle sind bereit.':'Warte, bis alle bereit sind.')}
+    if(S.host){const ok=L.players.length>=2&&L.players.every(p=>p.ready);$('#mpStart').disabled=!ok;ui.status(L.players.length<2?'Schicke Mitspielern den Raum-Code oder füge einen KI-Gegner hinzu.':ok?'Alle sind bereit.':'Warte, bis alle bereit sind.')}
   },
   chat(){const box=$('#mpChatLog');if(box&&S){box.innerHTML=S.chat.map(c=>c.slot<0?`<div class="sys">${esc(c.text)}</div>`:`<div><b style="color:${pc(c.slot)}">${esc(c.from)}:</b> ${esc(c.text)}</div>`).join('');box.scrollTop=box.scrollHeight}ui.ingameChat()},
   ingameChat(){const ig=$('#mpIngame');if(!ig)return;ig.hidden=!net.active;if(!net.active)return;const t=now(),inp=ig.querySelector('input');
@@ -346,7 +368,7 @@ const ui={
     const v=S.host?(S.pings||[]).filter((x,i)=>i&&x>0):[S.ping];const ms=v.length?Math.max(...v):0;b.textContent='Mitspieler · '+(S.host&&!v.length?'–':ms+' ms');
     b.style.color=ms>250?'var(--danger)':ms>120?'var(--warn,#d9a43a)':''},
   panel(){const p=$('#mpPanel');if(!S||!G())return;const pl=G().players,me=S.me;
-    p.innerHTML=`<h3>Mitspieler</h3>`+pl.map((x,i)=>{const pg=(S.pings||[])[i];const st=x.defeated?(x.left?'verlassen':'besiegt'):i===me?'du':S.host&&i===0?'':pg<0?'getrennt':pg?pg+' ms':'';
+    p.innerHTML=`<h3>Mitspieler</h3>`+pl.map((x,i)=>{const pg=(S.pings||[])[i];const st=x.defeated?(x.left?'verlassen':'besiegt'):i===me?'du':x.ai?'KI · '+AIDIFF[x.aiDiff|0]:S.host&&i===0?'':pg<0?'getrennt':pg?pg+' ms':'';
       return `<div class="pr"><span class="sw" style="background:${pc(i)}"></span><span>${esc(x.name||'')} · ${esc(civName(x.civ))}</span><span class="hint">${st}${i===0?' (Gastgeber)':''}</span>${i!==me&&!x.defeated&&!pl[me].defeated?`<div class="trib">${['food','wood','stone','gold'].map(r=>`<button class="tbtn" data-to="${i}" data-r="${r}">100 ${({food:'Nahrung',wood:'Holz',stone:'Stein',gold:'Gold'})[r]}</button>`).join('')}</div>`:''}</div>`}).join('')+
       `<p class="hint">Tribut: Rohstoffe an einen Mitspieler schicken. Enter öffnet den Chat. Ping = Verzögerung zum Gastgeber.</p><button class="tbtn" id="mpQuit">Partie verlassen</button>`;
     p.querySelectorAll('[data-to]').forEach(b=>b.onclick=()=>{G().cmd('trib',{to:+b.dataset.to,r:b.dataset.r,n:100});G().toast('Tribut wird geschickt.')});

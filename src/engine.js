@@ -233,7 +233,7 @@ function newGame(d,seed,mp){
   rng=mulberry32(seed);diff=d;curSeed=seed;
   ents=[];corpses=[];byId=new Map();nextId=1;block=new Int32Array(W*H);gate=new Uint8Array(W*H);terr=new Uint8Array(W*H);vis=new Uint8Array(W*H);exp=new Uint8Array(W*H);
   proj=[];fx=[];sel=[];gameT=0;over=false;placing=null;aMode=false;groups={};
-  players=MP?MP.players.map((p,i)=>Object.assign(newPlayer(i,false),{name:p.name})):[newPlayer(0,false),newPlayer(1,true)];
+  players=MP?MP.players.map((p,i)=>Object.assign(newPlayer(i,!!p.ai),{name:p.name},p.ai?{aiDiff:Math.max(0,Math.min(2,p.diff|0)),aiT:0}:{})):[newPlayer(0,false),newPlayer(1,true)];
   genMap();renderTerrain();
   bases.forEach((b,p)=>{
     const tc=placeBld(p,'tc',b.x,b.y,true);
@@ -242,7 +242,10 @@ function newGame(d,seed,mp){
   });
   epStart=Math.min(epStart,MAXEP());
   if(epStart>0)for(const pl of players){pl.epoch=epStart;for(const k in pl.res)pl.res[k]=Math.round(pl.res[k]*(1+epStart*.7))}
-  aiS={t:0,nextAttack:DIFF[d].firstAttack,wave:DIFF[d].wave,attacking:false,lastDef:0};WX={kind:'sun',until:150,speed:1,night:0};
+  aiS={t:0,nextAttack:DIFF[d].firstAttack,wave:DIFF[d].wave,attacking:false,lastDef:0};
+  // Mehrspieler: jeder KI-Platz hat eigenen Zustand und eigene Schwierigkeit
+  for(const pl of players)if(MP&&pl.ai){const D=DIFF[pl.aiDiff];pl.aiS={t:0,nextAttack:D.firstAttack,wave:D.wave,attacking:false,lastDef:0}}
+  WX={kind:'sun',until:150,speed:1,night:0};
   // Völker mit eigenen Boni (wie in Age of Empires 2); der Gegner zieht ein zufälliges anderes Volk
   if(MP)players.forEach((pl,i)=>{pl.civ=CIVS[MP.players[i].civ]?MP.players[i].civ:'roemer'});
   else{players[0].civ=chosenCiv;const others=Object.keys(CIVS).filter(k=>k!==chosenCiv);players[1].civ=others[(rng()*others.length)|0]}
@@ -518,9 +521,9 @@ function damage(t,dmg,src){if(src&&src.kind==='unit'&&WX.night>.5)dmg*=.8;if(src
   if(t.owner===ME&&gameT-lastAlarm>20&&src){lastAlarm=gameT;toast('Wir werden angegriffen!','warn');ping=center(t);pingT=3}
   if(t.kind==='unit'&&src&&!src.dead&&src.owner!==t.owner){
     if(isMil(t)&&!UNITS[t.type].stealth&&canHit(t,src)&&(t.order.t==='idle'||(t.order.t==='amove')))order(t,{t:'attack',target:src.id,resume:t.order.t==='amove'?t.order:null});
-    else if(t.type==='worker'&&players[t.owner].ai)aiS.alarm={x:t.x,y:t.y,time:gameT};
+    else if(t.type==='worker'&&players[t.owner].ai)aiOf(t.owner).alarm={x:t.x,y:t.y,time:gameT};
   }
-  if(t.kind==='bld'&&t.owner>=0&&players[t.owner].ai&&src)aiS.alarm={x:src.x,y:src.y,time:gameT};
+  if(t.kind==='bld'&&t.owner>=0&&players[t.owner].ai&&src)aiOf(t.owner).alarm={x:src.x,y:src.y,time:gameT};
   if(t.hp<=0)kill(t,src);
 }
 let lastAlarm=-99,ping=null,pingT=0;
@@ -616,7 +619,7 @@ function updUnit(u,dt){
       if(u.carry>=10+players[u.owner].fx.carry){order(u,{t:'return',resume:o});break}
       if(distEnt(u,r)<=.5){
         u.path=null;const c=center(r);u.ang=Math.atan2(c.y-u.y,c.x-u.x);
-        const rate={wood:.85,food:r.kind==='bld'?.6:.95,stone:.65,gold:.65}[o.rt]*(players[u.owner].moodMul||1)*(players[u.owner].toolMul||1)*(r.kind==='bld'?farmBoost(r):1)*(1+.06*players[u.owner].epoch)*(1+(players[u.owner].fx.gather[o.rt]||0))*(players[u.owner].ai?DIFF[diff].gather:1)*(SEASON===0&&o.rt==='food'?1.3:SEASON===2&&o.rt==='wood'?1.25:1);
+        const rate={wood:.85,food:r.kind==='bld'?.6:.95,stone:.65,gold:.65}[o.rt]*(players[u.owner].moodMul||1)*(players[u.owner].toolMul||1)*(r.kind==='bld'?farmBoost(r):1)*(1+.06*players[u.owner].epoch)*(1+(players[u.owner].fx.gather[o.rt]||0))*(players[u.owner].ai?DIFF[aiDiffOf(u.owner)].gather:1)*(SEASON===0&&o.rt==='food'?1.3:SEASON===2&&o.rt==='wood'?1.25:1);
         const amt=Math.min(rate*dt,r.kind==='res'?r.amount:99);
         u.carry+=amt;u.ct=o.rt;u.working=true;if(u.owner===ME&&visibleEnt(u)&&onScreen(u))sfx(o.rt==='wood'?'chop':o.rt==='food'?'':'mine');
         if(r.kind==='res'){r.amount-=amt;if(r.amount<=0.001)kill(r)}
@@ -646,7 +649,7 @@ function updUnit(u,dt){
         u.path=null;const c=center(b);u.ang=Math.atan2(c.y-u.y,c.x-u.x);u.working=true;
         const D=BLD[b.type];
         if(!b.built){
-          const inc=dt/D.time*(players[u.owner].ai?DIFF[diff].gather:1)*(1+players[u.owner].fx.build)*(SEASON===1?1.2:1);b.prog=Math.min(1,b.prog+inc);b.hp=Math.min(b.maxhp,b.hp+b.maxhp*inc);
+          const inc=dt/D.time*(players[u.owner].ai?DIFF[aiDiffOf(u.owner)].gather:1)*(1+players[u.owner].fx.build)*(SEASON===1?1.2:1);b.prog=Math.min(1,b.prog+inc);b.hp=Math.min(b.maxhp,b.hp+b.maxhp*inc);
           if(b.prog>=1){b.built=true;players[b.owner].st.built++;recalcPop();if(b.owner===ME){toast(D.name+' fertiggestellt.');sfx('bell')}
             if(b.type==='wonder'){players[b.owner].wonderT=180;toast((b.owner===ME?'Dein Weltwunder steht!':MP?'Das Weltwunder von '+players[b.owner].name+' steht!':'Das feindliche Weltwunder steht!')+' 3 Minuten bis zum Sieg.',b.owner===ME?'good':'warn')}}
         }else{b.hp=Math.min(b.maxhp,b.hp+b.maxhp*dt/D.time*.6)}
@@ -843,8 +846,14 @@ function simVis(){
 }
 
 // ================= AI =================
-function aiThink(){
-  const P=1,pl=players[P],D=DIFF[diff];
+// Schwierigkeit und Zustand einer KI: im Mehrspieler pro Platz, sonst die globale Einstellung
+const aiDiffOf=p=>players[p]&&players[p].aiDiff!=null?players[p].aiDiff:diff,aiOf=p=>players[p]&&players[p].aiS||aiS;
+// Feinde der KI P: alle anderen Reiche, die noch im Spiel sind
+const aiFoe=(P,o)=>o>=0&&o!==P&&!!players[o]&&!players[o].defeated;
+function aiThink(P=1){
+  const pl=players[P],dk=aiDiffOf(P),D=DIFF[dk];
+  // nächstgelegene feindliche Basis (im Einzelspiel immer die des Spielers)
+  let foeB=bases[0];{let bd=1e9;for(let i=0;i<bases.length;i++)if(aiFoe(P,i)){const d=Math.hypot(bases[i].x-bases[P].x,bases[i].y-bases[P].y);if(d<bd){bd=d;foeB=bases[i]}}}
   const mine=ents.filter(e=>!e.dead&&e.owner===P);
   const workers=mine.filter(e=>e.kind==='unit'&&e.type==='worker');
   const army=mine.filter(e=>isMil(e)&&!(UNITS[e.type]&&UNITS[e.type].naval));
@@ -852,7 +861,7 @@ function aiThink(){
   const blds=mine.filter(e=>e.kind==='bld');
   const tcs=blds.filter(b=>b.type==='tc');
   const count=t=>blds.filter(b=>b.type===t).length;
-  const home=tcs[0]?center(tcs[0]):(workers[0]?{x:workers[0].x,y:workers[0].y}:{x:bases[1].x,y:bases[1].y});
+  const home=tcs[0]?center(tcs[0]):(workers[0]?{x:workers[0].x,y:workers[0].y}:{x:bases[P].x,y:bases[P].y});
   const ep=pl.epoch;
   const want=(t,c)=>c&&canAfford(P,mulCost(c,D.reserve));
   // --- reserve while saving for the next epoch
@@ -887,15 +896,15 @@ function aiThink(){
       if(!spare(BLD[t].cost))break;
       if(t==='camp'){const r=nearestRes('wood',home.x,home.y,30,P)||nearestRes('gold',home.x,home.y,30,P);if(r&&build('camp',{x:r.x,y:r.y},2,6))break;continue}
       if(t==='dock'){if(!BLD.dock)continue;const wt=nearWater(home,28);if(wt&&build('dock',wt,0,6))break;continue}
-      if(t==='tower'){if(build('tower',{x:home.x+(bases[0].x-home.x)*.15,y:home.y+(bases[0].y-home.y)*.15},2,8))break;continue}
+      if(t==='tower'){if(build('tower',{x:home.x+(foeB.x-home.x)*.15,y:home.y+(foeB.y-home.y)*.15},2,8))break;continue}
       if(build(t,home,5,15))break;
     }
     if(BLD.dock&&ep>=1&&workers.length>=11&&!count('dock')&&gameT>(aiS.dockTry||0)&&spare(BLD.dock.cost)){aiS.dockTry=gameT+60;const wt=nearWater(home,28);if(wt)build('dock',wt,0,6)}
-    if(BLD.wonder&&ep>=BLD.wonder.minEpoch&&diff===2&&!count('wonder')&&canAfford(P,mulCost(BLD.wonder.cost,1.2)))build('wonder',home,6,16);
+    if(BLD.wonder&&ep>=BLD.wonder.minEpoch&&dk===2&&!count('wonder')&&canAfford(P,mulCost(BLD.wonder.cost,1.2)))build('wonder',home,6,16);
   }
   // --- Mauerabschnitt mit Tor Richtung Gegner (wie die AoE2-KI)
   if(BLD.wall&&BLD.gate&&!aiS.walled&&ep>=2&&workers.length>=16&&tcs.length&&pl.res.stone>=260){
-    aiS.walled=true;const dx=bases[0].x-home.x,dy=bases[0].y-home.y,dl=Math.hypot(dx,dy)||1,ux=dx/dl,uy=dy/dl;
+    aiS.walled=true;const dx=foeB.x-home.x,dy=foeB.y-home.y,dl=Math.hypot(dx,dy)||1,ux=dx/dl,uy=dy/dl;
     const mx=home.x+ux*11,my=home.y+uy*11,bs=[];
     for(let k=-5;k<=5;k++){const x=Math.round(mx-uy*k),y=Math.round(my+ux*k),t=k===0?'gate':'wall';
       if(canPlace(P,t,x,y)&&canAfford(P,BLD[t].cost)){pay(P,BLD[t].cost);bs.push(placeBld(P,t,x,y,false))}}
@@ -904,7 +913,7 @@ function aiThink(){
   }
   // --- Schiffe: Gewässer bei der Heimat sichern
   for(const sh of ships)if(sh.order.t==='idle'){let best=null,bd=40;
-    for(const e of ents)if(!e.dead&&e.owner===0&&((e.kind==='unit'&&UNITS[e.type]&&UNITS[e.type].naval)||e.type==='dock')){const c=center(e),d=Math.hypot(c.x-sh.x,c.y-sh.y);if(d<bd){bd=d;best=c}}
+    for(const e of ents)if(!e.dead&&aiFoe(P,e.owner)&&((e.kind==='unit'&&UNITS[e.type]&&UNITS[e.type].naval)||e.type==='dock')){const c=center(e),d=Math.hypot(c.x-sh.x,c.y-sh.y);if(d<bd){bd=d;best=c}}
     if(best)order(sh,{t:'amove',x:best.x,y:best.y})}
   // --- farms when berries run low
   const berries=nearestRes('food',home.x,home.y,12,P);
@@ -913,7 +922,7 @@ function aiThink(){
   // --- assign idle workers
   const desired={food:.4,wood:.3,gold:.18+.03*ep,stone:.1+.02*ep};
   if(saving){const e=EPOCH_COST[ep+1];for(const k in e)if(pl.res[k]<e[k])desired[k]+=.12}
-  if(ep>=4&&diff===2&&pl.res.stone<1000){desired.stone+=.08;desired.gold+=.05}
+  if(ep>=4&&dk===2&&pl.res.stone<1000){desired.stone+=.08;desired.gold+=.05}
   const counts={food:0,wood:0,gold:0,stone:0};
   for(const w of workers)if(w.order.rt)counts[w.order.rt]++;
   // move one worker per think from the most over-staffed to the most under-staffed resource
@@ -953,28 +962,28 @@ function aiThink(){
     if(!opts.length)continue;const tr=opts[(rng()*opts.length)|0],U=UNITS[tr];
     if(UNITS[tr].naval&&ships.length>=6)continue;
     if(CLS(tr)==='siege'&&army.filter(a=>CLS(a.type)==='siege').length>=4)continue;
-    if(gameT<90&&diff<2)continue;
+    if(gameT<90&&dk<2)continue;
     if(spare(uCost(P,tr)))queueUnit(b,tr);
   }
   // --- defend
-  const threat=ents.find(e=>!e.dead&&e.owner===0&&e.kind==='unit'&&blds.some(b=>Math.hypot(e.x-b.x-b.size/2,e.y-b.y-b.size/2)<12));
+  const threat=ents.find(e=>!e.dead&&aiFoe(P,e.owner)&&e.kind==='unit'&&blds.some(b=>Math.hypot(e.x-b.x-b.size/2,e.y-b.y-b.size/2)<12));
   if(threat){
     for(const a of army)if(a.order.t!=='attack'||!a.order.forced)if(!aiS.attacking||Math.hypot(a.x-home.x,a.y-home.y)<25)order(a,{t:'attack',target:threat.id,forced:true});
     if(army.length<3&&tcs.length)for(const w of workers)if(Math.hypot(w.x-threat.x,w.y-threat.y)<5&&threat.type==='worker')order(w,{t:'attack',target:threat.id,forced:true});
   }
   // --- Verwundete (unter 30 % Leben) ziehen sich nach Hause zurück, Heiler und Burg pflegen sie dort
   for(const a of army){if(a.retreat){if(a.hp>a.maxhp*.75||Math.hypot(a.x-home.x,a.y-home.y)<6&&a.hp>a.maxhp*.6)a.retreat=false;else continue}
-    if(a.hp<a.maxhp*.3&&Math.hypot(a.x-home.x,a.y-home.y)>10&&diff>0){a.retreat=true;a.waveAt=null;cmdMove([a],home.x+(rng()-.5)*4,home.y+4+(rng()-.5)*3,false)}}
+    if(a.hp<a.maxhp*.3&&Math.hypot(a.x-home.x,a.y-home.y)>10&&dk>0){a.retreat=true;a.waveAt=null;cmdMove([a],home.x+(rng()-.5)*4,home.y+4+(rng()-.5)*3,false)}}
   // Rückzügler heilen langsam in der Heimat
-  for(const a of army)if(a.retreat&&Math.hypot(a.x-home.x,a.y-home.y)<7)a.hp=Math.min(a.maxhp,a.hp+a.maxhp*.02*DIFF[diff].think);
+  for(const a of army)if(a.retreat&&Math.hypot(a.x-home.x,a.y-home.y)<7)a.hp=Math.min(a.maxhp,a.hp+a.maxhp*.02*D.think);
   // --- attack waves
   if(aiS.attacking){
     const out=army.filter(a=>a.waveAt||a.order.t==='amove'||a.order.t==='attack');
     if(out.length<Math.max(2,aiS.sent*.25)){aiS.attacking=false;aiS.nextAttack=gameT+70;for(const a of army)cmdMove([a],home.x+(rng()-.5)*6,home.y+6+(rng()-.5)*4,false)}
     else for(const a of army)if(a.retreat)continue;else if(a.waveAt&&gameT>=a.waveAt.t){order(a,{t:'amove',x:a.waveAt.x+(rng()-.5)*2,y:a.waveAt.y+(rng()-.5)*2});a.waveAt=null}
-    else if(!a.waveAt&&(a.order.t==='idle'||a.order.t==='guard')){const t=playerTarget(a);if(t){const c=center(t);order(a,{t:'amove',x:c.x,y:c.y})}}
+    else if(!a.waveAt&&(a.order.t==='idle'||a.order.t==='guard')){const t=playerTarget(a,P);if(t){const c=center(t);order(a,{t:'amove',x:c.x,y:c.y})}}
   }else if(gameT>=aiS.nextAttack-(WX.night>.6&&!(aiS.peaceUntil>gameT)?40:0)&&army.length>=aiS.wave&&!(aiS.peaceUntil>gameT)){
-    const t=playerTarget(army[0]);
+    const t=playerTarget(army[0],P);
     if(t){aiS.attacking=true;aiS.sent=army.length;aiS.wave+=D.waveGrow;const c=center(t);
       // Formation: erst am Sammelpunkt aufstellen (Nahkampf vorn, Fernkampf hinten), dann losmarschieren
       const dx=c.x-home.x,dy=c.y-home.y,dl=Math.hypot(dx,dy)||1,ux=dx/dl,uy=dy/dl,sx0=home.x+ux*10,sy0=home.y+uy*10;
@@ -984,18 +993,18 @@ function aiThink(){
         // jede dritte Einheit eines großen Heeres sammelt sich seitlich versetzt und fällt von der Flanke ein
         const fl=army.length>=6&&k%3===2,side=fl?(k%2?1:-1)*9:0,fwd=fl?6:0;
         a.waveAt={x:c.x,y:c.y,t:gameT+14};cmdMove([a],sx0-uy*(off+side)-ux*(back-fwd),sy0+ux*(off+side)-uy*(back-fwd),false)}));
-      toast('Feindliche Armee sammelt sich!','warn');ping={x:army[0].x,y:army[0].y};pingT=3}
+      if(!MP){toast('Feindliche Armee sammelt sich!','warn');ping={x:army[0].x,y:army[0].y};pingT=3}}
   }else{
     // rally idle army in front of home
-    const rx=home.x+(bases[0].x-home.x)*.12,ry=home.y+(bases[0].y-home.y)*.12;
+    const rx=home.x+(foeB.x-home.x)*.12,ry=home.y+(foeB.y-home.y)*.12;
     for(const a of army)if(a.order.t==='idle'&&Math.hypot(a.x-rx,a.y-ry)>6)cmdMove([a],rx+(rng()-.5)*4,ry+(rng()-.5)*4,false);
   }
 }
 function mulCost(c,m){const r={};for(const k in c)r[k]=c[k]*m;return r}
-function playerTarget(from){
+function playerTarget(from,P=1){
   let best=null,bd=1e9;
-  for(const e of ents)if(!e.dead&&e.owner===0&&e.kind==='bld'){const c=center(e),d=Math.hypot(c.x-from.x,c.y-from.y)+(e.type==='tc'?-6:0)+(e.type==='farm'?8:0)+(['camp','mill','mine','market','dock'].includes(e.type)?-8:0)+(['tower','castle','wall','gate'].includes(e.type)?10:0);if(d<bd){bd=d;best=e}}
-  if(!best)for(const e of ents)if(!e.dead&&e.owner===0&&e.kind==='unit'){const d=Math.hypot(e.x-from.x,e.y-from.y);if(d<bd){bd=d;best=e}}
+  for(const e of ents)if(!e.dead&&aiFoe(P,e.owner)&&e.kind==='bld'){const c=center(e),d=Math.hypot(c.x-from.x,c.y-from.y)+(e.type==='tc'?-6:0)+(e.type==='farm'?8:0)+(['camp','mill','mine','market','dock'].includes(e.type)?-8:0)+(['tower','castle','wall','gate'].includes(e.type)?10:0);if(d<bd){bd=d;best=e}}
+  if(!best)for(const e of ents)if(!e.dead&&aiFoe(P,e.owner)&&e.kind==='unit'){const d=Math.hypot(e.x-from.x,e.y-from.y);if(d<bd){bd=d;best=e}}
   return best;
 }
 function nearWater(c,maxR){let best=null,bd=1e9;
@@ -1050,7 +1059,8 @@ function step(dt){
   for(const e of ents){if(e.dead)continue;if(e.kind==='unit')updUnit(e,dt);else if(e.kind==='bld')updBld(e,dt)}
   separate();updProj(dt);
   if(ents.some(e=>e.dead)){ents=ents.filter(e=>{if(e.dead){byId.delete(e.id);return false}return true});const before=sel.length;sel=sel.filter(e=>!e.dead);if(sel.length!==before)uiDirty=true}
-  aiTimer-=dt;if(aiTimer<=0){aiTimer=DIFF[diff].think;if(players.some(p=>p.ai))aiThink();if(window.__autoplayer)autoPlayer()}
+  if(MP){for(const pl of players)if(pl.ai&&!pl.defeated&&(pl.aiT-=dt)<=0){pl.aiT=DIFF[pl.aiDiff].think;const sv=aiS;aiS=pl.aiS;try{aiThink(pl.i)}finally{aiS=sv}}}
+  else{aiTimer-=dt;if(aiTimer<=0){aiTimer=DIFF[diff].think;if(players.some(p=>p.ai))aiThink();if(window.__autoplayer)autoPlayer()}}
   visT-=dt;if(visT<=0){visT=.2;updateVis();if(MP)simVis()}
   popT-=dt;if(popT<=0){popT=1;recalcPop();checkEnd()}
   pingT-=dt;weatherTick();
@@ -1080,6 +1090,7 @@ function checkEnd(){
         if(pl.i===LOCAL){if(players.filter(p=>!p.defeated).length>1)endGame(false,pl.left?'Du hast das Spiel verlassen.':'Dein Reich ist untergegangen.',true)}
         else toast(pl.name+(pl.left?' hat das Spiel verlassen.':' wurde besiegt.'),'warn')}}
     const alive=players.filter(p=>!p.defeated);
+    if(alive.length>1&&!alive.some(p=>!p.ai)){endGame(false,'Nur noch KI-Reiche sind übrig.');return}
     if(alive.length<=1){const w=alive[0];endGame(!!w&&w.i===LOCAL,w?(w.i===LOCAL?'Alle Gegner sind besiegt.':w.name+' hat als Letzter überlebt.'):'Kein Reich hat überlebt.')}
     return}
   for(const pl of players){
