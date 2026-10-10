@@ -3336,7 +3336,13 @@ function drawUnitRaw(g,u){
      g.fillStyle=shade(hc,-10);g.beginPath();g.ellipse(14.5,0,3.6,1.9,0,0,7);g.fill();g.fillStyle='#1c140e';g.fillRect(17,-.6,1.2,1.2);// Kopf, Nüstern
      g.fillStyle='#1e1610';g.beginPath();g.ellipse(9,0,3.5,.9,0,0,7);g.fill();// Mähne
      g.fillStyle='rgba(255,255,255,.08)';g.beginPath();g.ellipse(-2,-1.8,7,1.4,0,0,7);g.fill();
-     g.fillStyle='#3a2a1c';g.fillRect(-4,-4.4,7,8.8);g.fillStyle=pc;g.globalAlpha=.8;g.fillRect(-4,-4.4,7,1.6);g.fillRect(-4,2.8,7,1.6);g.globalAlpha=1}
+     g.fillStyle='#3a2a1c';g.fillRect(-4,-4.4,7,8.8);g.fillStyle=pc;g.globalAlpha=.8;g.fillRect(-4,-4.4,7,1.6);g.fillRect(-4,2.8,7,1.6);g.globalAlpha=1;
+     // Sattelzeug: Sattelbaum, Steigbügel, Zaumzeug mit Zügeln, Mähnensträhnen
+     g.fillStyle='#24180f';g.fillRect(-4.6,-2.6,1.6,5.2);g.fillRect(2.4,-2.2,1.4,4.4);
+     g.strokeStyle='#6a6e70';g.lineWidth=.7;g.beginPath();g.moveTo(-.5,-4.4);g.lineTo(-.5,-6);g.moveTo(-.5,4.4);g.lineTo(-.5,6);g.stroke();g.fillStyle='#8a8e90';g.fillRect(-1.3,-6.6,1.6,.8);g.fillRect(-1.3,5.8,1.6,.8);
+     g.strokeStyle='#2a1a10';g.lineWidth=.6;g.beginPath();g.moveTo(13,-1.8);g.lineTo(13,1.8);g.moveTo(13,-1.2);g.lineTo(16.5,-1);g.moveTo(13,1.2);g.lineTo(16.5,1);g.stroke();
+     g.beginPath();g.moveTo(16,-1.1);g.quadraticCurveTo(9,-3.4,2,-1.2);g.moveTo(16,1.1);g.quadraticCurveTo(9,3.4,2,1.2);g.stroke();
+     g.strokeStyle='#15100b';g.lineWidth=.7;for(let k=0;k<5;k++){const mx=6+k*1.4;g.beginPath();g.moveTo(mx,-.6);g.lineTo(mx-1.2,-1.8-(k%2)*.5+ph*.3);g.stroke()}}
     g.restore();
     const rx=x-Math.cos(a)*1,ry=y-Math.sin(a)*1-5-(u.moving?Math.abs(ph)*1.2:0);
     {const cl=ep>=2&&ep<=5?'#71767c':'#5a4a36',gr=g.createLinearGradient(rx-4,ry-4,rx+4,ry+4);gr.addColorStop(0,shade(cl,25));gr.addColorStop(1,shade(cl,-30));
