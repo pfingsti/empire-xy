@@ -1277,7 +1277,8 @@ function bldSprite(type,rep,owner){
     }
   });
 }
-function drawBld(g,b){
+function drawBld(g,b){drawBld0(g,b);if(aiS&&aiS.married&&b.type==='tc'){const x=(b.x+b.size/2)*T,y=b.y*T-30+Math.sin(gameT*3)*2;g.fillStyle='#e0546a';g.beginPath();g.moveTo(x,y+7);g.bezierCurveTo(x-10,y-1,x-5,y-8,x,y-3);g.bezierCurveTo(x+5,y-8,x+10,y-1,x,y+7);g.fill()}}
+function drawBld0(g,b){
   const D=BLD[b.type],x=b.x*T,y=b.y*T,s=b.size*T,ep=players[b.owner].epoch,pc=PCOL[b.owner];
   if(D.draw){g.save();try{D.draw(g,b,{x,y,s,lift:Math.min(12,s*.18),ep,pc,wall:WALL[ep],roof:ROOF[ep],roofHi:ROOF_HI[ep],...DRAW_API})}catch(e){}g.restore();if(!b.built)drawProg(g,b,x,y,s);return}
   const spr=bldSprite(b.type,ep,b.owner);
@@ -1529,7 +1530,8 @@ function render(){
   for(const p of proj){
     if(!vis[idx(p.x|0,p.y|0)])continue;
     const tg=byId.get(p.tid),tc=p.ground?{x:p.tx,y:p.ty}:tg?center(tg):p,rem=Math.hypot(tc.x-p.x,tc.y-p.y),prog=Math.max(0,Math.min(1,1-rem/Math.max(.01,p.arc)));
-    const lift=Math.sin(prog*Math.PI)*Math.min(p.arc,8)*T*(p.k==='ball'?.22:.12);
+    const lift=(p.k==='ball'?4*prog*(1-prog)*Math.min(p.arc,9)*T*.4:Math.sin(prog*Math.PI)*Math.min(p.arc,8)*T*.12);
+    if(p.ground){ctx.strokeStyle='rgba(255,120,80,'+(.25+.5*prog)+')';ctx.lineWidth=1.5;ctx.beginPath();ctx.ellipse(p.tx*T,p.ty*T,.9*T*(1.3-prog*.3),.45*T*(1.3-prog*.3),0,0,7);ctx.stroke();ctx.lineWidth=1}
     ctx.fillStyle='rgba(0,0,0,.25)';ctx.beginPath();ctx.ellipse(p.x*T,p.y*T,2.5,1.2,0,0,7);ctx.fill();
     const x=p.x*T,y=p.y*T-lift+4;
     if(p.k==='ball'){ctx.fillStyle=p.ep>=3?'#222':'#6b6b6b';ctx.beginPath();ctx.arc(x,y-6,p.ep>=3?3:4,0,7);ctx.fill()}
@@ -2001,6 +2003,8 @@ function diploRender(){
   $('#diploState').textContent=peace?'Waffenstillstand noch '+fmtTime(aiS.peaceUntil-gameT)+'.':aiS.attacking?'Der Gegner greift gerade an.':'Nächster Angriff frühestens in '+fmtTime(Math.max(0,aiS.nextAttack-gameT))+'.';
   $('#diploTrib').innerHTML=['food','wood','stone','gold'].map(r=>`<button class="tbtn" data-trib="${r}"${pl.res[r]<amt?' disabled':''}>${amt} ${RESN[r]}</button>`).join('');
   const pc=Math.round(400*Math.pow(1.6,aiS.peaces||0));$('#diploPeace').textContent='Waffenstillstand für '+pc+' Gold';$('#diploPeace').disabled=peace||pl.res.gold<pc;$('#diploWar').hidden=!peace;$('#diploPeace').hidden=peace;
+  $('#diploMarry').textContent='Heiratsvertrag anbieten (1000 Gold, dauerhafter Frieden)';$('#diploMarry').hidden=!!aiS.married;$('#diploMarry').disabled=pl.res.gold<1000||pl.epoch<1;$('#diploWar').textContent=aiS.married?'Heiratsvertrag brechen (Beliebtheit fällt auf 0)':'Waffenstillstand brechen (Kriegserklärung)';
+  if(aiS.married)$('#diploState').textContent='Durch Heirat verbunden. Kein Krieg, solange der Vertrag hält.';
 }
 function payTribute(r){
   const pl=players[0],n=aiS.tributes||0,amt=Math.round(100*Math.pow(1.4,n));
@@ -2013,8 +2017,11 @@ $('#diploPeace').onclick=()=>{const pl=players[0],pc=Math.round(400*Math.pow(1.6
   pl.res.gold-=pc;players[1].res.gold+=pc;aiS.peaces=(aiS.peaces||0)+1;aiS.peaceUntil=gameT+180;aiS.nextAttack=Math.max(aiS.nextAttack,aiS.peaceUntil);
   if(aiS.attacking){aiS.attacking=false;for(const e of ents)if(!e.dead&&e.owner===1&&isMil(e)){e.waveAt=null;order(e,{t:'idle'})}}
   toast('Waffenstillstand für drei Minuten geschlossen.','good');sfx('good');diploRender()};
-$('#diploWar').onclick=()=>{if(!(aiS.peaceUntil>gameT))return;aiS.peaceUntil=0;aiS.nextAttack=gameT+20;
-  for(const pl of players)if(pl.mood!=null&&pl.i===0)pl.mood=Math.max(0,pl.mood-10);
+$('#diploMarry').onclick=()=>{const pl=players[0];if(pl.res.gold<1000||aiS.married)return;pl.res.gold-=1000;players[1].res.gold+=500;aiS.married=true;aiS.peaceUntil=1e9;aiS.nextAttack=1e9;
+  if(aiS.attacking){aiS.attacking=false;for(const e of ents)if(!e.dead&&e.owner===1&&isMil(e)){e.waveAt=null;order(e,{t:'idle'})}}
+  toast('Hochzeit! Beide Häuser sind nun verbunden und führen keinen Krieg mehr gegeneinander.','good');sfx('epoch');diploRender()};
+$('#diploWar').onclick=()=>{if(!(aiS.peaceUntil>gameT))return;const wasM=aiS.married;aiS.married=false;aiS.peaceUntil=0;aiS.nextAttack=wasM?gameT:gameT+20;if(wasM){aiS.wave=(aiS.wave||4)+4;players[1].res.gold+=600;players[1].res.food+=600}
+  for(const pl of players)if(pl.mood!=null&&pl.i===0)pl.mood=wasM?0:Math.max(0,pl.mood-10);
   toast('Du hast den Krieg erklärt. Der Gegner rüstet sich zum Gegenschlag.','warn');sfx('warn');diploRender()};
 $('#btnTribute').onclick=()=>{if(!started||over)return;$('#savePanel').hidden=true;$('#diploPanel').hidden=!$('#diploPanel').hidden;diploRender()};
 setInterval(diploRender,1000);
