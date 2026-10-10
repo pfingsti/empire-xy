@@ -1796,7 +1796,7 @@ function renderMini(){
 // ================= UI =================
 let uiDirty=true,uiKey='',uiT=0;
 // ---- Klang: synthetische Platzhalter-Effekte (WebAudio), Ein/Aus über die Taste „Ton“
-let SET={vol:.8,q:2,auto:1};try{Object.assign(SET,JSON.parse(localStorage.getItem('empire-xy.set')||'{}'))}catch(e){}
+let SET={vol:.8,q:2,auto:1,vox:1};try{Object.assign(SET,JSON.parse(localStorage.getItem('empire-xy.set')||'{}'))}catch(e){}
 let actx=null,soundOn=true;try{soundOn=localStorage.getItem('empire-xy.ton')!=='0'}catch(e){}
 const sfxLast={};
 const onScreen=u=>{const sx=(u.x*T-cam.x)*cam.z,sy=(u.y*T-cam.y)*cam.z;return sx>-40&&sy>-40&&sx<viewW+40&&sy<viewH+40};
@@ -1821,10 +1821,22 @@ function toast(msg,kind){
   setTimeout(()=>{el.style.opacity='0';setTimeout(()=>el.remove(),700)},5200);
 }
 function costHTML(c){return Object.keys(c).map(k=>`<b><span class="dot" style="background:${RES_COL[k]}"></span>${c[k]}</b>`).join('')}
+// Siedlerstimmen: kurze gesprochene Antworten beim Auswählen eigener Einheiten (Web Speech, sonst Murmelton)
+const VOX={worker:['Ja?','Was gibt es zu tun?','Bereit zur Arbeit.','Jawohl.','Hier bin ich.','Wo soll ich hin?'],
+  infantry:['Zu Befehl!','Bereit!','Für das Reich!','Schwert gezogen.','Jawohl, Herr!'],ranged:['Bogen gespannt.','Ziel erfasst?','Bereit!','Wir decken euch.'],
+  cavalry:['Aufsitzen!','Die Pferde sind bereit.','Zu Befehl!','Reiter bereit!'],siege:['Geschütz bereit.','Wohin zielen wir?','Laden!'],naval:['Segel gesetzt.','Leinen los!','Aye!'],hero:['Ich führe euch!','Für Ruhm und Ehre!','Sprecht!']};
+let voxT=0,voxV=null;
+function voice(u){if(!soundOn||SET.vol<=0)return;const now=performance.now();if(now-voxT<700)return;voxT=now;
+  const lk=UNITS[u.type]&&UNITS[u.type].hero?'hero':UNITS[u.type]&&UNITS[u.type].naval?'naval':LOOK(u.type);const L=VOX[lk]||VOX.worker,txt=L[(Math.random()*L.length)|0];
+  const pitch={worker:1.1,infantry:.8,ranged:1,cavalry:.85,siege:.7,naval:.9,hero:.75}[lk]||1;
+  try{const ss=window.speechSynthesis;if(ss&&window.SpeechSynthesisUtterance){if(!voxV){const vs=ss.getVoices();voxV=vs.find(v=>/^de/i.test(v.lang))||null}
+    ss.cancel();const ut=new SpeechSynthesisUtterance(txt);ut.lang='de-DE';if(voxV)ut.voice=voxV;ut.pitch=pitch*(.9+Math.random()*.2);ut.rate=1.05;ut.volume=SET.vol;ss.speak(ut);return}}catch(e){}
+  sfx('click')}
 function select(list,add){
   if(add){for(const e of list)if(!sel.includes(e))sel.push(e)}else sel=list.slice();
   // only one non-unit or foreign thing at a time
   if(sel.length>1)sel=sel.filter(e=>e.kind==='unit'&&e.owner===0).length?sel.filter(e=>e.kind==='unit'&&e.owner===0):[sel[0]];
+  {const u=list.find(e=>e.kind==='unit'&&e.owner===0&&!e.dead);if(u&&started&&SET.vox!==0)voice(u)}
   uiDirty=true;placing=null;aMode=false;
 }
 function selKey(){return sel.map(e=>e.id).join(',')+'|'+players[0].epoch+'|'+(placing||'')+(aMode?'A':'')+'|'+(sel[0]&&sel[0].kind==='bld'?(sel[0].built?1:0):'')}
@@ -2419,13 +2431,13 @@ $('#startBtn').onclick=()=>{timeLimit=+$('#limitSel').value;useCustomMap=!!(CUST
 };
 {// Einstellungen: im Spiel und im Hauptmenü erreichbar, gespeichert im Browser
   const sv=()=>{try{localStorage.setItem('empire-xy.set',JSON.stringify(SET))}catch(e){}};let wasP=false;
-  const open=()=>{$('#setSound').checked=soundOn;$('#setVol').value=Math.round(SET.vol*100);$('#setVolN').textContent=Math.round(SET.vol*100)+' %';$('#setQ').value=SET.q;$('#setAuto').checked=!!SET.auto;
+  const open=()=>{$('#setSound').checked=soundOn;$('#setVol').value=Math.round(SET.vol*100);$('#setVolN').textContent=Math.round(SET.vol*100)+' %';$('#setQ').value=SET.q;$('#setAuto').checked=!!SET.auto;$('#setVox').checked=SET.vox!==0;
     $('#setMenu').hidden=!started||over;wasP=paused;if(started)paused=true;$('#setPanel').hidden=false};
   const close=()=>{$('#setPanel').hidden=true;if(started)paused=wasP};
   $('#btnSet').onclick=open;$('#setBtn2').onclick=open;$('#setClose').onclick=close;
   $('#setSound').onchange=e=>{soundOn=e.target.checked;try{localStorage.setItem('empire-xy.ton',soundOn?'1':'0')}catch(_){}const b=$('#btnSound');if(b)b.textContent=soundOn?'Ton an':'Ton aus'};
   $('#setVol').oninput=e=>{SET.vol=e.target.value/100;$('#setVolN').textContent=e.target.value+' %';sv()};
-  $('#setQ').onchange=e=>{SET.q=+e.target.value;sv()};$('#setAuto').onchange=e=>{SET.auto=e.target.checked?1:0;sv()};
+  $('#setQ').onchange=e=>{SET.q=+e.target.value;sv()};$('#setAuto').onchange=e=>{SET.auto=e.target.checked?1:0;sv()};$('#setVox').onchange=e=>{SET.vox=e.target.checked?1:0;sv()};
   $('#setMenu').onclick=()=>{close();$('#btnMenu').click()};
   document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('#setPanel').hidden)close();else if(e.key==='F10'){e.preventDefault();if($('#setPanel').hidden)open();else close()}});
 }
