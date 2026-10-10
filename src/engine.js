@@ -1027,7 +1027,7 @@ function checkEnd(){
   }
 }
 function endGame(win,text){
-  if(over)return;over=true;clearSave();
+  if(over)return;over=true;clearSave();XY.emit('end',API,win);
   $('#endTitle').textContent=win?'Sieg':'Niederlage';
   $('#endText').textContent=text+' Spielzeit '+fmtTime(gameT)+', erreichte Epoche: '+EPOCHS[players[0].epoch]+'.';
   const rows=[['Ausgebildet','trained'],['Gefallen / zerstört','lost'],['Besiegte Feinde','killed'],['Gesammelte Rohstoffe','gathered'],['Gebäude errichtet','built']];

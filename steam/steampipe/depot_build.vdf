@@ -1,0 +1,13 @@
+"DepotBuild"
+{
+	"DepotID"	"481"          // <- eigene Depot-ID
+	"FileMapping"
+	{
+		"LocalPath"	"*"        // alles aus ContentRoot (win-unpacked)
+		"DepotPath"	"."
+		"Recursive"	"1"
+	}
+	// Nicht mitliefern: Debug-Dateien und der Testschlüssel
+	"FileExclusion"	"*.pdb"
+	"FileExclusion"	"steam_appid.txt"
+}

@@ -7,11 +7,13 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "dist": "node ../build.js && electron-builder --win nsis",
-    "release": "node ../build.js && electron-builder --win nsis --publish always"
+    "dist": "node ../build.js && electron-builder --win nsis --x64",
+    "release": "node ../build.js && electron-builder --win nsis --x64 --publish always",
+    "dist:steam": "node ../build.js && electron-builder --win --x64 --config electron-builder.steam.js"
   },
   "dependencies": {
-    "electron-updater": "6.3.9"
+    "electron-updater": "6.3.9",
+    "steamworks.js": "0.4.0"
   },
   "devDependencies": {
     "electron": "33.2.1",
@@ -20,11 +22,49 @@
   "build": {
     "appId": "de.pfingsti.empirexy",
     "productName": "Empire XY",
-    "files": ["main.js", "preload.js", "app/**/*"],
-    "extraResources": [{"from": "update-token.txt", "to": "update-token.txt"}],
-    "directories": {"output": "../release"},
-    "win": {"target": "nsis", "signAndEditExecutable": false},
-    "nsis": {"oneClick": false, "allowToChangeInstallationDirectory": true, "createDesktopShortcut": true, "shortcutName": "Empire XY", "artifactName": "Empire-XY-Setup-${version}.exe"},
-    "publish": {"provider": "github", "owner": "pfingsti", "repo": "empire-xy", "private": true, "releaseType": "release"}
-  }
+    "files": [
+      "main.js",
+      "preload.js",
+      "steam.js",
+      "app/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "update-token.txt",
+        "to": "update-token.txt"
+      }
+    ],
+    "directories": {
+      "output": "../release"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "Empire XY",
+      "artifactName": "Empire-XY-Setup-${version}.exe"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "pfingsti",
+      "repo": "empire-xy",
+      "private": true,
+      "releaseType": "release"
+    },
+    "asarUnpack": [
+      "node_modules/steamworks.js/**/*"
+    ]
+  },
+  "steamAppId": 480
 }

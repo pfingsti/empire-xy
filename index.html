@@ -848,8 +848,15 @@ const ACH=[
   ['reich','Schatzkammer','Besitze 2000 Gold auf einmal.',p=>p.res.gold>=2000],
   ['epoche5','Aufsteiger','Erreiche die 5. Epoche.',p=>p.epoch>=4],
   ['festung','Festungsherr','Besitze 5 Türme gleichzeitig.',(p,a)=>a.ents.filter(e=>e.owner===0&&e.kind==='bld'&&e.built&&!e.dead&&/tower|sniper/.test(e.type)).length>=5],
+  ['erste_epoche','Neue Zeit','Steige zum ersten Mal in eine neue Epoche auf.',p=>p.epoch>=1&&p.epoch>(p.epStart0||0)],
+  ['rohstoffe1000','Volle Kornkammer','Sammle 1000 Rohstoffe.',p=>p.st.gathered>=1000],
+  ['zehn_gebaeude','Dorfgründer','Errichte 10 Gebäude.',p=>p.st.built>=10],
+  ['sieg','Eroberer','Gewinne eine Partie.',(p,a)=>!!a._won],
 ];
+// Steam: Errungenschaft "id" heißt dort ACH_ID (z. B. ACH_ERSTE_EPOCHE), siehe steam/STEAM.md
+const steamAch=id=>{try{window.desktop&&window.desktop.steamAchievement&&window.desktop.steamAchievement('ACH_'+id.toUpperCase())}catch(e){}};
 let got={};try{got=JSON.parse(localStorage.getItem('empire-xy.erfolge')||'{}')}catch(e){}
+for(const id in got)steamAch(id); // früher freigeschaltete auch bei Steam nachtragen
 const css=document.createElement('style');css.textContent=`#achBanner{position:fixed;top:56px;right:14px;z-index:60;background:linear-gradient(#f3d27a,#c99a2e);color:#2a1d05;border:2px solid #fff3c4;border-radius:8px;padding:8px 14px;font:600 14px sans-serif;box-shadow:0 4px 18px rgba(0,0,0,.5);transition:opacity .4s,transform .4s;pointer-events:none}
 #achBanner small{display:block;font-weight:400}
 #tutBox{position:fixed;z-index:70;max-width:300px;background:#fffbe9;color:#2a1d05;border:2px solid #c99a2e;border-radius:10px;padding:10px 12px;font:14px sans-serif;box-shadow:0 6px 22px rgba(0,0,0,.5)}
@@ -886,14 +893,17 @@ window.__tut={start(){tut=0;done=false;render()},get step(){return tut}};
 function addBtn(){const sb=document.getElementById('startBtn');if(!sb||document.getElementById('tutBtn'))return;const b=document.createElement('button');b.className='opt';b.id='tutBtn';b.textContent='Tutorial';
   b.onclick=()=>{sb.click();window.__tut.start()};sb.parentNode.appendChild(b)}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',addBtn);else setTimeout(addBtn,0);
+function check(api){const p=api.players[0];if(!p)return;
+  for(const a of ACH)if(!got[a[0]]&&a[3](p,api)){got[a[0]]=1;show(a);steamAch(a[0]);try{localStorage.setItem('empire-xy.erfolge',JSON.stringify(got))}catch(e){}}}
 EmpireXY.register({
   id:'kern-erfolge',name:'Kern: Errungenschaften und Tutorial',version:'1.0.0',core:true,
-  description:'Zwölf Errungenschaften mit Goldbanner und ein geführtes Tutorial in sechs Schritten.',
+  description:'Sechzehn Errungenschaften (auch bei Steam) mit Goldbanner und ein geführtes Tutorial in sechs Schritten.',
   hooks:{
+    start(api){api._won=false;const p=api.players[0];if(p)p.epStart0=p.epoch},
+    end(api,win){if(win){api._won=true;check(api)}},
     tick(api,dt){const p=api.players[0];if(!p)return;toastE=m=>api.toast(m,'good');
       if(tut>=0&&!done&&STEPS[tut][2]({ents:api.ents,players:api.players,sel:()=>api.sel?api.sel():[]})){done=true;render()}
-      if((api._achT=(api._achT||0)+dt)<1)return;api._achT=0;
-      for(const a of ACH)if(!got[a[0]]&&a[3](p,api)){got[a[0]]=1;show(a);try{localStorage.setItem('empire-xy.erfolge',JSON.stringify(got))}catch(e){}}
+      if((api._achT=(api._achT||0)+dt)<1)return;api._achT=0;check(api);
     },
   },
 });
@@ -2830,7 +2840,7 @@ function checkEnd(){
   }
 }
 function endGame(win,text){
-  if(over)return;over=true;clearSave();
+  if(over)return;over=true;clearSave();XY.emit('end',API,win);
   $('#endTitle').textContent=win?'Sieg':'Niederlage';
   $('#endText').textContent=text+' Spielzeit '+fmtTime(gameT)+', erreichte Epoche: '+EPOCHS[players[0].epoch]+'.';
   const rows=[['Ausgebildet','trained'],['Gefallen / zerstört','lost'],['Besiegte Feinde','killed'],['Gesammelte Rohstoffe','gathered'],['Gebäude errichtet','built']];
