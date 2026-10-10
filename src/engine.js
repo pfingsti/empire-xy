@@ -253,7 +253,7 @@ function placeBld(p,type,x,y,done){
 function canPlace(p,type,x,y){
   const d=BLD[type];
   if(x<1||y<1||x+d.size>W-1||y+d.size>H-1)return false;
-  if(d.unique&&ents.some(e=>e.type===type&&!e.dead))return false;if(d.maxEpoch!=null&&players[p].epoch>d.maxEpoch)return false;
+  if(d.unique&&ents.some(e=>e.type===type&&!e.dead&&e.owner===p))return false;if(d.maxEpoch!=null&&players[p].epoch>d.maxEpoch)return false;
   if(d.monument&&ents.some(e=>e.type===type&&!e.dead&&(e.mep??players[e.owner].epoch)===players[p].epoch))return false;
   if(d.water){const i=idx(x,y);if(terr[i]!==1||block[i]!==-1||(p===0&&!exp[i]))return false;for(const e of ents)if(e.type==='bridge'&&!e.dead&&e.x===x&&e.y===y)return false;return true}
   for(let yy=y;yy<y+d.size;yy++)for(let xx=x;xx<x+d.size;xx++){
@@ -411,6 +411,8 @@ function approach(u,t,dt){
 
 // ================= orders =================
 function order(u,o){u.order=o;u.path=null;u.pathCD=0;u.pathFor=0}
+function nextWp(u){if(u.wq&&u.wq.length){const w=u.wq.shift();order(u,{t:w.a?'amove':'move',x:w.x,y:w.y});pathToPoint(u,w.x,w.y)}}
+let shiftHeld=false;addEventListener('keydown',e=>{if(e.key==='Shift')shiftHeld=true});addEventListener('keyup',e=>{if(e.key==='Shift')shiftHeld=false});addEventListener('blur',()=>shiftHeld=false);
 function cmdMove(units,wx,wy,amove){
   const n=units.length,cols=Math.ceil(Math.sqrt(n));let k=0;
   const sorted=[...units].sort((a,b)=>Math.hypot(a.x-wx,a.y-wy)-Math.hypot(b.x-wx,b.y-wy));
@@ -547,7 +549,7 @@ function updUnit(u,dt){
       break;}
     case 'move':{
       if(!u.path){pathToPoint(u,o.x,o.y)}
-      if(follow(u,dt)){u.path=null;u.order={t:'idle'};u.scan=.2}
+      if(follow(u,dt)){u.path=null;u.order={t:'idle'};u.scan=.2;nextWp(u)}
       break;}
     case 'amove':{
       if(u.scan<=0){u.scan=.4;const e=enemyNear(u,st.sight,true);if(e){order(u,{t:'attack',target:e.id,resume:{t:'amove',x:o.x,y:o.y}});break}}
@@ -652,8 +654,8 @@ function updBld(b,dt){
     return;
   }
   const U=UNITS[q.u];
-  if(!q.started){if(pl.pop+U.pop>pl.cap){q.blocked=true;if(b.owner===0&&gameT-(b.popWarn||-99)>15){b.popWarn=gameT;toast('Bevölkerungslimit erreicht. Baue Wohnhäuser.','warn')}return}q.started=true;q.blocked=false;recalcPop()}
-  q.t+=sdt;
+  if(!q.started){if(pl.pop+U.pop>pl.cap){q.blocked=true;if(b.owner===0&&gameT-(b.popWarn||-99)>15){b.popWarn=gameT;toast('Bevölkerungslimit erreicht. Baue Wohnhäuser.','warn')}return}q.started=true;q.blocked=false;recalcPop();if(b.prio===2){const c=q.cost||U.cost;if(Object.keys(c).every(r=>pl.res[r]>=c[r])){for(const r in c)pl.res[r]-=c[r];q.boost=true}}}
+  q.t+=sdt*(q.boost?2:b.prio===.5?.5:1);
   if(q.t>=q.total){
     b.queue.shift();
     const s=freeAround(b,b.rally?{x:b.rally.x,y:b.rally.y}:null,!!U.naval);
@@ -700,6 +702,8 @@ function applyTech(pl,id){
   const t=TECHS[id],e=t.effect||{},f=pl.fx;pl.techs[id]=true;
   for(const k of ['gather','atk','hp','speed','range'])if(e[k])for(const x in e[k])f[k][x]=(f[k][x]||0)+e[k][x];
   for(const k of ['carry','build','bldHp','bldAtk'])if(e[k])f[k]+=e[k];
+  {const cls=new Set();for(const k of ['atk','hp','speed','range'])if(e[k])for(const x in e[k])cls.add(x);const gat=e.gather||e.carry,bl=e.bldHp||e.bldAtk||e.build;
+    for(const v of ents)if(!v.dead&&v.owner===pl.i&&(v.kind==='unit'?cls.has(CLS(v.type))||(gat&&v.type==='worker')||(e.build&&v.type==='worker'):v.kind==='bld'&&(bl&&(!e.bldAtk||BLD[v.type].atk)||v.type===t.at)))v.glowT=gameT+3}
   for(const u of ents)if(!u.dead&&u.owner===pl.i){
     if(u.kind==='unit'){const fr=u.hp/u.maxhp;u.maxhp=uStat(u).hp;u.hp=Math.max(1,Math.round(u.maxhp*fr))}
     else if(u.kind==='bld'&&e.bldHp){const fr=u.hp/u.maxhp;u.maxhp=Math.round(BLD[u.type].hp*(1+f.bldHp));u.hp=Math.max(1,Math.round(u.maxhp*fr))}
@@ -1592,6 +1596,14 @@ function render(){
     ctx.strokeStyle=ok?'#9ef0a0':'#ff8a7a';ctx.strokeRect(gx*T+.5,gy*T+.5,d.size*T-1,d.size*T-1);
     if(d.range){ctx.beginPath();ctx.arc((gx+d.size/2)*T,(gy+d.size/2)*T,d.range*T,0,7);ctx.setLineDash([5,5]);ctx.stroke();ctx.setLineDash([])}
   }
+  // Wegpunkte (Shift-Befehle) und Goldstaub nach Forschungen
+  ctx.save();ctx.setLineDash([6,5]);ctx.lineWidth=1.5;ctx.strokeStyle='rgba(158,240,160,.8)';
+  for(const u of sel){if(u.kind!=='unit'||u.owner!==0||!u.wq||!u.wq.length||!u.order||!(u.order.t==='move'||u.order.t==='amove'))continue;
+    ctx.beginPath();ctx.moveTo(u.x*T,u.y*T);ctx.lineTo(u.order.x*T,u.order.y*T);for(const w of u.wq)ctx.lineTo(w.x*T,w.y*T);ctx.stroke();
+    ctx.fillStyle='rgba(158,240,160,.9)';for(const w of [u.order,...u.wq]){ctx.beginPath();ctx.arc(w.x*T,w.y*T,3,0,7);ctx.fill()}}
+  ctx.restore();
+  for(const e of ents){if(!(e.glowT>gameT)||e.dead||!visibleEnt(e))continue;const c=center(e),k=(e.glowT-gameT)/3;ctx.fillStyle='rgba(255,215,90,'+(.85*k).toFixed(2)+')';
+    for(let i=0;i<10;i++){const a=i*2.4+e.id,ph=((gameT*1.3+i*.13)%1);ctx.fillRect(c.x*T+Math.cos(a)*12-1,c.y*T-ph*30+Math.sin(a)*4-1,2.5,2.5)}}
   // command marker
   if(marker&&marker.t>0){ctx.strokeStyle=marker.c;ctx.lineWidth=2;const r=(1-marker.t)*10+4;ctx.beginPath();ctx.ellipse(marker.x*T,marker.y*T,r,r*.55,0,0,7);ctx.stroke();ctx.lineWidth=1}
   // box
@@ -1774,7 +1786,8 @@ function buildInfo(){
   let h=`<h2>${bname(D,ep)}</h2><div class="sub">${own}${e.built?'':' · im Bau'}</div><div class="hp"><b data-live="hp" style="width:${e.hp/e.maxhp*100}%"></b></div><div class="stats"><span><em>Leben</em><span data-live="hpt">${Math.ceil(e.hp)}/${e.maxhp}</span></span>${D.pop?`<span><em>Bevölkerung</em>+${D.pop}</span>`:''}${D.atk?`<span><em>Angriff</em>${(D.atk*(1+.14*ep)).toFixed(0)}</span><span><em>Reichweite</em>${D.range}</span>`:''}${!e.built?`<span><em>Fortschritt</em><span data-live="prog">${Math.floor(e.prog*100)}%</span></span>`:''}</div>`;
   if(e.owner===0&&e.queue.length){h+=`<div class="queue" data-live="queue"></div>`}
   else if(e.owner===0&&trainsOf(e.type).length)h+=`<div class="hint">Keine Ausbildung in Arbeit.</div>`;
-  box.innerHTML=h;
+  if(e.owner===0&&e.built&&trainsOf(e.type).length)h+=`<label class="prio">Priorität <select id="prioSel"><option value="2"${e.prio===2?' selected':''}>Hoch (doppelt so schnell, doppelte Kosten)</option><option value="1"${!e.prio||e.prio===1?' selected':''}>Normal</option><option value=".5"${e.prio===.5?' selected':''}>Niedrig (halbe Rate)</option></select></label>`;
+  box.innerHTML=h;const ps=box.querySelector('#prioSel');if(ps)ps.onchange=()=>{e.prio=+ps.value;toast('Priorität: '+ps.options[ps.selectedIndex].text.split(' ')[0]+'.')};
 }
 function refreshInfo(){
   const box=$('#info');if(sel.length!==1)return;const e=sel[0];
@@ -1843,10 +1856,12 @@ function rightCommand(wx,wy){
   }
   const units=mine.filter(e=>e.kind==='unit');if(!units.length)return;
   if(t&&t.kind==='bld'&&t.type==='market'&&t.owner===0&&units.some(u=>u.type==='caravan')){for(const u of units)if(u.type==='caravan'){u.dest=t.id;u.leg=1;u.order={t:'idle'}}toast('Karawanenziel festgelegt.','good');marker={x:wx,y:wy,t:1,c:'#e9be72'};uiDirty=true;return}
+  if(shiftHeld&&units.every(u=>u.order&&(u.order.t==='move'||u.order.t==='amove'))){for(const u of units)(u.wq=u.wq||[]).push({x:wx,y:wy,a:aMode});marker={x:wx,y:wy,t:1,c:'#9ef0a0'};aMode=false;uiDirty=true;return}
+  for(const u of units)u.wq=[];
   if(t&&!(t.kind==='bld'&&t.type==='farm'&&units.every(u=>u.type!=='worker')&&t.owner===0)){
     cmdTarget(units,t);marker={x:wx,y:wy,t:1,c:t.owner===1?'#ff8a7a':'#e9be72'};
     // spread workers across multiple farms or trees
-  }else{cmdMove(units,wx,wy,aMode);marker={x:wx,y:wy,t:1,c:aMode?'#ff8a7a':'#9ef0a0'}}
+  }else{for(const u of units)u.wq=[];cmdMove(units,wx,wy,aMode);marker={x:wx,y:wy,t:1,c:aMode?'#ff8a7a':'#9ef0a0'}}
   aMode=false;uiDirty=true;
 }
 let wallDrag=null;
@@ -1884,7 +1899,7 @@ cv.addEventListener('pointerdown',e=>{
     return}
   if(e.button===1||(freeCam&&e.button===0)){drag={pan:true,sx:mouse.x,sy:mouse.y,cx:cam.x,cy:cam.y};return}
   if(freeCam)return;
-  if(e.button===2){if(placing){placing=null;wallDrag=null;uiDirty=true;return}rightCommand(w.x,w.y);return}
+  if(e.button===2){shiftHeld=e.shiftKey;if(placing){placing=null;wallDrag=null;uiDirty=true;return}rightCommand(w.x,w.y);return}
   if(e.button===0){
     if(placing&&BLD[placing].line){wallDrag={x:Math.floor(w.x),y:Math.floor(w.y)};return}
     if(placing){tryPlace(w.x,w.y,e.shiftKey);return}
@@ -2242,6 +2257,7 @@ function autoPlayer(){ // lets the player side be run by the same AI for soak te
   const a=aiS;aiS=window.__ai0||(window.__ai0={t:0,nextAttack:DIFF[diff].firstAttack,wave:DIFF[diff].wave,attacking:false});
   try{aiThink()}finally{window.__ai0=aiS;aiS=a;for(const e of ents)swap(e);players=save;players[0].i=0;players[1].i=1;bases=b}
 }
+window.__rc=(x,y,sh)=>{shiftHeld=!!sh;rightCommand(x,y);shiftHeld=false};
 window.__ex={start:(d,s)=>{newGame(d,s);started=true},step:n=>{for(let i=0;i<n&&!over;i++)step(DT)},select:a=>select(a),get:()=>({t:gameT,over,players,ents})};
 window.__spawn=(p,t,x,y)=>spawnUnit(p,t,x,y);window.__reveal=()=>{exp.fill(1);vis.fill(1)};window.__place=(p,t,x,y)=>placeBld(p,t,x,y,true);window.__can=(p,t,x,y)=>canPlace(p,t,x,y);window.__water=(x,y)=>terr[idx(x|0,y|0)]===1;window.__cam=(x,y)=>{cam.x=x*T;cam.y=y*T};window.__move=(u,x,y)=>cmdMove([u],x,y,false);window.__limit=m=>{timeLimit=m};window.__placeU=(p,t,x,y)=>placeBld(p,t,x,y,false);
 })();
