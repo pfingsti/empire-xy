@@ -969,8 +969,14 @@ const API={
 };
 // ================= main step =================
 let aiTimer=0,popT=0;
+let pathT=0;
+function wearPaths(){// Trampelpfade: wo oft gelaufen wird, wird das Gras zu Erde
+  const g=terrC.getContext('2d');g.save();
+  for(const u of ents){if(u.dead||u.kind!=='unit'||!u.moving||UNITS[u.type].naval)continue;const i=idx(u.x|0,u.y|0);if(terr[i]===1)continue;
+    g.fillStyle='rgba(112,92,62,.045)';g.beginPath();g.ellipse(u.x*T,u.y*T+4,5,3,0,0,7);g.fill()}
+  g.restore()}
 function step(dt){
-  gameT+=dt;
+  gameT+=dt;if((pathT+=dt)>=.5){pathT=0;wearPaths()}
   for(const e of ents){if(e.dead)continue;if(e.kind==='unit')updUnit(e,dt);else if(e.kind==='bld')updBld(e,dt)}
   separate();updProj(dt);
   if(ents.some(e=>e.dead)){ents=ents.filter(e=>{if(e.dead){byId.delete(e.id);return false}return true});const before=sel.length;sel=sel.filter(e=>!e.dead);if(sel.length!==before)uiDirty=true}
