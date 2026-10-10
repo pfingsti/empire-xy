@@ -44,7 +44,7 @@ const XY={
         if(m.nodes)for(const k in m.nodes)XY.nodes[k]=copyDef(m.nodes[k]);
         if(m.epochs)for(const e of m.epochs)XY.epochs.push({...e,cost:e.cost?{...e.cost}:null});
         if(m.units)for(const k in m.units)XY.units[k]=copyDef(m.units[k]);
-        if(m.buildings)for(const k in m.buildings)XY.buildings[k]=copyDef(m.buildings[k]);
+        if(m.buildings)for(const k in m.buildings)XY.buildings[k]=XY.buildings[k]&&!m.buildings[k].name?Object.assign(XY.buildings[k],copyDef(m.buildings[k])):copyDef(m.buildings[k]);
         if(m.techs)for(const k in m.techs)XY.techs[k]=copyDef(m.techs[k]);
         if(m.patch)m.patch(XY);
         if(m.hooks)for(const h in m.hooks)(XY.hooks[h]=XY.hooks[h]||[]).push(m.hooks[h]);

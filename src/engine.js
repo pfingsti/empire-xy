@@ -611,9 +611,9 @@ function updBld(b,dt){
   if(D.atk){
     b.cd-=dt;
     if(b.cd<=0){
-      let best=null,bd=D.range;
+      let best=null,bd=D.range*(b.upg?1.5:1);
       for(const e of ents){if(e.kind!=='unit'||e.dead||e.owner===b.owner||hidden(e))continue;const c=center(b),d=Math.hypot(e.x-c.x,e.y-c.y)-b.size/2;if(d<bd){bd=d;best=e}}
-      if(best){b.cd=D.rate;const c=center(b);proj.push({x:c.x,y:c.y-.6,tid:best.id,dmg:D.atk*(1+.14*pl.epoch)*(1+pl.fx.bldAtk),src:b.id,k:'arrow',ep:pl.epoch,sp:14,arc:bd})}
+      if(best){b.cd=D.rate*(b.upg?.6:1);const c=center(b);proj.push({x:c.x,y:c.y-.6,tid:best.id,dmg:D.atk*(1+.14*pl.epoch)*(1+pl.fx.bldAtk),src:b.id,k:'arrow',ep:pl.epoch,sp:14,arc:bd})}
     }
   }
   const q=b.queue[0];if(!q)return;const sdt=(b.sabotUntil>gameT?dt*.5:dt)*(players[b.owner].crowdMul||1)*(players[b.owner].monProd||1)*(SEASON===3?.8:1);// sabotiert: halbe Produktion
@@ -933,7 +933,7 @@ function findSpot(p,type,near,minR,maxR){
 // ================= module API =================
 const API={
   get ents(){return ents},income(pl,r,v){income(pl,r,v)},get players(){return players},get time(){return gameT},
-  spawnUnit,uCost,get gate(){return gate},idx,W,placeBld,toast,damage,order,applyTech,techState,center,distEnt,alive,isMil,uStat,
+  spawnUnit,uCost,water:(x,y)=>inb(x|0,y|0)&&terr[idx(x|0,y|0)]===1,get gate(){return gate},idx,W,placeBld,toast,damage,order,applyTech,techState,center,distEnt,alive,isMil,uStat,
   heal(e,amt){e.hp=Math.min(e.maxhp,e.hp+amt)},
   revealAll(){exp.fill(1)},
   fx(x,y,k){fx.push({x,y,t:0,k:k||'hit'})},
