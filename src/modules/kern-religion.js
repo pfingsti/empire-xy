@@ -10,12 +10,20 @@ function priest(g,u,a){
   g.strokeStyle='#7a5530';g.lineWidth=1.4;g.beginPath();g.moveTo(x+7,y+8);g.lineTo(x+7,y-10+bob);g.stroke();
   if(u.convT>0){g.strokeStyle='rgba(242,207,79,'+(.4+.4*Math.sin(a.time*8))+')';g.lineWidth=1.5;g.beginPath();g.arc(x,y,11+u.convT*2,0,7);g.stroke()}
 }
-function boat(g,u,a){
-  const T=a.T,x=u.x*T,y=u.y*T,pc=a.PCOL[u.owner];
-  g.save();g.translate(x,y);g.rotate(u.ang||0);
-  g.fillStyle='#6b4a2a';g.beginPath();g.moveTo(-10,-4);g.lineTo(8,-4);g.lineTo(12,0);g.lineTo(8,4);g.lineTo(-10,4);g.closePath();g.fill();
-  g.fillStyle='#8a6a40';g.fillRect(-8,-2,14,4);g.fillStyle=pc;g.fillRect(-2,-2,3,4);
-  g.strokeStyle='rgba(230,230,220,.6)';g.lineWidth=.8;g.beginPath();g.moveTo(2,0);g.lineTo(-14,-9);g.moveTo(2,0);g.lineTo(-14,9);g.stroke();
+function boat(g,u,a){// Fischerboot in Seitenansicht: Einbaum mit Paddel, später Kahn mit Lateinsegel, Fischer und Netz
+  const T=a.T,x=u.x*T,y=u.y*T,pc=a.PCOL[u.owner],ep=a.epochOf(u.owner),dir=Math.cos(u.ang||0)>=0?1:-1,t=a.time,bob=Math.sin(t*1.8+u.id)*.6;
+  g.save();g.translate(x,y+3);g.fillStyle='rgba(10,30,45,.28)';g.beginPath();g.ellipse(0,1.4,12,2,0,0,7);g.fill();
+  if(u.moving){g.strokeStyle='rgba(230,240,240,.4)';g.lineWidth=.7;g.beginPath();g.moveTo(-dir*10,1);g.lineTo(-dir*18,2.4);g.stroke()}
+  g.scale(dir,1);g.translate(0,bob);
+  const hg=g.createLinearGradient(0,-4,0,1);hg.addColorStop(0,'#9a7650');hg.addColorStop(1,'#4a3220');g.fillStyle=hg;
+  g.beginPath();g.moveTo(-11,-3.4);g.lineTo(9,-3.4);g.quadraticCurveTo(12.5,-4.4,12,-5);g.quadraticCurveTo(11,0,7,1);g.lineTo(-8,1);g.quadraticCurveTo(-11,.4,-11,-3.4);g.fill();
+  g.fillStyle='rgba(30,18,8,.4)';g.fillRect(-10,-2,19,.5);g.fillStyle=pc;g.fillRect(-9,-3.4,3,1);
+  // Fischer am Heck
+  g.save();g.translate(-5,0);g.fillStyle='#5a4a36';g.fillRect(-1.6,-9,3.2,5.6);g.fillStyle='#c49a76';g.beginPath();g.arc(0,-10.4,1.6,0,7);g.fill();g.fillStyle=ep>=1?'#b8984a':'#3a2a1c';g.beginPath();g.ellipse(0,-11.4,ep>=1?2.6:1.6,.8,0,0,7);g.fill();
+  g.restore();
+  if(ep===0){const w=Math.sin(t*3+u.id)*.5;g.strokeStyle='#6b4a2a';g.lineWidth=.8;g.beginPath();g.moveTo(1,-7);g.lineTo(-5+w*4,1.4);g.stroke()}
+  else{g.strokeStyle='#3a2a1a';g.lineWidth=.8;g.beginPath();g.moveTo(4,-3.4);g.lineTo(4,-18);g.stroke();g.fillStyle='rgba(226,214,184,.92)';g.beginPath();g.moveTo(4,-18.6);g.quadraticCurveTo(0,-11,-6,-4.4);g.lineTo(4,-4.4);g.closePath();g.fill();g.strokeStyle='rgba(90,70,40,.5)';g.lineWidth=.4;g.beginPath();g.moveTo(4,-18.6);g.lineTo(-6,-4.4);g.stroke()}
+  if(u.working||!u.moving){g.strokeStyle='rgba(200,190,160,.6)';g.lineWidth=.35;g.beginPath();g.moveTo(-6,-3);g.quadraticCurveTo(-11,0,-14,2);g.moveTo(-6,-3);g.quadraticCurveTo(-9,1,-10,2.4);g.stroke();for(let k=0;k<3;k++){g.fillStyle='#c8a050';g.beginPath();g.arc(-11+k*1.6,2+(k%2)*.4,.5,0,7);g.fill()}}
   g.restore();
 }
 const D=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
@@ -27,7 +35,7 @@ EmpireXY.register({
       hp:45,atk:0,range:.5,rate:9,speed:1.4,sight:8,cost:{gold:100},time:18,r:.27,pop:1,draw:priest,
       desc:'Steht er 6 Sekunden still neben einer feindlichen Einheit (bis 4 Felder), läuft sie zu dir über. Helden, Schiffe und Belagerung widerstehen.'},
     fishboat:{label:'Fischerboot',from:'dock',cls:'ship',naval:true,civil:true,ai:false,minEpoch:0,names:['Einbaum','Fischerboot','Fischerboot','Fischerboot','Fischerboot','Kutter','Kutter','Trawler','Trawler','Fangschiff'],
-      hp:60,atk:0,range:.5,rate:9,speed:1.8,sight:6,cost:{wood:60},time:12,r:.35,pop:1,draw:boat,
+      hp:60,atk:0,range:.5,rate:9,speed:1.8,sight:6,cost:{wood:60},time:12,r:.35,pop:1,noShadow:true,draw:boat,
       desc:'Fängt auf dem Wasser bis 12 Felder um den eigenen Hafen von selbst Nahrung.'},
   },
   hooks:{
