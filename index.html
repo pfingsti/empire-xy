@@ -2860,7 +2860,7 @@ function grade(c,sat,grain,seed){const g=c.getContext('2d'),W2=c.width,H2=c.heig
 function sprite(key,w,h,fn){
   let c=SPR.get(key);if(c)return c;
   c=document.createElement('canvas');c.width=w*SS;c.height=h*SS;const g=c.getContext('2d');g.scale(SS,SS);g.lineJoin='round';fn(g);
-  if(key.startsWith('b|'))grade(c,.8,14,key.length*31);else if(key.startsWith('tree'))grade(c,.82,12,key.length*17);
+  if(key.startsWith('b|'))grade(c,.8,14,key.length*31);else if(key.startsWith('stone')||key.startsWith('gold'))grade(c,.85,16,key.length*5);else if(key.startsWith('tree'))grade(c,.82,12,key.length*17);
   c.lw=w;c.lh=h;SPR.set(key,c);return c;
 }
 function hex2rgb(h){if(h[0]!=='#')return[128,128,128];const n=parseInt(h.slice(1),16);return[n>>16,n>>8&255,n&255]}
@@ -2905,17 +2905,22 @@ function bushSprite(v){return sprite('bush'+(v*4|0),32,32,g=>{
   for(const [x,y,r] of [[10,17,7],[22,16,7],[16,11,7],[16,19,7]])blob(g,x,y,r,'#5f9a3e','#3d7029','#244a19');})}
 function rockSprite(kind,v){return sprite(kind+(v*3|0),40,36,g=>{
   const r=mulberry32((v*3|0)+(kind==='gold'?11:5));const gold=kind==='gold';
-  g.fillStyle='rgba(0,0,0,.3)';g.beginPath();g.ellipse(21,28,16,6,0,0,7);g.fill();
-  const rocks=[[12,22,8],[26,21,9],[19,15,8],[30,26,6],[9,27,5]];
+  g.fillStyle='rgba(10,12,8,.32)';g.beginPath();g.ellipse(22,29,17,6.5,0,0,7);g.fill();
+  const rocks=[[19,15,8],[12,22,8],[26,21,9],[30,26,6],[9,27,5]];
   for(const [x,y,s] of rocks){
-    const top=gold?'#a59b86':'#b9c0c6',side=gold?'#7a7060':'#8a9299',dark=gold?'#544c40':'#5f666c';
-    const pts=[[x-s,y+s*.4],[x-s*.7,y-s*.6],[x+s*.1,y-s*.95],[x+s*.9,y-s*.35],[x+s,y+s*.45],[x+s*.2,y+s*.75]];
-    g.fillStyle=dark;g.beginPath();pts.forEach((p,i)=>i?g.lineTo(p[0],p[1]+1):g.moveTo(p[0],p[1]+1));g.closePath();g.fill();
-    g.fillStyle=side;g.beginPath();pts.forEach((p,i)=>i?g.lineTo(p[0],p[1]):g.moveTo(p[0],p[1]));g.closePath();g.fill();
-    g.fillStyle=top;g.beginPath();g.moveTo(pts[1][0],pts[1][1]);g.lineTo(pts[2][0],pts[2][1]);g.lineTo(pts[3][0],pts[3][1]);g.lineTo(x+s*.1,y+s*.05);g.lineTo(x-s*.5,y+s*.1);g.closePath();g.fill();
-    g.strokeStyle='rgba(0,0,0,.25)';g.lineWidth=.8;g.beginPath();g.moveTo(x+s*.1,y+s*.05);g.lineTo(x+s*.2,y+s*.75);g.stroke();
-    if(gold){for(let k=0;k<3;k++){const gx=x+(r()-.5)*s*1.2,gy=y+(r()-.6)*s*.9;g.fillStyle='#f6d35a';g.beginPath();g.arc(gx,gy,1.4+r()*1.4,0,7);g.fill();g.fillStyle='#fff6c8';g.fillRect(gx-.5,gy-.8,1,1)}}
-    else{g.fillStyle='rgba(255,255,255,.25)';g.fillRect(x-s*.3,y-s*.5,2,1)}
+    const base=gold?[118,106,88]:[128,126,118],n=9,pts=[];
+    for(let k=0;k<n;k++){const a=-Math.PI+k/n*Math.PI*2,rr=s*(.78+r()*.32);pts.push([x+Math.cos(a)*rr,y+Math.sin(a)*rr*.72])}
+    const rgb=(m)=>`rgb(${base.map(c=>Math.max(0,Math.min(255,c*m|0))).join(',')})`;
+    const gr=g.createLinearGradient(x-s,y-s,x+s*.8,y+s);gr.addColorStop(0,rgb(1.28));gr.addColorStop(.45,rgb(1));gr.addColorStop(1,rgb(.55));
+    g.fillStyle=rgb(.45);g.beginPath();pts.forEach((p,i)=>i?g.lineTo(p[0],p[1]+1.2):g.moveTo(p[0],p[1]+1.2));g.closePath();g.fill();
+    g.fillStyle=gr;g.beginPath();pts.forEach((p,i)=>i?g.lineTo(p[0],p[1]):g.moveTo(p[0],p[1]));g.closePath();g.fill();
+    // Facetten und Risse
+    g.fillStyle='rgba(255,255,255,.10)';g.beginPath();g.moveTo(pts[1][0],pts[1][1]);g.lineTo(pts[3][0],pts[3][1]);g.lineTo(x+s*.15,y);g.closePath();g.fill();
+    g.strokeStyle='rgba(20,18,14,.35)';g.lineWidth=.7;for(let k=0;k<2;k++){const sx=x+(r()-.5)*s,sy=y+(r()-.6)*s*.6;g.beginPath();g.moveTo(sx,sy);g.lineTo(sx+(r()-.5)*s*.8,sy+r()*s*.5);g.stroke()}
+    // Moos und Flechten
+    g.fillStyle='rgba(78,96,52,.45)';for(let k=0;k<3;k++){g.beginPath();g.ellipse(x+(r()-.5)*s*1.1,y+s*.25+(r()-.5)*s*.3,1.5+r()*2,1+r(),0,0,7);g.fill()}
+    if(gold){g.strokeStyle='rgba(214,176,72,.85)';g.lineWidth=.9;for(let k=0;k<3;k++){let gx=x+(r()-.5)*s,gy=y+(r()-.7)*s*.7;g.beginPath();g.moveTo(gx,gy);for(let q=0;q<3;q++){gx+=(r()-.3)*3.5;gy+=(r()-.4)*2.5;g.lineTo(gx,gy)}g.stroke()}
+      g.fillStyle='rgba(255,236,160,.8)';for(let k=0;k<4;k++)g.fillRect(x+(r()-.5)*s,y+(r()-.7)*s*.7,.9,.9)}
   }})}
 
 function drawRes(g,r){
