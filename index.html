@@ -2002,6 +2002,11 @@ function renderTerrain(){
     for(let y=1;y<H-1;y++)for(let x=1;x<W-1;x++){if(terr[idx(x,y)]===1)continue;
       const nb=[[1,0],[-1,0],[0,1],[0,-1]].filter(([a,b])=>terr[idx(x+a,y+b)]===1);if(!nb.length)continue;
       for(const [a,b] of nb){const ex=(x+.5+a*.45)*T,ey=(y+.5+b*.45)*T;g.fillStyle='rgba(70,62,46,.35)';g.beginPath();g.ellipse(ex,ey,b?T*.5:T*.12,a?T*.5:T*.12,0,0,7);g.fill()}
+      if(rr()<.18){// feuchte Pfütze mit Himmelsspiegelung und dunklem Schlammrand
+        const px=(x+.5-nb[0][0]*.15)*T+(rr()-.5)*T*.4,py=(y+.5-nb[0][1]*.15)*T+(rr()-.5)*T*.4,rw=3+rr()*4;
+        g.fillStyle='rgba(60,48,32,.5)';g.beginPath();g.ellipse(px,py,rw+1.5,rw*.55+1,0,0,7);g.fill();
+        g.fillStyle='rgba(120,145,160,.75)';g.beginPath();g.ellipse(px,py,rw,rw*.55,0,0,7);g.fill();
+        g.fillStyle='rgba(230,240,245,.4)';g.beginPath();g.ellipse(px-rw*.3,py-rw*.15,rw*.35,rw*.12,0,0,7);g.fill()}
       if(rr()<.55){const [a,b]=nb[0];for(let k=0;k<7;k++){const bx=(x+.5+a*.3)*T+(rr()-.5)*T*(b?1:.4),byy=(y+.5+b*.3)*T+(rr()-.5)*T*(a?1:.4),h=5+rr()*7;
         g.strokeStyle=rr()<.5?'#5e6a3a':'#7a7a46';g.lineWidth=.9;g.beginPath();g.moveTo(bx,byy);g.quadraticCurveTo(bx+1,byy-h*.6,bx+(rr()-.3)*3,byy-h);g.stroke();
         if(rr()<.25){g.fillStyle='#5a4128';g.fillRect(bx-.8+(rr()-.5)*2,byy-h-3,1.6,3.5)}}}}}
