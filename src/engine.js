@@ -1423,7 +1423,7 @@ function drawProg(g,b,x,y,s){g.fillStyle='rgba(0,0,0,.6)';g.fillRect(x+4,y+s-8,s
 
 // ---------- units (animated, drawn live)
 const SKIN='#d6ab7f';
-const DRAW_API={T,PCOL,PCOL_DK,SKIN,shade,blob,get time(){return gameT},epochOf:p=>players[p].epoch};
+const DRAW_API={T,PCOL,PCOL_DK,SKIN,shade,blob,sprite,hall,hipRoof,bshadow,banner,wallFace,door,MAT,get time(){return gameT},epochOf:p=>players[p].epoch};
 function legs(g,x,y,a,moving,anim,col){
   col='#2a241c';const ph=moving?Math.sin(gameT*13+anim)*3:0,px=-Math.sin(a),py=Math.cos(a),fx=Math.cos(a),fy=Math.sin(a);
   g.fillStyle=col;
@@ -2429,5 +2429,5 @@ function autoPlayer(){ // lets the player side be run by the same AI for soak te
 }
 window.__rc=(x,y,sh)=>{shiftHeld=!!sh;rightCommand(x,y);shiftHeld=false};
 window.__ex={start:(d,s)=>{newGame(d,s);started=true},step:n=>{for(let i=0;i<n&&!over;i++)step(DT)},select:a=>select(a),get:()=>({t:gameT,over,players,ents})};
-window.__spawn=(p,t,x,y)=>spawnUnit(p,t,x,y);window.__reveal=()=>{exp.fill(1);vis.fill(1)};window.__place=(p,t,x,y)=>placeBld(p,t,x,y,true);window.__can=(p,t,x,y)=>canPlace(p,t,x,y);window.__water=(x,y)=>terr[idx(x|0,y|0)]===1;window.__cam=(x,y)=>{cam.x=x*T;cam.y=y*T};window.__move=(u,x,y)=>cmdMove([u],x,y,false);window.__limit=m=>{timeLimit=m};window.__placeU=(p,t,x,y)=>placeBld(p,t,x,y,false);
+window.__bldDraw=(t,g,x,y,ep,o)=>{const D=BLD[t],s=D.size*T;D.draw(g,{type:t,owner:o,built:true,size:D.size},{x,y,s,lift:Math.min(12,s*.18),ep,pc:PCOL[o],wall:WALL[ep],roof:ROOF[ep],roofHi:ROOF_HI[ep],...DRAW_API})};window.__spawn=(p,t,x,y)=>spawnUnit(p,t,x,y);window.__reveal=()=>{exp.fill(1);vis.fill(1)};window.__place=(p,t,x,y)=>placeBld(p,t,x,y,true);window.__can=(p,t,x,y)=>canPlace(p,t,x,y);window.__water=(x,y)=>terr[idx(x|0,y|0)]===1;window.__cam=(x,y)=>{cam.x=x*T;cam.y=y*T};window.__move=(u,x,y)=>cmdMove([u],x,y,false);window.__limit=m=>{timeLimit=m};window.__placeU=(p,t,x,y)=>placeBld(p,t,x,y,false);
 })();
