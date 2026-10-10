@@ -231,7 +231,7 @@ function newGame(d,seed,mp){
   aiTimer=0;popT=0;pathT=0;visT=0;SEASON=0;lastAlarm=-99;
   syncRegistry();
   rng=mulberry32(seed);diff=d;curSeed=seed;
-  ents=[];corpses=[];byId=new Map();nextId=1;block=new Int32Array(W*H);gate=new Uint8Array(W*H);terr=new Uint8Array(W*H);vis=new Uint8Array(W*H);exp=new Uint8Array(W*H);
+  ents=[];corpses=[];stumpDecals=[];byId=new Map();nextId=1;block=new Int32Array(W*H);gate=new Uint8Array(W*H);terr=new Uint8Array(W*H);vis=new Uint8Array(W*H);exp=new Uint8Array(W*H);
   proj=[];fx=[];sel=[];gameT=0;capT.length=0;over=false;placing=null;aMode=false;groups={};
   players=MP?MP.players.map((p,i)=>Object.assign(newPlayer(i,!!p.ai),{name:p.name},p.ai?{aiDiff:Math.max(0,Math.min(2,p.diff|0)),aiT:0}:{})):[newPlayer(0,false),newPlayer(1,true)];
   genMap();renderTerrain();
@@ -276,8 +276,12 @@ function spawnUnit(p,type,x,y){
   const u=addEnt({kind:'unit',type,owner:p,x,y,r:d.r,hp:0,cd:0,ang:[-Math.PI*.25,Math.PI*.75,Math.PI*.25,-Math.PI*.75][p]??0,order:{t:'idle'},path:null,pathCD:0,carry:0,ct:null,scan:rng()*.5,anim:rng()*6});
   u.hp=uStat(u).hp;u.maxhp=u.hp;return u;
 }
+// Baumstumpf: angefällter Baum. Darauf darf gebaut werden, der Stumpf verschwindet dann
+function stumpAt(i){const id=block[i];if(id<=0)return null;const e=byId.get(id);return e&&!e.dead&&e.kind==='res'&&e.type==='tree'&&e.amount<e.max?e:null}
 function placeBld(p,type,x,y,done){
   const d=BLD[type];
+  if(!d.water)for(let yy=y;yy<y+d.size;yy++)for(let xx=x;xx<x+d.size;xx++){const st=inb(xx,yy)&&stumpAt(idx(xx,yy));if(st)kill(st)}
+  if(!d.water&&stumpDecals.length)stumpDecals=stumpDecals.filter(t=>t.x<x||t.x>=x+d.size||t.y<y||t.y>=y+d.size);
   const b=addEnt({kind:'bld',type,owner:p,x,y,size:d.size,built:!!done,prog:done?1:0,hp:done?Math.round(d.hp*(1+players[p].fx.bldHp)):1,maxhp:Math.round(d.hp*(1+players[p].fx.bldHp)),queue:[],rally:null,cd:0,seen:p===LOCAL});
   if(!d.walk)for(let yy=y;yy<y+d.size;yy++)for(let xx=x;xx<x+d.size;xx++){block[idx(xx,yy)]=b.id;if(d.gate)gate[idx(xx,yy)]=p+1}
   // push units out of the footprint
@@ -291,7 +295,7 @@ function canPlace(p,type,x,y){
   if(d.monument&&ents.some(e=>e.type===type&&!e.dead&&(e.mep??players[e.owner].epoch)===players[p].epoch))return false;
   if(d.water){const i=idx(x,y);if(terr[i]!==1||block[i]!==-1||(p===ME&&!CMDX&&!exp[i]))return false;for(const e of ents)if(e.type==='bridge'&&!e.dead&&e.x===x&&e.y===y)return false;return true}
   for(let yy=y;yy<y+d.size;yy++)for(let xx=x;xx<x+d.size;xx++){
-    const i=idx(xx,yy);if(block[i]!==0||terr[i]===1)return false;
+    const i=idx(xx,yy);if((block[i]!==0&&!stumpAt(i))||terr[i]===1)return false;
     if(p===ME&&!CMDX&&!exp[i])return false;
     for(const e of ents)if(e.kind==='bld'&&BLD[e.type].walk&&!e.dead&&xx>=e.x&&xx<e.x+e.size&&yy>=e.y&&yy<e.y+e.size)return false;
   }
@@ -529,7 +533,7 @@ function damage(t,dmg,src){if(src&&src.kind==='unit'&&WX.night>.5)dmg*=.8;if(src
   if(t.hp<=0)kill(t,src);
 }
 let lastAlarm=-99,ping=null,pingT=0;
-let corpses=[];
+let corpses=[],stumpDecals=[];// stumpDecals: Stümpfe ganz gefällter Bäume, nur Grafik, blockieren nichts
 function kill(e,src){
   e.dead=true;
   const mech=e.kind==='unit'&&UNITS[e.type]&&(UNITS[e.type].air||CLS(e.type)==='vehicle');
@@ -542,7 +546,7 @@ function kill(e,src){
     if(e.queue.some(q=>q.ep))players[e.owner].advancing=false;
     for(let k=0;k<6;k++)fx.push({x:e.x+rng()*e.size,y:e.y+rng()*e.size,t:-k*.1,k:'smoke'});
     if(e.type==='wonder')players[e.owner].wonderT=-1;
-  }else if(e.kind==='res'){block[idx(e.x,e.y)]=0}
+  }else if(e.kind==='res'){block[idx(e.x,e.y)]=0;if(e.type==='tree'&&e.amount<=.001){stumpDecals.push({x:e.x,y:e.y});if(stumpDecals.length>500)stumpDecals.shift()}}
   else{fx.push({x:e.x,y:e.y,t:0,k:'die',c:PCOL[e.owner]})}
   if(e.owner>=0&&e.kind!=='res'){players[e.owner].st.lost++;if(src&&src.owner>=0)players[src.owner].st.killed++}
   recalcPop();
@@ -1718,6 +1722,7 @@ function render(){
     const sx=tx*T+(h%23),sy=ty*T+((h>>5)%27);ctx.strokeStyle=`rgba(225,245,250,${al})`;ctx.lineWidth=1.4;ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(sx+6,sy-1);ctx.stroke();
   }
   ctx.lineCap='butt';
+  if(stumpDecals.length){const sp=stumpSprite();for(const t of stumpDecals)if(t.x>=tx0&&t.x<=tx1&&t.y>=ty0&&t.y<=ty1&&exp[idx(t.x,t.y)])ctx.drawImage(sp,t.x*T,t.y*T,32,32)}
   const list=[];
   for(const e of ents){
     if(e.dead)continue;const s=e.size||1;
@@ -2465,7 +2470,7 @@ function loadGame(d){
     if(e.kind==='unit')e.path=null;
     if(e.kind==='bld')e.queue=e.queue.filter(q=>q.ep||(q.tech&&TECHS[q.tech])||(q.u&&UNITS[q.u]));}
   nextId=d.nextId;bases=d.bases;aiS=d.aiS;players=d.players;gameT=d.gameT;capT.length=0;
-  proj=[];fx=[];sel=[];over=false;placing=null;aMode=false;groups={};
+  proj=[];fx=[];sel=[];stumpDecals=[];over=false;placing=null;aMode=false;groups={};
   renderTerrain();recalcPop();updateVis(true);
   if(d.cam){zoomT=0;cam.z=d.cam.z;cam.x=d.cam.x;cam.y=d.cam.y;clampCam()}
   XY.emit('load',API,d);
