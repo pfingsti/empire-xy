@@ -68,11 +68,17 @@ function setupUpdater(){
   autoUpdater.autoInstallOnAppQuit=true;
   autoUpdater.on('update-available',i=>send('update',{state:'available',version:i.version}));
   autoUpdater.on('download-progress',p=>send('update',{state:'progress',percent:p.percent}));
-  autoUpdater.on('update-downloaded',i=>send('update',{state:'ready',version:i.version}));
+  // Beim Start gefundene Updates werden sofort still installiert und das Spiel neu gestartet,
+  // später gefundene erst beim Beenden (damit keine laufende Partie unterbrochen wird).
+  const startedAt=Date.now();
+  autoUpdater.on('update-downloaded',i=>{
+    send('update',{state:'ready',version:i.version});
+    if(Date.now()-startedAt<3*60*1000)setTimeout(()=>autoUpdater.quitAndInstall(true,true),1500);
+  });
   autoUpdater.on('error',e=>console.log('Update-Fehler:',e&&e.message));
   const check=()=>autoUpdater.checkForUpdates().catch(()=>{});
-  setTimeout(check,5000);
-  setInterval(check,30*60*1000); // alle 30 Minuten im Hintergrund nachsehen
+  check(); // bei jedem Start sofort prüfen
+  setInterval(check,30*60*1000); // danach alle 30 Minuten im Hintergrund nachsehen
 }
 ipcMain.on('update-install',()=>autoUpdater.quitAndInstall());
 
