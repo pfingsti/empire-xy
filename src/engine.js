@@ -281,7 +281,7 @@ const alive=e=>e&&!e.dead;
 function canAfford(p,c){for(const k in c)if(players[p].res[k]<c[k])return false;return true}
 function pay(p,c){for(const k in c)players[p].res[k]-=c[k]}
 // Einkommen je Rohstoff der letzten 60 Sekunden (für die Anzeige oben)
-function income(pl,r,v){(pl.inc=pl.inc||[]).push([gameT,r,v])}
+function income(pl,r,v){(pl.tot=pl.tot||{})[r]=(pl.tot[r]||0)+v;(pl.inc=pl.inc||[]).push([gameT,r,v])}
 function incomeRate(pl,r){if(!pl.inc)return 0;while(pl.inc.length&&pl.inc[0][0]<gameT-60)pl.inc.shift();let s=0;for(const x of pl.inc)if(x[1]===r)s+=x[2];return Math.round(s*60/Math.min(60,Math.max(10,gameT)))}
 function refund(p,c){for(const k in c)players[p].res[k]+=c[k]}
 function costOf(type){return UNITS[type]?UNITS[type].cost:BLD[type].cost}
@@ -425,6 +425,7 @@ function cmdTarget(units,t,force){
   let moved=[];
   for(const u of units){
     if(t.kind==='res'){if(u.type==='worker')order(u,{t:'gather',target:t.id,rt:t.rt});else moved.push(u)}
+    else if(t.owner!==u.owner&&t.owner>=0&&aiS&&aiS.allied){if(u.owner===0)toast('Verbündete kann man nicht angreifen.','warn')}
     else if(t.owner!==u.owner&&t.owner>=0)order(u,{t:'attack',target:t.id,forced:true});
     else if(t.kind==='bld'&&t.owner===u.owner&&u.type==='worker'){
       if(!t.built)order(u,{t:'build',target:t.id});
@@ -458,7 +459,7 @@ function nearestDrop(p,x,y){
 function enemyNear(u,radius,wantBld){
   let best=null,bd=radius;
   for(const e of ents){
-    if(e.dead||e.owner<0||e.owner===u.owner||e.kind==='unit'&&hidden(e)&&Math.hypot(e.x-u.x,e.y-u.y)>2.5)continue;
+    if(e.dead||e.owner<0||e.owner===u.owner||aiS&&aiS.allied||e.kind==='unit'&&hidden(e)&&Math.hypot(e.x-u.x,e.y-u.y)>2.5)continue;
     if(e.kind==='res')continue;
     if(e.kind==='bld'&&!wantBld)continue;
     if(u.owner===0&&e.kind==='unit'&&!vis[idx(e.x|0,e.y|0)])continue;
@@ -470,7 +471,7 @@ function enemyNear(u,radius,wantBld){
 
 // ================= combat =================
 const vetRank=u=>(u.kills||0)>=5?2:(u.kills||0)>=2?1:0,vetMul=u=>u&&u.rank?(u.rank===2?1.15:1.05):1;
-function damage(t,dmg,src){
+function damage(t,dmg,src){if(src&&aiS&&aiS.allied&&src.owner>=0&&t.owner>=0&&src.owner!==t.owner)return;
   if(t.dead)return;
   if(src&&src.buffUntil>gameT)dmg*=1.2;if(src&&src.templeT>gameT)dmg*=1.1;if(src&&src.form===2)dmg*=1.3;if(src&&src.owner>=0&&players[src.owner]&&players[src.owner].templar&&(src.type==='knight'||CLS(src.type)==='cavalry'))dmg*=1.3;if(t.form===1)dmg*=UNITS[t.type]&&UNITS[t.type].shield?.5:.7;if(src&&src.owner>=0&&players[src.owner]&&players[src.owner].raceUntil>gameT)dmg*=1.1;if(t.campT>gameT)dmg*=.6;else if(t.form===2)dmg*=1.2;if(src&&src.owner!=null&&players[src.owner]&&players[src.owner].monAtk)dmg*=1+players[src.owner].monAtk;if(src&&src.kind==='unit'&&t.kind==='unit'&&t.hp>0&&t.hp<=dmg*vetMul(src)){src.kills=(src.kills||0)+1;const r=vetRank(src);if(r>(src.rank||0)){src.rank=r;if(src.type!=='hero'){src.maxhp=Math.round(src.maxhp*(r===1?1.05:1.1));if(src.owner===0&&r===2)toast(uname(UNITS[src.type],players[0].epoch)+' ist jetzt ein Veteran.','good')}}}
   if(src)dmg*=vetMul(src);if(t.rank)dmg/=t.rank===2?1.15:1.05;if(src&&src.vetAuraT>gameT&&!src.rank)dmg*=1.08;
@@ -758,7 +759,7 @@ function tryNudge(u,dx,dy){const nx=u.x+dx,ny=u.y+dy;passOwner=u.owner;passNaval
 let visT=0;
 function updateVis(force){
   vis.fill(0);
-  for(const e of ents){if(e.dead||e.owner!==0)continue;
+  for(const e of ents){if(e.dead||(e.owner!==0&&!(aiS&&aiS.allied&&e.owner===1)))continue;
     const s=e.kind==='unit'?uStat(e).sight:(e.built?BLD[e.type].sight:2),c=center(e),r2=s*s;
     const x0=Math.max(0,Math.floor(c.x-s)),x1=Math.min(W-1,Math.ceil(c.x+s)),y0=Math.max(0,Math.floor(c.y-s)),y1=Math.min(H-1,Math.ceil(c.y+s));
     for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){const dx=x+.5-c.x,dy=y+.5-c.y;if(dx*dx+dy*dy<=r2){vis[idx(x,y)]=1;exp[idx(x,y)]=1}}
@@ -997,6 +998,9 @@ function endGame(win,text){
   const val=(pl,k)=>k==='techs'?Object.keys(pl.techs).length:k==='epoch'?EPOCHS[pl.epoch]:k==='score'?score(pl):Math.round(pl.st[k]||0);
   rows.push(['Erforschte Techniken','techs'],['Erreichte Epoche','epoch'],['Punkte','score']);
   $('#endStats').innerHTML='<span class="h"></span><span class="h">Du</span><span class="h">Gegner</span>'+rows.map(([l,k])=>`<span>${l}</span><span>${val(players[0],k)}</span><span>${val(players[1],k)}</span>`).join('');
+  const bars=[['Rohstoffe gesamt',pl=>Math.round(Object.values(pl.tot||{}).reduce((a,b)=>a+b,0)||pl.st.gathered)],['Einheiten produziert',pl=>pl.st.trained],['Einheiten verloren',pl=>pl.st.lost],['Forschungen',pl=>Object.keys(pl.techs).length],['Gebäude gebaut',pl=>pl.st.built]];
+  for(const r of ['food','wood','stone','gold'])bars.splice(1+['food','wood','stone','gold'].indexOf(r),0,['  '+RESN[r],pl=>Math.round((pl.tot||{})[r]||0)]);
+  $('#endBars').innerHTML=bars.map(([l,f])=>{const a=f(players[0])||0,b=f(players[1])||0,m=Math.max(1,a,b);return `<div class="bl">${l}</div><div class="bw"><i class="b0" style="width:${a/m*100}%"></i><span>${a}</span></div><div class="bw"><i class="b1" style="width:${b/m*100}%"></i><span>${b}</span></div>`}).join('');
   setTimeout(()=>{$('#endScreen').hidden=false},900);
 }
 const fmtTime=t=>{t=Math.floor(t);return Math.floor(t/60)+':'+String(t%60).padStart(2,'0')};
@@ -2036,7 +2040,8 @@ function diploRender(){
   $('#diploTrib').innerHTML=['food','wood','stone','gold'].map(r=>`<button class="tbtn" data-trib="${r}"${pl.res[r]<amt?' disabled':''}>${amt} ${RESN[r]}</button>`).join('');
   const pc=Math.round(400*Math.pow(1.6,aiS.peaces||0));$('#diploPeace').textContent='Waffenstillstand für '+pc+' Gold';$('#diploPeace').disabled=peace||pl.res.gold<pc;$('#diploWar').hidden=!peace;$('#diploPeace').hidden=peace;
   $('#diploMarry').textContent='Heiratsvertrag anbieten (1000 Gold, dauerhafter Frieden)';$('#diploMarry').hidden=!!aiS.married;$('#diploMarry').disabled=pl.res.gold<1000||pl.epoch<1;$('#diploWar').textContent=aiS.married?'Heiratsvertrag brechen (Beliebtheit fällt auf 0)':'Waffenstillstand brechen (Kriegserklärung)';
-  if(aiS.married)$('#diploState').textContent='Durch Heirat verbunden. Kein Krieg, solange der Vertrag hält.';
+  $('#diploAlly').textContent=aiS.allied?'Bündnis aufkündigen':'Bündnis schließen (800 Gold: gemeinsame Sicht, keine Angriffe)';$('#diploAlly').disabled=!aiS.allied&&pl.res.gold<800;
+  if(aiS.allied)$('#diploState').textContent='Verbündet: gemeinsame Sicht, kein Angriff aufeinander möglich.';else if(aiS.married)$('#diploState').textContent='Durch Heirat verbunden. Kein Krieg, solange der Vertrag hält.';
 }
 function payTribute(r){
   const pl=players[0],n=aiS.tributes||0,amt=Math.round(100*Math.pow(1.4,n));
@@ -2052,6 +2057,10 @@ $('#diploPeace').onclick=()=>{const pl=players[0],pc=Math.round(400*Math.pow(1.6
 $('#diploMarry').onclick=()=>{const pl=players[0];if(pl.res.gold<1000||aiS.married)return;pl.res.gold-=1000;players[1].res.gold+=500;aiS.married=true;aiS.peaceUntil=1e9;aiS.nextAttack=1e9;
   if(aiS.attacking){aiS.attacking=false;for(const e of ents)if(!e.dead&&e.owner===1&&isMil(e)){e.waveAt=null;order(e,{t:'idle'})}}
   toast('Hochzeit! Beide Häuser sind nun verbunden und führen keinen Krieg mehr gegeneinander.','good');sfx('epoch');diploRender()};
+$('#diploAlly').onclick=()=>{const pl=players[0];if(aiS.allied){aiS.allied=false;players[0].ally=players[1].ally=undefined;aiS.peaceUntil=gameT+60;aiS.nextAttack=gameT+60;toast('Bündnis aufgekündigt. In einer Minute herrscht wieder Krieg.','warn');diploRender();return}
+  if(pl.res.gold<800)return;pl.res.gold-=800;players[1].res.gold+=400;aiS.allied=true;players[0].ally=1;players[1].ally=0;aiS.peaceUntil=1e9;aiS.nextAttack=1e9;
+  if(aiS.attacking){aiS.attacking=false}for(const e of ents)if(!e.dead&&e.kind==='unit'&&e.order&&e.order.t==='attack'){const t=ents.find(x=>x.id===e.order.target);if(t&&t.owner!==e.owner&&t.owner>=0){e.waveAt=null;order(e,{t:'idle'})}}
+  toast('Bündnis geschlossen! Ihr teilt die Sicht und kämpft nicht mehr gegeneinander.','good');sfx('epoch');diploRender()};
 $('#diploWar').onclick=()=>{if(!(aiS.peaceUntil>gameT))return;const wasM=aiS.married;aiS.married=false;aiS.peaceUntil=0;aiS.nextAttack=wasM?gameT:gameT+20;if(wasM){aiS.wave=(aiS.wave||4)+4;players[1].res.gold+=600;players[1].res.food+=600}
   for(const pl of players)if(pl.mood!=null&&pl.i===0)pl.mood=wasM?0:Math.max(0,pl.mood-10);
   toast('Du hast den Krieg erklärt. Der Gegner rüstet sich zum Gegenschlag.','warn');sfx('warn');diploRender()};
@@ -2061,10 +2070,13 @@ $('#btnSound').textContent=soundOn?'Ton an':'Ton aus';$('#btnSound').onclick=()=
 
 // ================= main loop =================
 let last=performance.now(),acc=0;
+let gameSpeed=1;
+document.querySelectorAll('[data-speed]').forEach(b=>b.onclick=()=>{gameSpeed=+b.dataset.speed;document.querySelectorAll('[data-speed]').forEach(x=>x.classList.toggle('on',x===b))});
+window.__speed=()=>gameSpeed;
 function frame(now){
   const dt=Math.min(.1,(now-last)/1000);last=now;
   if(started&&!paused&&!over){
-    acc+=dt;let n=0;while(acc>=DT&&n<5){step(DT);acc-=DT;n++}if(n>=5)acc=0;
+    acc+=dt*gameSpeed;let n=0,mx=5*Math.max(1,gameSpeed);while(acc>=DT&&n<mx){step(DT);acc-=DT;n++}if(n>=mx)acc=0;
   }
   if(started){
     // scrolling
@@ -2214,6 +2226,8 @@ let freeCam=false;
 function toggleFreeCam(){freeCam=!freeCam;if(freeCam){select([]);placing=null;aMode=false}$('#camLbl').hidden=!freeCam;$('#btnCam').classList.toggle('on',freeCam);toast(freeCam?'Freie Kamera: ziehen zum Schwenken, Mausrad zum Zoomen, Z beendet.':'Freie Kamera aus.')}
 $('#btnCam').onclick=()=>{if(started)toggleFreeCam()};
 window.__freeCam=()=>freeCam;
+$('#verLink').onclick=()=>{const c=$('#credits');c.hidden=false;const r=c.querySelector('.roll');r.style.animation='none';void r.offsetWidth;r.style.animation=''};
+$('#credits').onclick=()=>{$('#credits').hidden=true};
 $('#startBtn').onclick=()=>{timeLimit=+$('#limitSel').value;useCustomMap=!!(CUSTOM_MAP&&$('#useCustom').checked);
   $('#startScreen').hidden=true;resize();newGame(chosenDiff,seed);started=true;paused=false;$('#btnPause').textContent='Pause';
 };

@@ -174,6 +174,17 @@ label.opt{font-size:14px;padding:5px 12px}
   .cmd .n{font-size:11px}
 }
 @media (prefers-reduced-motion:reduce){.toast{transition:none}}
+.spd{display:inline-flex;gap:2px}.tbtn.on{border-color:var(--bronze-hi);color:var(--bronze-hi)}
+#verLink{color:var(--muted);font-size:12px;text-decoration:underline dotted;cursor:pointer}
+.evh{margin:14px 0 6px;font-size:15px}.lg{font-size:11px;font-weight:400;margin-left:8px}.lg i{display:inline-block;width:10px;height:10px;margin:0 3px 0 8px;vertical-align:middle}
+#endBars{display:grid;grid-template-columns:auto 1fr 1fr;gap:4px 8px;font-size:12px;text-align:left;margin-bottom:12px}
+.bl{white-space:pre}.bw{position:relative;background:rgba(255,255,255,.07);height:16px;border-radius:3px;min-width:60px}.bw i{position:absolute;left:0;top:0;bottom:0;border-radius:3px}.bw span{position:relative;padding-left:4px;line-height:16px}
+.b0{background:#4a8fd6}.b1{background:#c9493e}
+#credits{position:fixed;inset:0;z-index:90;background:#000;overflow:hidden;color:#f0e2b8;text-align:center;font-family:Georgia,serif;cursor:pointer}
+#credits .roll{position:absolute;left:0;right:0;top:100%;animation:roll 40s linear forwards}
+@keyframes roll{to{transform:translateY(-100%) translateY(-100vh)}}
+#credits .logo{font-size:56px;letter-spacing:.15em;margin-bottom:6px}#credits .logo b{color:#e9be72}
+#credits h4{margin:34px 0 4px;font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:#c9a35a}#credits p{margin:0;font-size:20px}#credits .tg{margin-top:40px;font-style:italic;color:#9c8c6a}
 </style>
 
 <div id="app">
@@ -197,7 +208,7 @@ label.opt{font-size:14px;padding:5px 12px}
     <button class="tbtn" id="btnChron" title="Meilensteine dieser Partie">Chronik</button>
     <button class="tbtn" id="btnSave" title="Spielstand in einen von drei Speicherplätzen sichern">Speichern</button>
     <button class="tbtn" id="btnSound" title="Soundeffekte ein- oder ausschalten">Ton an</button>
-    <button class="tbtn" id="btnPause" title="Pause (P)">Pause</button>
+    <button class="tbtn" id="btnPause" title="Pause (P)">Pause</button><span class="spd"><button class="tbtn" data-speed=".5">½×</button><button class="tbtn on" data-speed="1">1×</button><button class="tbtn" data-speed="2">2×</button><button class="tbtn" data-speed="4">4×</button></span>
     <span id="updBox" hidden><span id="updText"></span> <button class="tbtn" id="updBtn" hidden>Jetzt neu starten</button></span>
   </header>
   <main id="stage">
@@ -247,6 +258,7 @@ label.opt{font-size:14px;padding:5px 12px}
     </div>
     <div class="row"><button class="go" id="startBtn">Reich gründen</button><button class="opt" id="continueBtn" hidden>Weiterspielen</button></div>
     <div class="row"><button class="opt" id="editBtn">Karte bearbeiten</button><label class="epsel" id="customRow" hidden><input type="checkbox" id="useCustom"> eigene Karte verwenden</label></div>
+    <div class="row"><a href="#" id="verLink" title="Credits" onclick="return false">v1.0</a></div>
     <div class="row" id="loadRow" hidden><span class="lbl">Laden</span><span id="loadSlots"></span></div>
     <section class="mods" aria-labelledby="modsTitle">
       <div class="modsHead"><span class="lbl" id="modsTitle">Bausteine</span>
@@ -286,8 +298,9 @@ label.opt{font-size:14px;padding:5px 12px}
   <div class="row" id="diploTrib"></div>
   <button class="tbtn" id="diploPeace"></button>
   <button class="tbtn" id="diploMarry"></button>
+  <button class="tbtn" id="diploAlly"></button>
   <button class="tbtn" id="diploWar" hidden>Waffenstillstand brechen (Kriegserklärung)</button>
-  <p class="hint">Tribut stimmt den Gegner milde und verschiebt seinen nächsten Angriff. Ein Waffenstillstand hält drei Minuten. Bündnisse folgen, wenn mehr Völker auf der Karte sind.</p>
+  <p class="hint">Tribut stimmt den Gegner milde und verschiebt seinen nächsten Angriff. Ein Waffenstillstand hält drei Minuten. Ein Bündnis teilt die Sicht und verhindert Angriffe, bis es aufgekündigt wird.</p>
 </div>
 <div class="overlay" id="techScreen" hidden>
   <div class="tree">
@@ -297,11 +310,26 @@ label.opt{font-size:14px;padding:5px 12px}
   </div>
 </div>
 
+<div id="credits" hidden><div class="roll">
+<div class="logo">EMPIRE <b>XY</b></div><p class="tg">Zehn Epochen. Ein Reich.</p>
+<h4>Spielidee und Bauherr</h4><p>Christian, Kaiser aller Epochen</p>
+<h4>Chefingenieurin des Schleimressourcen-Systems</h4><p>Dr. Gunda Glibber</p>
+<h4>Oberster Baumfäller-Choreograf</h4><p>Holger Holzmichel</p>
+<h4>Leitender Katapult-Ballistiker</h4><p>Bertram Bogenwurf</p>
+<h4>Beauftragter für Steinzeit-Nostalgie</h4><p>Ugga Bugga</p>
+<h4>Abteilung verlorene Arbeiter</h4><p>Paul Pfadlos</p>
+<h4>Diplomatie und Hochzeitsplanung</h4><p>Gräfin Amalie von Allianz</p>
+<h4>Wettergott (Teilzeit)</h4><p>Petrus Regenreich</p>
+<h4>KI-Gegner, Charakterdarsteller</h4><p>Der Böse Nachbar</p>
+<h4>Qualitätssicherung</h4><p>Claude und 4000 Testläufe</p>
+<h4>Besonderer Dank</h4><p>Allen Hühnern, die für die Nahrungsproduktion ihr Bestes gaben</p>
+<p class="tg">Klicken zum Schließen</p></div></div>
 <div class="overlay" id="endScreen" hidden>
   <div class="card">
     <h1 id="endTitle">Sieg</h1>
     <p class="tag" id="endText"></p>
     <div class="stattbl" id="endStats"></div>
+    <h3 class="evh">Auswertung <span class="lg"><i class="b0"></i>Du <i class="b1"></i>Gegner</span></h3><div id="endBars"></div>
     <button class="go" id="againBtn">Neues Spiel</button>
   </div>
 </div>
