@@ -35,6 +35,12 @@ button:focus-visible{outline:2px solid var(--bronze-hi);outline-offset:1px}
 #researchHud em{font-style:normal;color:var(--muted);font-variant-numeric:tabular-nums}
 #researchHud i,.tk .pb{grid-column:1/-1;display:block;height:4px;background:var(--line);border-radius:2px;overflow:hidden}
 #researchHud i b,.tk .pb b{display:block;height:100%;width:0;background:#6f9fc9}
+#diploPanel{position:absolute;top:52px;right:10px;z-index:7;width:300px;max-width:calc(100vw - 32px);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px 12px;display:flex;flex-direction:column;gap:8px;box-shadow:0 8px 24px rgba(0,0,0,.45)}
+#diploPanel h3{margin:0;font-size:15px;letter-spacing:.04em}
+#diploPanel .st{margin:0;font-size:12px;color:var(--muted)}
+#diploPanel .row{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+#diploPanel .hint{margin:0;font-size:11px;color:var(--muted);line-height:1.35}
+.tbtn:disabled{opacity:.42;cursor:default}
 #epochBar{height:4px;background:var(--line);border-radius:2px;overflow:hidden}
 #epochBar b{display:block;height:100%;width:0;background:var(--bronze-hi)}
 .spacer{flex:1}
@@ -179,7 +185,7 @@ label.opt{font-size:14px;padding:5px 12px}
     <button class="tbtn" id="btnTech" title="Technologiebaum (N)">Forschung</button>
     <button class="tbtn" id="btnBuild" title="Arbeiter wählen und Gebäude bauen">Bauen</button>
     <button class="tbtn" id="btnIdle" title="Untätigen Arbeiter wählen (.)">Untätig: <span id="idleN">0</span></button>
-    <button class="tbtn" id="btnTribute" title="Tribut zahlen: Der Gegner verschiebt seinen nächsten Angriff um eine Minute">Tribut</button>
+    <button class="tbtn" id="btnTribute" title="Diplomatie: Tribut zahlen oder Waffenstillstand anbieten">Diplomatie</button>
     <button class="tbtn" id="btnSound" title="Soundeffekte ein- oder ausschalten">Ton an</button>
     <button class="tbtn" id="btnPause" title="Pause (P)">Pause</button>
     <span id="updBox" hidden><span id="updText"></span> <button class="tbtn" id="updBtn" hidden>Jetzt neu starten</button></span>
@@ -241,6 +247,13 @@ label.opt{font-size:14px;padding:5px 12px}
 </div>
 
 <div id="researchHud" hidden></div>
+<div id="diploPanel" hidden>
+  <h3>Diplomatie</h3>
+  <p class="st" id="diploState"></p>
+  <div class="row" id="diploTrib"></div>
+  <button class="tbtn" id="diploPeace"></button>
+  <p class="hint">Tribut stimmt den Gegner milde und verschiebt seinen nächsten Angriff. Ein Waffenstillstand hält drei Minuten. Bündnisse folgen, wenn mehr Völker auf der Karte sind.</p>
+</div>
 <div class="overlay" id="techScreen" hidden>
   <div class="tree">
     <div class="treeHead"><h1>Forschung</h1><button class="opt" id="techClose">Schließen</button></div>

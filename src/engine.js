@@ -1285,6 +1285,7 @@ function humanoid(g,u,ep,pc,dk){
   else if(ep===0){g.fillStyle='#3a2616';g.beginPath();g.arc(hx,hy-.8,4,Math.PI,0);g.fill()}
   else{const hc=ep===1?'#c08a3e':ep===2?'#9aa3ab':ep===3?'#2b2f3a':'#4f5a3c';g.fillStyle=hc;g.beginPath();g.arc(hx,hy-.6,4.3,Math.PI,0);g.fill();
     if(ep===3){g.fillRect(hx-5,hy-1.2,10,1.4);g.fillStyle=pc;g.fillRect(hx-1,hy-6,2,2.5)}if(ep===2){g.fillStyle='rgba(255,255,255,.35)';g.fillRect(hx-2,hy-4,1.5,1.5)}}
+  if(LOOK(u.type)!=='worker'&&!UNITS[u.type].civil)epochDress(g,players[u.owner].epoch,x,by,hx,hy,pc);
   // equipment
   const sw=u.swing>0?Math.sin(u.swing/.25*Math.PI):0;
   g.lineCap='round';
@@ -1307,6 +1308,34 @@ function humanoid(g,u,ep,pc,dk){
       if(u.swing>.12){g.fillStyle='#ffd27a';g.beginPath();g.arc(x+ca*17,by+sa*13-2,3.5,0,7);g.fill();g.fillStyle='rgba(220,220,220,.5)';g.beginPath();g.arc(x+ca*20,by+sa*15-4,4,0,7);g.fill()}}
   }
   g.lineCap='butt';
+}
+// Epochentracht: jede der 10 Epochen bekommt eigene Kleidung und Kopfbedeckung über der Grundfigur
+function epochDress(g,re,x,by,hx,hy,pc){
+  if(re===0){// Fellumhang mit Flecken
+    g.fillStyle='#8a6038';g.beginPath();g.ellipse(x,by-3,7,4,0,0,7);g.fill();g.fillStyle='#5a3a1e';for(const [dx,dy] of [[-3,-4],[2,-2],[4,-5]]){g.beginPath();g.arc(x+dx,by+dy,1,0,7);g.fill()}
+    g.fillStyle='#3a2616';g.beginPath();g.arc(hx,hy-.6,4.1,Math.PI*.95,Math.PI*2.05);g.fill()}
+  else if(re===1){g.fillStyle='#b5793a';g.fillRect(x-6,by+2,12,2.2)}// Kupfergürtel
+  else if(re===2){g.fillStyle='#c79a3c';g.beginPath();g.arc(hx,hy-1,4.4,Math.PI,0);g.fill();g.fillStyle='#b8322c';g.fillRect(hx-.8,hy-8.5,1.6,4)}// Bronzehelm mit Busch
+  else if(re===3){g.strokeStyle='rgba(0,0,0,.35)';g.lineWidth=.6;for(let k=-4;k<=4;k+=2){g.beginPath();g.moveTo(x+k,by-5);g.lineTo(x+k,by+4);g.stroke()}g.lineWidth=1}// Schuppenpanzer
+  else if(re===4){// Ritter: Topfhelm und Wappenrock mit Kreuz
+    g.fillStyle='#f0ead8';g.fillRect(x-4,by-4,8,9);g.fillStyle=pc;g.fillRect(x-.9,by-3.5,1.8,8);g.fillRect(x-3.5,by-.5,7,1.8);
+    g.fillStyle='#9aa3ab';g.fillRect(hx-4,hy-4.5,8,7.5);g.fillStyle='#1a1a1a';g.fillRect(hx-3,hy-1.5,6,1)}
+  else if(re===5){// Renaissance: Morion mit Kamm, weiße Kreuzgurte
+    g.strokeStyle='#eee6d2';g.lineWidth=1.2;g.beginPath();g.moveTo(x-5,by-5);g.lineTo(x+5,by+4);g.moveTo(x+5,by-5);g.lineTo(x-5,by+4);g.stroke();g.lineWidth=1;
+    g.fillStyle='#b9bfc4';g.beginPath();g.ellipse(hx,hy-1.5,6,1.6,0,0,7);g.fill();g.beginPath();g.arc(hx,hy-2,3.4,Math.PI,0);g.fill();g.fillRect(hx-.6,hy-7,1.2,2.5)}
+  else if(re===6){// Kolonialzeit: Dreispitz und Kreuzgurte
+    g.strokeStyle='#eee6d2';g.lineWidth=1.2;g.beginPath();g.moveTo(x-5,by-5);g.lineTo(x+5,by+4);g.stroke();g.lineWidth=1;
+    g.fillStyle='#1d1d22';g.beginPath();g.moveTo(hx-6,hy-1);g.lineTo(hx,hy-6);g.lineTo(hx+6,hy-1);g.lineTo(hx,hy+.5);g.closePath();g.fill();g.fillStyle='#d9b24a';g.fillRect(hx-.6,hy-4,1.2,1.2)}
+  else if(re===7){// Industriezeit: Pickelhaube
+    g.fillStyle='#222';g.beginPath();g.arc(hx,hy-1,4.3,Math.PI,0);g.fill();g.fillStyle='#c9a649';g.fillRect(hx-.7,hy-8,1.4,3.5);g.beginPath();g.arc(hx,hy-3,1,0,7);g.fill()}
+  else if(re===8){// Weltkriege: Stahlhelm und Feldgrau
+    g.fillStyle='rgba(90,100,80,.55)';g.beginPath();g.ellipse(x,by,6.4,7,0,0,7);g.fill();g.fillStyle=pc;g.fillRect(x-4,by-5,2.5,2.5);
+    g.fillStyle='#4f5a3c';g.beginPath();g.ellipse(hx,hy-.5,5.6,2,0,0,7);g.fill();g.beginPath();g.arc(hx,hy-1,4.2,Math.PI,0);g.fill()}
+  else {// Moderne: Tarnmuster, Gefechtshelm, Weste
+    g.fillStyle='rgba(70,80,55,.6)';g.beginPath();g.ellipse(x,by,6.4,7,0,0,7);g.fill();
+    for(const [dx,dy,c] of [[-3,-3,'#3a432c'],[2,1,'#7c7a55'],[-1,3,'#3a432c'],[3,-4,'#7c7a55']]){g.fillStyle=c;g.beginPath();g.ellipse(x+dx,by+dy,2,1.3,.5,0,7);g.fill()}
+    g.fillStyle='#2e3326';g.fillRect(x-4,by-3,8,6);g.fillStyle=pc;g.fillRect(x-1.5,by-2,3,2);
+    g.fillStyle='#55603f';g.beginPath();g.arc(hx,hy-.8,4.4,Math.PI*.95,Math.PI*2.05);g.fill()}
 }
 // Einheiten größer zeichnen (AoE-artige Figuren), schwere Typen etwas wuchtiger
 function drawUnit(g,u){
@@ -1817,6 +1846,7 @@ window.addEventListener('keydown',e=>{
   if(k.startsWith('Arrow')){keys.add(k);e.preventDefault();return}
   if(k==='Escape'&&!$('#techScreen').hidden){toggleTech(false);return}
   if(k==='n'||k==='N'){toggleTech();return}
+  if(k==='Escape'&&!$('#diploPanel').hidden){$('#diploPanel').hidden=true;return}
   if(k==='Escape'){if(placing||aMode){placing=null;aMode=false;uiDirty=true}else select([]);return}
   if(k==='p'||k==='P'||k==='Pause'){togglePause();return}
   if(paused)return;
@@ -1877,15 +1907,28 @@ $('#btnBuild').onclick=()=>{
 };
 function togglePause(){paused=!paused;$('#btnPause').textContent=paused?'Weiter':'Pause'}
 $('#btnPause').onclick=()=>{if(started&&!over)togglePause()};
-// Tribut (wie AoE2): Rohstoffe an den Gegner zahlen, um seinen nächsten Angriff hinauszuzögern
-$('#btnTribute').onclick=()=>{
-  if(!started||over)return;const pl=players[0],n=aiS.tributes||0,amt=Math.round(150*Math.pow(1.5,n));
+// Diplomatie (wie AoE2): Tribut in einer Wahl-Ressource oder Waffenstillstand gegen Gold
+const RESN={food:'Nahrung',wood:'Holz',stone:'Stein',gold:'Gold'};
+function diploRender(){
+  if($('#diploPanel').hidden)return;const n=aiS.tributes||0,amt=Math.round(100*Math.pow(1.4,n)),pl=players[0];
+  const peace=aiS.peaceUntil>gameT;
+  $('#diploState').textContent=peace?'Waffenstillstand noch '+fmtTime(aiS.peaceUntil-gameT)+'.':aiS.attacking?'Der Gegner greift gerade an.':'Nächster Angriff frühestens in '+fmtTime(Math.max(0,aiS.nextAttack-gameT))+'.';
+  $('#diploTrib').innerHTML=['food','wood','stone','gold'].map(r=>`<button class="tbtn" data-trib="${r}"${pl.res[r]<amt?' disabled':''}>${amt} ${RESN[r]}</button>`).join('');
+  const pc=Math.round(400*Math.pow(1.6,aiS.peaces||0));$('#diploPeace').textContent='Waffenstillstand für '+pc+' Gold';$('#diploPeace').disabled=peace||pl.res.gold<pc;
+}
+function payTribute(r){
+  const pl=players[0],n=aiS.tributes||0,amt=Math.round(100*Math.pow(1.4,n));
   if(aiS.attacking){toast('Zu spät, die feindliche Armee ist schon unterwegs.','warn');return}
-  const r=['food','wood','stone','gold'].reduce((a,b)=>pl.res[b]>pl.res[a]?b:a);
-  if(pl.res[r]<amt){toast('Für einen Tribut brauchst du '+amt+' einer Ressource.','warn');sfx('warn');return}
-  pl.res[r]-=amt;players[1].res[r]+=amt;aiS.tributes=n+1;aiS.nextAttack=Math.max(aiS.nextAttack,gameT)+60;
-  toast('Tribut gezahlt ('+amt+' '+({food:'Nahrung',wood:'Holz',stone:'Stein',gold:'Gold'})[r]+'). Der Gegner hält eine Minute still.','good');sfx('good');
-};
+  if(pl.res[r]<amt)return;pl.res[r]-=amt;players[1].res[r]+=amt;aiS.tributes=n+1;aiS.nextAttack=Math.max(aiS.nextAttack,gameT)+60;
+  toast('Tribut gezahlt ('+amt+' '+RESN[r]+'). Der Gegner hält eine Minute still.','good');sfx('good');diploRender();
+}
+$('#diploTrib').onclick=e=>{const b=e.target.closest('[data-trib]');if(b)payTribute(b.dataset.trib)};
+$('#diploPeace').onclick=()=>{const pl=players[0],pc=Math.round(400*Math.pow(1.6,aiS.peaces||0));if(pl.res.gold<pc||aiS.peaceUntil>gameT)return;
+  pl.res.gold-=pc;players[1].res.gold+=pc;aiS.peaces=(aiS.peaces||0)+1;aiS.peaceUntil=gameT+180;aiS.nextAttack=Math.max(aiS.nextAttack,aiS.peaceUntil);
+  if(aiS.attacking){aiS.attacking=false;for(const e of ents)if(!e.dead&&e.owner===1&&isMil(e)){e.waveAt=null;order(e,{t:'idle'})}}
+  toast('Waffenstillstand für drei Minuten geschlossen.','good');sfx('good');diploRender()};
+$('#btnTribute').onclick=()=>{if(!started||over)return;$('#diploPanel').hidden=!$('#diploPanel').hidden;diploRender()};
+setInterval(diploRender,1000);
 $('#btnSound').textContent=soundOn?'Ton an':'Ton aus';$('#btnSound').onclick=()=>{soundOn=!soundOn;try{localStorage.setItem('empire-xy.ton',soundOn?'1':'0')}catch(e){}$('#btnSound').textContent=soundOn?'Ton an':'Ton aus';sfx('click')};
 
 // ================= main loop =================
