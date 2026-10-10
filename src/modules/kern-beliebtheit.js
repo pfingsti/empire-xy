@@ -22,6 +22,7 @@ const BELIEB_GFX=(()=>{
     g.fillStyle='rgba(0,0,0,.35)';g.fillRect(cx-w/2-1,yb+.6,w+2,.7)}
   function market(g,S,ep,pc,a){
     const bx=4,by=36,x1=bx+S,y1=by+S,rn=rng(4711+ep*97),modern=ep>=7,cx=bx+S/2;
+    if(ep>=7&&a&&a.lateMarket){a.lateMarket(g,bx,by,S,ep,pc);return}
     // unregelmäßiger Platzrand (Superellipse mit Zittern)
     const pts=[];for(let k=0;k<28;k++){const t=k/28*Math.PI*2,c=Math.cos(t),s=Math.sin(t),j=S/2-3-rn()*3.5;
       pts.push([cx+Math.sign(c)*Math.pow(Math.abs(c),.45)*j,by+S/2+Math.sign(s)*Math.pow(Math.abs(s),.45)*j])}
