@@ -1696,38 +1696,66 @@ function drawUnitRaw(g,u){
   if(!UD.noShadow){g.fillStyle='rgba(8,14,6,.32)';g.beginPath();g.ellipse(x+3,y+u.r*T*.7,u.r*T*1.1,u.r*T*.5,0,0,7);g.fill()}
   if(UD.draw){g.save();try{UD.draw(g,u,DRAW_API)}catch(e){}g.restore();return}
   if(LOOK(u.type)==='cavalry'){
-    const ph=u.moving?Math.sin(gameT*16+u.anim):0;
-    g.save();g.translate(x,y);g.rotate(a);
-    if(ep===1){// Streitwagen: Achse, Speichenräder von oben, geflochtener Wagenkorb mit Lederrand, Deichsel
-      g.fillStyle='rgba(8,14,6,.3)';g.beginPath();g.ellipse(-14,1.5,7,8,0,0,7);g.fill();
-      g.fillStyle='#3a2a1a';g.fillRect(-15,-9,1.6,18);g.fillRect(-14,-.6,14,1.2);
-      for(const sy of [-9,9]){g.fillStyle='#4a3420';g.beginPath();g.ellipse(-14.2,sy,3.6,1.2,0,0,7);g.fill();g.strokeStyle='rgba(20,12,6,.6)';g.lineWidth=.4;g.beginPath();for(let k=-3;k<=3;k+=1.5){g.moveTo(-14.2+k,sy-1);g.lineTo(-14.2+k,sy+1)}g.stroke()}
-      const wg=g.createLinearGradient(-19,-7,-9,7);wg.addColorStop(0,'#9a7a4c');wg.addColorStop(1,'#5a4026');g.fillStyle=wg;g.beginPath();g.moveTo(-19,-6);g.lineTo(-12,-6);g.quadraticCurveTo(-8,0,-12,6);g.lineTo(-19,6);g.closePath();g.fill();
-      g.strokeStyle='rgba(40,26,12,.5)';g.lineWidth=.4;g.beginPath();for(let k=-5;k<=5;k+=1.6){g.moveTo(-19,k);g.lineTo(-11,k)}g.stroke();
-      g.strokeStyle='#4a2e1a';g.lineWidth=1;g.beginPath();g.moveTo(-19,-6);g.lineTo(-12,-6);g.quadraticCurveTo(-8,0,-12,6);g.lineTo(-19,6);g.stroke();
-      g.fillStyle=pc;g.globalAlpha=.7;g.fillRect(-13.5,-2,1.4,4);g.globalAlpha=1}
-    g.fillStyle='#3a2716';for(const [lx,ly] of [[6,-3],[6,3],[-6,-3],[-6,3]]){g.beginPath();g.ellipse(lx+(lx>0?ph:-ph)*2.5,ly*1.3,2.2,1.4,0,0,7);g.fill()}
-    {const hc=['#6b4a30','#4a3324','#7d5a3a','#3a2c22'][u.id%4],hg=g.createLinearGradient(0,-5,0,5);hg.addColorStop(0,shade(hc,25));hg.addColorStop(.5,hc);hg.addColorStop(1,shade(hc,-35));
-     g.strokeStyle='#2a1c12';g.lineWidth=1.6;g.beginPath();g.moveTo(-11,0);g.quadraticCurveTo(-15,ph*1.5,-17,1+ph);g.stroke();// Schweif
-     g.fillStyle=hg;g.beginPath();g.ellipse(-1,0,10,4.2,0,0,7);g.fill();// Rumpf
-     g.beginPath();g.moveTo(6,-2.6);g.quadraticCurveTo(10,-3.2,12,-1.4);g.lineTo(12,1.4);g.quadraticCurveTo(10,3.2,6,2.6);g.closePath();g.fill();// Hals
-     g.fillStyle=shade(hc,-10);g.beginPath();g.ellipse(14.5,0,3.6,1.9,0,0,7);g.fill();g.fillStyle='#1c140e';g.fillRect(17,-.6,1.2,1.2);// Kopf, Nüstern
-     g.fillStyle='#1e1610';g.beginPath();g.ellipse(9,0,3.5,.9,0,0,7);g.fill();// Mähne
-     g.fillStyle='rgba(255,255,255,.08)';g.beginPath();g.ellipse(-2,-1.8,7,1.4,0,0,7);g.fill();
-     g.fillStyle='#3a2a1c';g.fillRect(-4,-4.4,7,8.8);g.fillStyle=pc;g.globalAlpha=.8;g.fillRect(-4,-4.4,7,1.6);g.fillRect(-4,2.8,7,1.6);g.globalAlpha=1;
-     // Sattelzeug: Sattelbaum, Steigbügel, Zaumzeug mit Zügeln, Mähnensträhnen
-     g.fillStyle='#24180f';g.fillRect(-4.6,-2.6,1.6,5.2);g.fillRect(2.4,-2.2,1.4,4.4);
-     g.strokeStyle='#6a6e70';g.lineWidth=.7;g.beginPath();g.moveTo(-.5,-4.4);g.lineTo(-.5,-6);g.moveTo(-.5,4.4);g.lineTo(-.5,6);g.stroke();g.fillStyle='#8a8e90';g.fillRect(-1.3,-6.6,1.6,.8);g.fillRect(-1.3,5.8,1.6,.8);
-     g.strokeStyle='#2a1a10';g.lineWidth=.6;g.beginPath();g.moveTo(13,-1.8);g.lineTo(13,1.8);g.moveTo(13,-1.2);g.lineTo(16.5,-1);g.moveTo(13,1.2);g.lineTo(16.5,1);g.stroke();
-     g.beginPath();g.moveTo(16,-1.1);g.quadraticCurveTo(9,-3.4,2,-1.2);g.moveTo(16,1.1);g.quadraticCurveTo(9,3.4,2,1.2);g.stroke();
-     g.strokeStyle='#15100b';g.lineWidth=.7;for(let k=0;k<5;k++){const mx=6+k*1.4;g.beginPath();g.moveTo(mx,-.6);g.lineTo(mx-1.2,-1.8-(k%2)*.5+ph*.3);g.stroke()}}
-    g.restore();
-    const rx=x-Math.cos(a)*1,ry=y-Math.sin(a)*1-5-(u.moving?Math.abs(ph)*1.2:0);
-    {const cl=ep>=2&&ep<=5?'#71767c':'#5a4a36',gr=g.createLinearGradient(rx-4,ry-4,rx+4,ry+4);gr.addColorStop(0,shade(cl,25));gr.addColorStop(1,shade(cl,-30));
-    g.fillStyle=gr;g.save();g.translate(rx,ry);g.rotate(a+Math.PI/2);g.beginPath();g.ellipse(0,0,4.4,2.8,0,0,7);g.fill();g.fillStyle=pc;g.globalAlpha=.85;g.fillRect(-4,-.6,8,1.4);g.globalAlpha=1;g.restore();
-    g.fillStyle=ep>=2&&ep<4?'#8d9298':ep>=4?'#4f5a3c':'#c49a76';g.beginPath();g.arc(rx+Math.cos(a),ry-3.6,2.5,0,7);g.fill()}
-    g.lineCap='round';g.strokeStyle=ep>=3?'#2b2b2b':ep===2?'#b9a27a':'#6b4a2a';g.lineWidth=1.6;g.beginPath();g.moveTo(rx-Math.cos(a)*4,ry-Math.sin(a)*4);g.lineTo(rx+Math.cos(a)*16,ry+Math.sin(a)*13-3);g.stroke();g.lineCap='butt';
-    if(ep===2){g.fillStyle=pc;g.beginPath();g.moveTo(rx+Math.cos(a)*14,ry+Math.sin(a)*11-3);g.lineTo(rx+Math.cos(a)*10,ry+Math.sin(a)*8-7);g.lineTo(rx+Math.cos(a)*10,ry+Math.sin(a)*8-2);g.fill()}
+    // Reiter in Seitenansicht wie in EE2: Pferd im Profil mit Gangart, Reiter aufrecht im Sattel, Blick in Laufrichtung
+    const dir=Math.cos(a)>=0?1:-1,gal=u.moving?gameT*13+u.anim:0,bob=u.moving?Math.abs(Math.sin(gal))*1.1:0,sw=u.swing>0?Math.sin(u.swing/.25*Math.PI):0;
+    const hc=['#6b4a30','#4a3324','#7d5a3a','#3a2c22','#8a7a66'][u.id%5],hd=shade(hc,-32),cha=ep===1;
+    g.save();g.translate(x,y+u.r*T*.62);g.scale(dir,1);g.lineCap='round';g.lineJoin='round';
+    const leg=(hx,hy,p,col,front)=>{const s=Math.sin(p),kx=hx+s*2.6*(front?1:-.6),ky=hy+5.2,fx=hx+s*4.2-(front?0:1),fy=-Math.max(0,Math.cos(p))*1.6*(u.moving?1:0);
+      g.strokeStyle=col;g.lineWidth=2.6;g.beginPath();g.moveTo(hx,hy);g.lineTo(kx,ky);g.stroke();g.lineWidth=1.5;g.beginPath();g.moveTo(kx,ky);g.lineTo(fx,fy-1);g.stroke();
+      g.fillStyle='#1a140e';g.fillRect(fx-1.1,fy-1.4,2.4,1.4)};
+    const by=-11-bob;
+    if(cha){// zweirädriger Streitwagen hinter dem Pferd: geflochtener Korb, großes Speichenrad, Deichsel
+      g.strokeStyle='#3e2c1a';g.lineWidth=1.3;g.beginPath();g.moveTo(-13,-9);g.lineTo(3,by+1);g.stroke();
+      const wg=g.createLinearGradient(0,-17,0,-8);wg.addColorStop(0,'#a2824f');wg.addColorStop(1,'#5a4026');g.fillStyle=wg;g.beginPath();g.moveTo(-22,-8);g.lineTo(-22,-15);g.quadraticCurveTo(-17,-18,-12,-14);g.lineTo(-12,-8);g.closePath();g.fill();
+      g.strokeStyle='rgba(40,26,12,.45)';g.lineWidth=.45;g.beginPath();for(let k=-21;k<-12;k+=1.6){g.moveTo(k,-8.5);g.lineTo(k,-15.5)}g.stroke();
+      g.strokeStyle='#4a2e1a';g.lineWidth=.9;g.beginPath();g.moveTo(-22,-15);g.quadraticCurveTo(-17,-18,-12,-14);g.stroke();
+      const rot=u.moving?gameT*7:0;g.strokeStyle='#3a2a1a';g.lineWidth=1.4;g.beginPath();g.arc(-17,-5,5,0,7);g.stroke();
+      g.lineWidth=.7;g.beginPath();for(let k=0;k<6;k++){const q=rot+k*Math.PI/3;g.moveTo(-17,-5);g.lineTo(-17+Math.cos(q)*4.6,-5+Math.sin(q)*4.6)}g.stroke();g.fillStyle='#2a1e12';g.beginPath();g.arc(-17,-5,1,0,7);g.fill();
+      g.fillStyle=pc;g.globalAlpha=.75;g.fillRect(-21,-13,8,1.3);g.globalAlpha=1}
+    // ferne Beine (dunkler), Schweif
+    leg(5.5,by+2,gal+Math.PI,hd,true);leg(-6.5,by+2,gal,hd,false);
+    g.strokeStyle='#22170f';g.lineWidth=2.4;g.beginPath();g.moveTo(-9.5,by-1.5);g.quadraticCurveTo(-13.5,by+1+Math.sin(gal)*.8,-12.5+Math.sin(gal*.5),by+8);g.stroke();
+    g.strokeStyle='rgba(60,44,30,.6)';g.lineWidth=1;g.beginPath();g.moveTo(-10,by-1);g.quadraticCurveTo(-13,by+2,-11.5,by+7.5);g.stroke();
+    // Rumpf mit Brust und Kruppe, Licht von oben links
+    const bg=g.createLinearGradient(0,by-5,0,by+5);bg.addColorStop(0,shade(hc,22));bg.addColorStop(.55,hc);bg.addColorStop(1,shade(hc,-30));g.fillStyle=bg;
+    g.beginPath();g.ellipse(0,by,9.4,4.4,0,0,7);g.fill();g.beginPath();g.ellipse(6,by+.3,4,4.4,0,0,7);g.fill();g.beginPath();g.ellipse(-6.4,by-.4,4.4,4.8,0,0,7);g.fill();
+    // Hals und Kopf
+    g.beginPath();g.moveTo(4.5,by-3);g.lineTo(9.5,by-10);g.quadraticCurveTo(12,by-11.5,13,by-9.5);g.lineTo(10,by+1.5);g.closePath();g.fill();
+    g.fillStyle=shade(hc,-6);g.beginPath();g.moveTo(9.6,by-10.5);g.quadraticCurveTo(12,by-12.5,13.6,by-11);g.lineTo(17.2,by-6);g.quadraticCurveTo(17,by-4.4,15.4,by-4.8);g.lineTo(11.5,by-7.5);g.closePath();g.fill();
+    g.fillStyle=hd;g.beginPath();g.moveTo(11,by-11.6);g.lineTo(11.3,by-14);g.lineTo(12.4,by-11.8);g.closePath();g.fill();
+    g.fillStyle='#120c08';g.beginPath();g.arc(12.9,by-9.4,.55,0,7);g.fill();g.fillRect(16.2,by-5.9,.9,.9);
+    g.strokeStyle='#1c130c';g.lineWidth=1.7;g.beginPath();g.moveTo(10.6,by-11);g.quadraticCurveTo(7.5,by-8.5,4.5,by-4);g.stroke();
+    g.lineWidth=.6;for(let k=0;k<4;k++){g.beginPath();g.moveTo(9.6-k*1.4,by-10+k*1.6);g.lineTo(8.6-k*1.4+Math.sin(gal+k)*.4,by-8.4+k*1.6);g.stroke()}
+    g.fillStyle='rgba(255,240,220,.1)';g.beginPath();g.ellipse(-1,by-3.2,7,1.2,0,0,7);g.fill();
+    g.strokeStyle='rgba(0,0,0,.16)';g.lineWidth=.8;g.beginPath();g.arc(5.5,by+.5,3.6,-1.9,1.2);g.moveTo(-3.2,by-3);g.quadraticCurveTo(-6.5,by-1.5,-7.6,by+3.6);g.stroke();   // Schulter und Hinterhand
+    g.fillStyle='rgba(0,0,0,.18)';g.beginPath();g.ellipse(0,by+3,7.5,1.3,0,0,7);g.fill();
+    // nahe Beine
+    leg(6.5,by+2.5,gal,hc,true);leg(-5.5,by+2.5,gal+Math.PI,hc,false);
+    // Satteldecke in Spielerfarbe, Sattel, Zaumzeug
+    const rX=cha?-17:-.5;
+    if(!cha){g.fillStyle=dk;g.beginPath();g.moveTo(-4.6,by-4);g.lineTo(3.4,by-4);g.lineTo(3,by+2.2);g.lineTo(-4.2,by+2.2);g.closePath();g.fill();
+      g.fillStyle=pc;g.globalAlpha=.85;g.fillRect(-4.2,by-3.4,7.2,4.6);g.globalAlpha=1;g.fillStyle='#2a1a10';g.beginPath();g.moveTo(-3.8,by-4);g.quadraticCurveTo(-.5,by-3,2.8,by-4.8);g.lineTo(2.8,by-3.2);g.lineTo(-3.8,by-2.8);g.closePath();g.fill()}
+    g.strokeStyle='#24170e';g.lineWidth=.6;g.beginPath();g.moveTo(16.4,by-5.4);g.lineTo(cha?-14:3,by-(cha?7.5:9));g.stroke();
+    // Reiter: Bein mit Stiefel, Rumpf mit Rüstung und Wappenrock, Kopf mit epochengerechtem Helm
+    const ry=by-(cha?-1.5:4),cl=ep>=2&&ep<=5?'#7a7f84':ep>=6?'#4a4a3e':'#6a5236',sk=['#c49a76','#b88a66','#a8785a'][u.id%3];
+    if(!cha){g.strokeStyle=ep>=6?'#3a3428':'#5a4630';g.lineWidth=2;g.beginPath();g.moveTo(rX,ry);g.lineTo(rX+2.2,ry+3.4);g.lineTo(rX+1.6,ry+6.6);g.stroke();g.fillStyle='#1e1610';g.fillRect(rX+.6,ry+6,2.6,1.4)}
+    const tg=g.createLinearGradient(rX-3,0,rX+3,0);tg.addColorStop(0,shade(cl,22));tg.addColorStop(1,shade(cl,-28));g.fillStyle=tg;
+    g.beginPath();g.moveTo(rX-2.6,ry+.5);g.lineTo(rX-2.2,ry-7);g.quadraticCurveTo(rX,ry-8.3,rX+2.2,ry-7);g.lineTo(rX+2.4,ry+.5);g.closePath();g.fill();
+    g.fillStyle=pc;g.globalAlpha=.85;g.fillRect(rX-2.3,ry-3.2,4.6,3.4);g.globalAlpha=1;g.fillStyle='rgba(20,14,8,.5)';g.fillRect(rX-2.4,ry-3.6,4.8,.6);
+    const tip=(UD.range||0)>1.5;
+    g.strokeStyle=shade(cl,-10);g.lineWidth=1.4;g.beginPath();g.moveTo(rX+.5,ry-6);g.lineTo(rX+3.2+sw*1.5,ry-3.2);g.lineTo(rX+5+sw*2,ry-3.6);g.stroke();
+    const hy=ry-10;g.fillStyle=sk;g.beginPath();g.arc(rX+.3,hy,2.3,0,7);g.fill();g.fillStyle='rgba(0,0,0,.22)';g.beginPath();g.arc(rX-.4,hy+.3,2,Math.PI*.6,Math.PI*1.5);g.fill();
+    if(ep>=2&&ep<=5){g.fillStyle='#8d9298';g.beginPath();g.arc(rX+.3,hy-.4,2.5,Math.PI,0);g.fill();g.fillRect(rX-2.2,hy-.6,5,.9);g.fillStyle='#6a6e72';g.fillRect(rX+1.8,hy-.5,.7,2.2);
+      if(u.type==='knight'){g.fillStyle=pc;g.beginPath();g.moveTo(rX,hy-2.8);g.quadraticCurveTo(rX-3,hy-4.5,rX-4.5,hy-2);g.lineTo(rX-.5,hy-2.4);g.closePath();g.fill()}}
+    else if(ep>=6){g.fillStyle='#2a2620';g.beginPath();g.ellipse(rX+.3,hy-1.6,3.4,.9,0,0,7);g.fill();g.beginPath();g.ellipse(rX+.3,hy-2.4,2,1.4,0,Math.PI,0);g.fill()}
+    else{g.fillStyle='#3a2a1c';g.beginPath();g.arc(rX+.1,hy-.6,2.3,Math.PI*.95,Math.PI*2.05);g.fill()}
+    // Waffe: Lanze (vorgestreckt beim Angriff) oder Bogen/Flinte bei Schützen
+    if(tip){if(ep>=5){g.strokeStyle='#2b2620';g.lineWidth=1.3;g.beginPath();g.moveTo(rX-1,ry-2);g.lineTo(rX+9+sw*2,ry-6);g.stroke()}
+      else{g.strokeStyle='#5a3a1e';g.lineWidth=1;g.beginPath();g.arc(rX+5.6,ry-4.5,5,-1.2,1.2);g.stroke();g.strokeStyle='rgba(220,210,190,.6)';g.lineWidth=.4;g.beginPath();g.moveTo(rX+5.6+Math.cos(-1.2)*5,ry-4.5+Math.sin(-1.2)*5);g.lineTo(rX+5.6+Math.cos(1.2)*5-sw*2,ry-4.5+Math.sin(1.2)*5);g.stroke()}}
+    else{const lx=sw*4,wc=ep>=3?'#3a3026':ep===2?'#b9a27a':'#6b4a2a';g.strokeStyle=wc;g.lineWidth=1.3;g.beginPath();g.moveTo(rX-6+lx,ry-1);g.lineTo(rX+17+lx,ry-8.5+sw*3);g.stroke();
+      g.fillStyle='#9a9ea2';g.beginPath();g.moveTo(rX+17+lx,ry-8.5+sw*3);g.lineTo(rX+20+lx,ry-9.5+sw*3);g.lineTo(rX+16.6+lx,ry-7.4+sw*3);g.closePath();g.fill();
+      if(ep===2||u.type==='knight'){g.fillStyle=pc;g.beginPath();g.moveTo(rX+14+lx,ry-7.6+sw*3);g.lineTo(rX+10+lx,ry-8+sw*3);g.lineTo(rX+12+lx,ry-5.6+sw*3);g.closePath();g.fill()}}
+    g.restore();g.lineCap='butt';g.lineJoin='miter';
   }else if(LOOK(u.type)==='siege'){
     g.save();g.translate(x,y);g.rotate(a);
     const wheel=(wx,wy,r)=>{// Speichenrad mit Eisenreifen, dreht sich beim Fahren
