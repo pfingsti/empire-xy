@@ -1419,6 +1419,8 @@ function epochDress(g,re,x,by,hx,hy,pc){
 // Einheiten größer zeichnen (AoE-artige Figuren), schwere Typen etwas wuchtiger
 function drawUnit(g,u){
   const UD=UNITS[u.type],k=(UD.scale||1.32)*Math.sqrt((UD.r||.3)/.3),x=u.x*T,y=u.y*T;
+  if(!UD.naval){const rr=(UD.r||.3)*T*k;g.strokeStyle=PCOL[u.owner];g.globalAlpha=.55;g.lineWidth=1.6;g.beginPath();g.ellipse(x,y+rr*.75,rr*1.05,rr*.48,0,0,7);g.stroke();g.globalAlpha=1;
+    if(u.moving&&SEASON!==3){const ca=Math.cos(u.ang||0),sa=Math.sin(u.ang||0);for(let i=0;i<3;i++){const f=((gameT*2.2+i/3+(u.id%7)/7)%1),d=6+f*14;g.fillStyle=`rgba(150,125,90,${(.32*(1-f)).toFixed(2)})`;g.beginPath();g.arc(x-ca*d+(i-1)*2,y+rr*.7-sa*d*.5,2+f*4,0,7);g.fill()}}}
   g.save();g.translate(x,y);g.scale(k,k);g.translate(-x,-y);drawUnitRaw(g,u);g.restore();
   if(u.rank&&u.type!=='hero'){const xx=u.x*T+u.r*T*1.2,yy=u.y*T-u.r*T*2.6;g.fillStyle=u.rank===2?'#f2cf4f':'#c9ccd0';for(let i=0;i<u.rank;i++){g.beginPath();g.moveTo(xx-4,yy+i*3.5);g.lineTo(xx,yy+2.5+i*3.5);g.lineTo(xx+4,yy+i*3.5);g.lineTo(xx+4,yy+1.5+i*3.5);g.lineTo(xx,yy+4+i*3.5);g.lineTo(xx-4,yy+1.5+i*3.5);g.closePath();g.fill()}}
   if(u.form){const yy=u.y*T+u.r*T*1.6,xx=u.x*T;g.fillStyle=['','#6fa0d8','#e07a4a','#8fd06a'][u.form];if(u.form===1)g.fillRect(xx-5,yy,10,3);else if(u.form===2){g.beginPath();g.moveTo(xx-5,yy+3);g.lineTo(xx,yy-2);g.lineTo(xx+5,yy+3);g.closePath();g.fill()}else{for(let i=-1;i<=1;i++)g.fillRect(xx+i*4-1,yy,2,3)}}
