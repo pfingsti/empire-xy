@@ -1536,6 +1536,9 @@ function render(){
   ctx.lineCap='round';
   for(let ty=Math.max(0,ty0);ty<Math.min(H,ty1);ty++)for(let tx=Math.max(0,tx0);tx<Math.min(W,tx1);tx++){
     if(terr[idx(tx,ty)]!==1)continue;const h=((tx*73856093)^(ty*19349663))>>>0,ph=(h%1000)/1000;
+    {// Lichtreflexe und Wellengang: weiche Bänder ziehen über das Wasser
+      const wv=Math.sin(now*.6+tx*.35-ty*.22)*.5+.5,wv2=Math.sin(now*.9-tx*.18+ty*.4)*.5+.5;
+      ctx.fillStyle=`rgba(190,215,225,${(.07*wv*wv*(1-WX.night)).toFixed(3)})`;ctx.fillRect(tx*T,ty*T,T,T);}
     {const fo=.22+.18*Math.sin(now*1.6+tx*.9+ty*.7);ctx.strokeStyle=`rgba(235,245,240,${fo.toFixed(2)})`;ctx.lineWidth=2;const w=Math.sin(now*1.6+tx+ty)*1.5;
       const L=(x,y)=>inb(x,y)&&terr[idx(x,y)]!==1;ctx.beginPath();
       if(L(tx,ty-1)){ctx.moveTo(tx*T+2,ty*T+3+w);ctx.lineTo(tx*T+T-2,ty*T+3+w)}if(L(tx,ty+1)){ctx.moveTo(tx*T+2,ty*T+T-3-w);ctx.lineTo(tx*T+T-2,ty*T+T-3-w)}
