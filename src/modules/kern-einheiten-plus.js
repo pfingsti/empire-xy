@@ -12,7 +12,7 @@ EmpireXY.register({
       hp:40,atk:4,range:4.5,rate:1.5,speed:1.6,sight:7,cost:{food:30,wood:30},time:10,r:.27,pop:1,proj:1,bonus:{ranged:2.2},tint:'#5b7a3c',desc:'Billiger Fernkämpfer gegen gegnerische Schützen.'},
     marks:{label:'Elite-Schützen',cls:'ranged',from:'range',minEpoch:4,names:['','','','','Langbogenschütze','Elite-Arkebusier','Rotröcke','Gebirgsjäger','Präzisionsschütze','Scharfschütze'],
       hp:50,atk:11,range:6.5,rate:2.2,speed:1.35,sight:8,cost:{food:50,wood:40,gold:40},time:15,r:.27,pop:1,proj:1,bonus:{infantry:1.5},tint:'#8e2f2a',desc:'Große Reichweite, hoher Schaden.'},
-    scout:{label:'Späher',cls:'cavalry',from:'stable',minEpoch:1,names:['','Späher','Kundschafter','Leichter Reiter','Husar','Ulan','Chasseur','Kradmelder','Spähwagen','Aufklärungsfahrzeug'],
+    scout:{label:'Späher',cls:'cavalry',stealth:true,from:'stable',minEpoch:1,names:['','Späher','Kundschafter','Leichter Reiter','Husar','Ulan','Chasseur','Kradmelder','Spähwagen','Aufklärungsfahrzeug'],
       hp:70,atk:5,range:.5,rate:1.1,speed:3.2,sight:10,cost:{food:70},time:12,r:.36,pop:1,bonus:{siege:2,ranged:1.4},desc:'Sehr schnell, sieht weit. Ideal zum Erkunden und Jagen von Belagerung.'},
     harcher:{label:'Berittene Schützen',cls:'cavalry',look:'cavalry',from:'stable',minEpoch:3,names:['','','','Berittener Bogner','Steppenreiter','Berittener Arkebusier','Dragoner-Schütze','Karabinierreiter','Panzerspähwagen','Schützenpanzer'],
       hp:85,atk:6,range:4,rate:1.8,speed:2.6,sight:8,cost:{food:60,wood:40,gold:40},time:16,r:.37,pop:1,proj:1,bonus:{infantry:1.3},desc:'Schnell und schießt aus der Bewegung.'},

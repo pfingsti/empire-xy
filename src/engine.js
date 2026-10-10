@@ -437,7 +437,7 @@ function nearestDrop(p,x,y){
 function enemyNear(u,radius,wantBld){
   let best=null,bd=radius;
   for(const e of ents){
-    if(e.dead||e.owner<0||e.owner===u.owner)continue;
+    if(e.dead||e.owner<0||e.owner===u.owner||e.kind==='unit'&&hidden(e)&&Math.hypot(e.x-u.x,e.y-u.y)>2.5)continue;
     if(e.kind==='res')continue;
     if(e.kind==='bld'&&!wantBld)continue;
     if(u.owner===0&&e.kind==='unit'&&!vis[idx(e.x|0,e.y|0)])continue;
@@ -450,11 +450,11 @@ function enemyNear(u,radius,wantBld){
 // ================= combat =================
 function damage(t,dmg,src){
   if(t.dead)return;
-  t.hp-=dmg;t.hitT=gameT;if(visibleEnt(t))sfx(dmg>20?'boom':src&&src.kind==='unit'&&uStat(src).range<1.5&&!['siege'].includes(CLS(src.type))?'sword':'hit');
+  t.hp-=dmg;t.hitT=gameT;t.revealT=gameT+6;if(src)src.revealT=gameT+6;if(visibleEnt(t))sfx(dmg>20?'boom':src&&src.kind==='unit'&&uStat(src).range<1.5&&!['siege'].includes(CLS(src.type))?'sword':'hit');
   fx.push({x:center(t).x+(rng()-.5)*.4,y:center(t).y+(rng()-.5)*.4,t:0,k:'hit'});
   if(t.owner===0&&gameT-lastAlarm>20&&src){lastAlarm=gameT;toast('Wir werden angegriffen!','warn');ping=center(t);pingT=3}
   if(t.kind==='unit'&&src&&!src.dead&&src.owner!==t.owner){
-    if(isMil(t)&&(t.order.t==='idle'||(t.order.t==='amove')))order(t,{t:'attack',target:src.id,resume:t.order.t==='amove'?t.order:null});
+    if(isMil(t)&&!UNITS[t.type].stealth&&(t.order.t==='idle'||(t.order.t==='amove')))order(t,{t:'attack',target:src.id,resume:t.order.t==='amove'?t.order:null});
     else if(t.type==='worker'&&t.owner===1)aiS.alarm={x:t.x,y:t.y,time:gameT};
   }
   if(t.kind==='bld'&&t.owner===1&&src)aiS.alarm={x:src.x,y:src.y,time:gameT};
@@ -511,7 +511,7 @@ function updUnit(u,dt){
   const o=u.order;
   switch(o.t){
     case 'idle':{
-      if(isMil(u)&&u.scan<=0){u.scan=.5;const e=enemyNear(u,st.sight,u.type==='siege');if(e)order(u,{t:'attack',target:e.id,resume:{t:'guard',x:u.x,y:u.y}})}
+      if(isMil(u)&&!UNITS[u.type].stealth&&u.scan<=0){u.scan=.5;const e=enemyNear(u,st.sight,u.type==='siege');if(e)order(u,{t:'attack',target:e.id,resume:{t:'guard',x:u.x,y:u.y}})}
       break;}
     case 'guard':{ // return to post after a skirmish
       if(u.scan<=0){u.scan=.5;const e=enemyNear(u,st.sight,u.type==='siege');if(e){order(u,{t:'attack',target:e.id,resume:{t:'guard',x:o.x,y:o.y}});break}}
@@ -603,19 +603,19 @@ function updBld(b,dt){
     b.cd-=dt;
     if(b.cd<=0){
       let best=null,bd=D.range;
-      for(const e of ents){if(e.kind!=='unit'||e.dead||e.owner===b.owner)continue;const c=center(b),d=Math.hypot(e.x-c.x,e.y-c.y)-b.size/2;if(d<bd){bd=d;best=e}}
+      for(const e of ents){if(e.kind!=='unit'||e.dead||e.owner===b.owner||hidden(e))continue;const c=center(b),d=Math.hypot(e.x-c.x,e.y-c.y)-b.size/2;if(d<bd){bd=d;best=e}}
       if(best){b.cd=D.rate;const c=center(b);proj.push({x:c.x,y:c.y-.6,tid:best.id,dmg:D.atk*(1+.14*pl.epoch)*(1+pl.fx.bldAtk),src:b.id,k:'arrow',ep:pl.epoch,sp:14,arc:bd})}
     }
   }
-  const q=b.queue[0];if(!q)return;
+  const q=b.queue[0];if(!q)return;const sdt=b.sabotUntil>gameT?dt*.5:dt;// sabotiert: halbe Produktion
   if(q.tech){
-    q.t+=dt;
+    q.t+=sdt;
     if(q.t>=q.total){b.queue.shift();applyTech(pl,q.tech);
       if(b.owner===0)toast('Forschung abgeschlossen: '+TECHS[q.tech].name+'.','good');uiDirty=true}
     return;
   }
   if(q.ep){
-    q.t+=dt;
+    q.t+=sdt;
     if(q.t>=q.total){b.queue.shift();pl.advancing=false;pl.epoch++;
       for(const u of ents)if(u.kind==='unit'&&u.owner===b.owner&&!u.dead){const f=u.hp/u.maxhp;u.maxhp=uStat(u).hp;u.hp=Math.max(1,Math.round(u.maxhp*f))}
       if(b.owner===0)toast('Willkommen in der '+EPOCHS[pl.epoch]+'! Neue Einheiten und Gebäude sind verfügbar.','good');
@@ -626,7 +626,7 @@ function updBld(b,dt){
   }
   const U=UNITS[q.u];
   if(!q.started){if(pl.pop+U.pop>pl.cap){q.blocked=true;if(b.owner===0&&gameT-(b.popWarn||-99)>15){b.popWarn=gameT;toast('Bevölkerungslimit erreicht. Baue Wohnhäuser.','warn')}return}q.started=true;q.blocked=false;recalcPop()}
-  q.t+=dt;
+  q.t+=sdt;
   if(q.t>=q.total){
     b.queue.shift();
     const s=freeAround(b,b.rally?{x:b.rally.x,y:b.rally.y}:null,!!U.naval);
@@ -987,9 +987,14 @@ function centerOn(tx,ty){cam.x=tx*T-viewW/cam.z/2;cam.y=ty*T-viewH/cam.z/2;clamp
 const toScreen=(x,y)=>({x:(x*T-cam.x)*cam.z,y:(y*T-cam.y)*cam.z});
 const toWorld=(sx,sy)=>({x:(sx/cam.z+cam.x)/T,y:(sy/cam.z+cam.y)/T});
 
+// getarnt und gerade nicht enttarnt (für Türme und Einheiten des Gegners)
+const hidden=e=>UNITS[e.type]&&UNITS[e.type].stealth&&!(e.revealT>gameT);
 function visibleEnt(e){
   if(e.owner===0)return true;
-  if(e.kind==='unit')return !!vis[idx(e.x|0,e.y|0)];
+  if(e.kind==='unit'){if(!vis[idx(e.x|0,e.y|0)])return false;
+    // getarnte Kundschafter sieht man nur aus nächster Nähe oder kurz nach einem Kampf
+    if(UNITS[e.type]&&UNITS[e.type].stealth&&!(e.revealT>gameT)){for(const o of ents)if(!o.dead&&o.owner===0&&o.kind==='unit'&&Math.abs(o.x-e.x)<2.5&&Math.abs(o.y-e.y)<2.5)return true;return false}
+    return true}
   if(e.kind==='bld')return e.seen;
   return !!exp[idx(e.x,e.y)];
 }
@@ -1275,6 +1280,7 @@ function drawBld(g,b){
     drawProg(g,b,x,y,s);return;
   }
   g.drawImage(spr,x-4,y-36,spr.lw,spr.lh);
+  if(b.sabotUntil>gameT){const cx=x+s/2,cy=y-6+Math.sin(gameT*4)*1.5;g.fillStyle='rgba(30,20,20,.8)';g.beginPath();g.arc(cx,cy,7,0,7);g.fill();g.strokeStyle='#ff6a5a';g.lineWidth=2;g.beginPath();g.moveTo(cx-3.5,cy-3.5);g.lineTo(cx+3.5,cy+3.5);g.moveTo(cx+3.5,cy-3.5);g.lineTo(cx-3.5,cy+3.5);g.stroke();g.lineWidth=1}
   if(b.hp<b.maxhp*.5){const n=b.hp<b.maxhp*.25?2:1;for(let i=0;i<n;i++){const fx=x+s*(.3+.4*i),fy=y+s*.35;const f=Math.sin(gameT*12+i*2)*1.5;
     g.fillStyle='rgba(255,140,40,.85)';g.beginPath();g.moveTo(fx-4,fy+4);g.quadraticCurveTo(fx+f,fy-10,fx+4,fy+4);g.fill();g.fillStyle='rgba(255,230,120,.9)';g.beginPath();g.moveTo(fx-2,fy+4);g.quadraticCurveTo(fx+f*.5,fy-4,fx+2,fy+4);g.fill()}}
 }
@@ -1459,6 +1465,13 @@ function render(){
     list.push(e);
   }
   list.sort((a,b)=>(a.kind==='unit'?a.y:a.y+a.size-.3)-(b.kind==='unit'?b.y:b.y+b.size-.3));
+  // Handelsrouten: gestrichelte Linie vom Markt (und Lager, Mühle) zum Stadtzentrum, die der Träger abläuft
+  ctx.setLineDash([6,6]);ctx.lineDashOffset=-performance.now()/60;ctx.lineWidth=1.6;
+  for(const c of ents){if(c.dead||c.type!=='carrier'||c.owner!==0)continue;const h=byId.get(c.home);if(!h||h.dead)continue;
+    let tc=null,bd=1e9;for(const e of ents)if(e.type==='tc'&&e.owner===0&&e.built&&!e.dead){const a=center(h),b2=center(e),d=Math.hypot(a.x-b2.x,a.y-b2.y);if(d<bd){bd=d;tc=e}}
+    if(!tc)continue;const a=center(h),b2=center(tc);ctx.strokeStyle=h.type==='market'?'rgba(240,200,90,.55)':'rgba(230,220,190,.28)';
+    ctx.beginPath();ctx.moveTo(a.x*T,a.y*T);ctx.lineTo(b2.x*T,b2.y*T);ctx.stroke()}
+  ctx.setLineDash([]);ctx.lineWidth=1;
   // selection rings under units
   ctx.lineWidth=1.5;
   for(const e of sel){
