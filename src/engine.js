@@ -2076,7 +2076,7 @@ function epochDress(g,re,x,by,hx,hy,pc){
 // Einheiten größer zeichnen (AoE-artige Figuren), schwere Typen etwas wuchtiger
 function drawUnit(g,u){
   const UD=UNITS[u.type],k=(UD.scale||1.18)*Math.sqrt((UD.r||.3)/.3),x=u.x*T,y=u.y*T;
-  if(!UD.naval){const rr=(UD.r||.3)*T*k;g.strokeStyle=PCOL[u.owner];if(UD.air)g.setLineDash([3,3]);g.globalAlpha=.55;g.lineWidth=1.6;g.beginPath();g.ellipse(x,y+rr*.75,rr*1.05,rr*.48,0,0,7);g.stroke();g.globalAlpha=1;g.setLineDash([]);
+  if(!UD.naval&&!(sel&&sel.includes(u))){const rr=(UD.r||.3)*T*k;g.strokeStyle=PCOL[u.owner];if(UD.air)g.setLineDash([3,3]);g.globalAlpha=.32;g.lineWidth=1.1;g.beginPath();g.ellipse(x,y+rr*.75,rr*1.05,rr*.48,0,0,7);g.stroke();g.globalAlpha=1;g.setLineDash([]);
     if(u.moving&&SEASON!==3&&!UD.air){const ca=Math.cos(u.ang||0),sa=Math.sin(u.ang||0);for(let i=0;i<3;i++){const f=((gameT*2.2+i/3+(u.id%7)/7)%1),d=6+f*14;g.fillStyle=`rgba(150,125,90,${(.32*(1-f)).toFixed(2)})`;g.beginPath();g.arc(x-ca*d+(i-1)*2,y+rr*.7-sa*d*.5,2+f*4,0,7);g.fill()}}}
   g.save();g.translate(x,y);g.scale(k,k);g.translate(-x,-y);drawUnitRaw(g,u);g.restore();
   if(u.rank&&u.type!=='hero'){const xx=u.x*T+u.r*T*1.2,yy=u.y*T-u.r*T*2.6;g.fillStyle=u.rank===2?'#f2cf4f':'#c9ccd0';for(let i=0;i<u.rank;i++){g.beginPath();g.moveTo(xx-4,yy+i*3.5);g.lineTo(xx,yy+2.5+i*3.5);g.lineTo(xx+4,yy+i*3.5);g.lineTo(xx+4,yy+1.5+i*3.5);g.lineTo(xx,yy+4+i*3.5);g.lineTo(xx-4,yy+1.5+i*3.5);g.closePath();g.fill()}}
@@ -2204,7 +2204,9 @@ function drawUnitRaw(g,u){
   }else{humanoid(g,u,ep,pc,dk);
   }
 }
-function hpBar(g,x,y,w,f){g.fillStyle='rgba(0,0,0,.7)';g.fillRect(x-1,y-1,w+2,5);g.fillStyle=f>.5?'#79c27c':f>.25?'#e8c650':'#e0604f';g.fillRect(x,y,w*f,3);g.fillStyle='rgba(255,255,255,.25)';g.fillRect(x,y,w*f,1)}
+function hpBar(g,x,y,w,f){f=Math.max(0,Math.min(1,f));g.fillStyle='rgba(12,10,8,.72)';g.fillRect(x-1,y-1,w+2,5);g.fillStyle='rgba(60,40,30,.6)';g.fillRect(x,y,w,3);
+  const c=f>.5?['#9ed08a','#4f8f4a']:f>.25?['#ecd07a','#a8862e']:['#ec8a72','#a83a2c'],gr=g.createLinearGradient(0,y,0,y+3);gr.addColorStop(0,c[0]);gr.addColorStop(1,c[1]);g.fillStyle=gr;g.fillRect(x,y,w*f,3);
+  if(w>24){g.fillStyle='rgba(0,0,0,.35)';for(let i=1;i<4;i++)g.fillRect(x+Math.round(w*i/4),y,.8,3)}g.strokeStyle='rgba(200,180,140,.35)';g.lineWidth=.6;g.strokeRect(x-.7,y-.7,w+1.4,4.4);g.lineWidth=1}
 
 // ---------- ambient visual effects (not part of the simulation)
 let vfx=[];
@@ -2260,8 +2262,11 @@ function render(){
   ctx.lineWidth=1.5;
   for(const e of sel){
     if(e.dead)continue;ctx.strokeStyle=e.owner===ME?'#9ef0a0':e.owner<0?'#f0d78a':'#ff8a7a';
-    if(e.kind==='unit'){ctx.globalAlpha=.35;ctx.lineWidth=4;ctx.beginPath();ctx.ellipse(e.x*T,e.y*T+e.r*T*.6,e.r*T*1.35,e.r*T*.7,0,0,7);ctx.stroke();ctx.globalAlpha=1;ctx.lineWidth=1.5;ctx.stroke()}
-    else{ctx.strokeRect(e.x*T+1,e.y*T+1,e.size*T-2,e.size*T-2);if(e.owner===ME&&e.built&&['camp','mill','mine'].includes(e.type)&&e.area!==null){ctx.save();ctx.setLineDash([8,6]);ctx.strokeStyle='rgba(233,190,114,.6)';ctx.lineWidth=1.5;ctx.beginPath();ctx.arc((e.x+e.size/2)*T,(e.y+e.size/2)*T,10*T,0,7);ctx.stroke();ctx.restore()}}
+    if(e.kind==='unit'){const UD=UNITS[e.type]||{},k=(UD.scale||1.18)*Math.sqrt((UD.r||.3)/.3),rr=(UD.r||.3)*T*k,cx=e.x*T,cy=e.y*T+rr*.75,rx=rr*1.2,ry=rr*.56;
+      ctx.globalAlpha=.18;ctx.fillStyle=ctx.strokeStyle;ctx.beginPath();ctx.ellipse(cx,cy,rx,ry,0,0,7);ctx.fill();ctx.globalAlpha=.3;ctx.lineWidth=3.5;ctx.stroke();ctx.globalAlpha=.95;ctx.lineWidth=1.2;ctx.stroke();ctx.globalAlpha=1}
+    else{const x0=e.x*T+1,y0=e.y*T+1,x1=x0+e.size*T-2,y1=y0+e.size*T-2,L=Math.min(12,e.size*T*.22);ctx.save();ctx.globalAlpha=.25;ctx.lineWidth=4;
+      const br=()=>{ctx.beginPath();for(const [px,py,dx,dy] of [[x0,y0,1,1],[x1,y0,-1,1],[x0,y1,1,-1],[x1,y1,-1,-1]]){ctx.moveTo(px+dx*L,py);ctx.lineTo(px,py);ctx.lineTo(px,py+dy*L)}ctx.stroke()};
+      br();ctx.globalAlpha=.95;ctx.lineWidth=1.6;br();ctx.globalAlpha=.12;ctx.lineWidth=1;ctx.strokeRect(x0,y0,x1-x0,y1-y0);ctx.restore();if(e.owner===ME&&e.built&&['camp','mill','mine'].includes(e.type)&&e.area!==null){ctx.save();ctx.setLineDash([8,6]);ctx.strokeStyle='rgba(233,190,114,.6)';ctx.lineWidth=1.5;ctx.beginPath();ctx.arc((e.x+e.size/2)*T,(e.y+e.size/2)*T,10*T,0,7);ctx.stroke();ctx.restore()}}
   }
   ctx.lineWidth=1;
   // Gefallene: kippen um und verblassen (wie in AoE)
