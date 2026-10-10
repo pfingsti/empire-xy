@@ -1057,6 +1057,8 @@ function shade(hex,amt){const c=hex2rgb(hex);return `rgb(${Math.max(0,Math.min(2
 function blob(g,x,y,r,light,mid,dark){const gr=g.createRadialGradient(x-r*.4,y-r*.45,r*.1,x,y,r);gr.addColorStop(0,light);gr.addColorStop(.55,mid);gr.addColorStop(1,dark);g.fillStyle=gr;g.beginPath();g.arc(x,y,r,0,7);g.fill()}
 const OUT='rgba(20,16,10,.55)';
 
+const SHADOWS=new Map();
+function shadowSprite(sp,key){let c=SHADOWS.get(key);if(c)return c;c=document.createElement('canvas');c.width=sp.width;c.height=sp.height;const g=c.getContext('2d');g.drawImage(sp,0,0);g.globalCompositeOperation='source-in';g.fillStyle='#0a0f08';g.fillRect(0,0,c.width,c.height);SHADOWS.set(key,c);return c}
 function treeSprite(v){
   const kind=v<.33?'pine':v<.42?'birch':'leaf',vi=(v*97|0)%6;
   return sprite('tree'+kind+vi,48,64,g=>{
@@ -1505,6 +1507,10 @@ function render(){
   ctx.lineCap='round';
   for(let ty=Math.max(0,ty0);ty<Math.min(H,ty1);ty++)for(let tx=Math.max(0,tx0);tx<Math.min(W,tx1);tx++){
     if(terr[idx(tx,ty)]!==1)continue;const h=((tx*73856093)^(ty*19349663))>>>0,ph=(h%1000)/1000;
+    {const fo=.22+.18*Math.sin(now*1.6+tx*.9+ty*.7);ctx.strokeStyle=`rgba(235,245,240,${fo.toFixed(2)})`;ctx.lineWidth=2;const w=Math.sin(now*1.6+tx+ty)*1.5;
+      const L=(x,y)=>inb(x,y)&&terr[idx(x,y)]!==1;ctx.beginPath();
+      if(L(tx,ty-1)){ctx.moveTo(tx*T+2,ty*T+3+w);ctx.lineTo(tx*T+T-2,ty*T+3+w)}if(L(tx,ty+1)){ctx.moveTo(tx*T+2,ty*T+T-3-w);ctx.lineTo(tx*T+T-2,ty*T+T-3-w)}
+      if(L(tx-1,ty)){ctx.moveTo(tx*T+3+w,ty*T+2);ctx.lineTo(tx*T+3+w,ty*T+T-2)}if(L(tx+1,ty)){ctx.moveTo(tx*T+T-3-w,ty*T+2);ctx.lineTo(tx*T+T-3-w,ty*T+T-2)}ctx.stroke()}
     const al=Math.pow(Math.max(0,Math.sin(now*1.3+ph*6.28)),6)*.55;if(al<.03)continue;
     const sx=tx*T+(h%23),sy=ty*T+((h>>5)%27);ctx.strokeStyle=`rgba(225,245,250,${al})`;ctx.lineWidth=1.4;ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(sx+6,sy-1);ctx.stroke();
   }
@@ -1538,6 +1544,15 @@ function render(){
   for(const c of corpses){const age=gameT-c.dt0,k=Math.min(1,age/.35),x=c.x*T,y=c.y*T;
     ctx.save();ctx.globalAlpha=age<9?1:Math.max(0,(12-age)/3);ctx.translate(x,y+4);ctx.rotate(c.fall*k*Math.PI/2);ctx.translate(-x,-y-4);
     if(age>.35)ctx.filter='saturate(.55) brightness(.8)';drawUnit(ctx,c);ctx.restore()}
+  // Sonnenschatten (wie in Empire Earth 2): Silhouetten wandern mit dem Sonnenstand über den Tag
+  {const dp=(gameT%240)/120;if(dp<1&&WX.night<.9){const k=(dp-.5)*-2.2,sy=.38+.5*Math.abs(dp-.5),al=(.3*(1-WX.night)*(WX.kind==='sun'?1:.55)).toFixed(3);
+    ctx.save();ctx.globalAlpha=+al;
+    for(const e of list){let spr,bx,by,dx,dy,w,h;
+      if(e.kind==='bld'&&e.built&&!BLD[e.type].draw&&!BLD[e.type].line){const sp=bldSprite(e.type,players[e.owner].epoch,e.owner);spr=shadowSprite(sp,'b'+e.type+players[e.owner].epoch+e.owner);bx=e.x*T+e.size*T/2;by=e.y*T+e.size*T-4;dx=e.x*T-4-bx;dy=e.y*T-36-by;w=sp.lw;h=sp.lh}
+      else if(e.kind==='res'&&e.type==='tree'&&!(e.amount<e.max)){const sp=treeSprite(e.v);spr=shadowSprite(sp,'t'+e.v);bx=e.x*T+16;by=e.y*T+28;dx=-24;dy=-60;w=48;h=64}
+      else continue;
+      const z=cam.z*dpr;ctx.setTransform(z,0,0,z,(bx-cam.x)*z,(by-cam.y)*z);ctx.transform(1,0,k,sy,0,0);ctx.drawImage(spr,dx,dy,w,h)}
+    ctx.restore()}}
   for(const e of list){if(e.kind==='res')drawRes(ctx,e);else if(e.kind==='bld')drawBld(ctx,e);
     else if(e.hitT&&gameT-e.hitT<.1){ctx.save();ctx.filter='brightness(1.9)';drawUnit(ctx,e);ctx.restore()}else drawUnit(ctx,e)}
   // ambient particles: dust, wood chips, chimney smoke
