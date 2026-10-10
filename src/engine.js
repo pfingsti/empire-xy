@@ -456,7 +456,7 @@ function enemyNear(u,radius,wantBld){
 const vetRank=u=>(u.kills||0)>=5?2:(u.kills||0)>=2?1:0,vetMul=u=>u&&u.rank?(u.rank===2?1.15:1.05):1;
 function damage(t,dmg,src){
   if(t.dead)return;
-  if(src&&src.buffUntil>gameT)dmg*=1.2;if(src&&src.templeT>gameT)dmg*=1.1;if(src&&src.form===2)dmg*=1.3;if(t.form===1)dmg*=.7;if(t.campT>gameT)dmg*=.6;else if(t.form===2)dmg*=1.2;if(src&&src.owner!=null&&players[src.owner]&&players[src.owner].monAtk)dmg*=1+players[src.owner].monAtk;if(src&&src.kind==='unit'&&t.kind==='unit'&&t.hp>0&&t.hp<=dmg*vetMul(src)){src.kills=(src.kills||0)+1;const r=vetRank(src);if(r>(src.rank||0)){src.rank=r;if(src.type!=='hero'){src.maxhp=Math.round(src.maxhp*(r===1?1.05:1.1));if(src.owner===0&&r===2)toast(uname(UNITS[src.type],players[0].epoch)+' ist jetzt ein Veteran.','good')}}}
+  if(src&&src.buffUntil>gameT)dmg*=1.2;if(src&&src.templeT>gameT)dmg*=1.1;if(src&&src.form===2)dmg*=1.3;if(t.form===1)dmg*=UNITS[t.type]&&UNITS[t.type].shield?.5:.7;if(src&&src.owner>=0&&players[src.owner]&&players[src.owner].raceUntil>gameT)dmg*=1.1;if(t.campT>gameT)dmg*=.6;else if(t.form===2)dmg*=1.2;if(src&&src.owner!=null&&players[src.owner]&&players[src.owner].monAtk)dmg*=1+players[src.owner].monAtk;if(src&&src.kind==='unit'&&t.kind==='unit'&&t.hp>0&&t.hp<=dmg*vetMul(src)){src.kills=(src.kills||0)+1;const r=vetRank(src);if(r>(src.rank||0)){src.rank=r;if(src.type!=='hero'){src.maxhp=Math.round(src.maxhp*(r===1?1.05:1.1));if(src.owner===0&&r===2)toast(uname(UNITS[src.type],players[0].epoch)+' ist jetzt ein Veteran.','good')}}}
   if(src)dmg*=vetMul(src);if(t.rank)dmg/=t.rank===2?1.15:1.05;if(src&&src.vetAuraT>gameT&&!src.rank)dmg*=1.08;
   t.hp-=dmg;t.hitT=gameT;t.revealT=gameT+6;if(src)src.revealT=gameT+6;if(visibleEnt(t))sfx(dmg>20?'boom':src&&src.kind==='unit'&&uStat(src).range<1.5&&!['siege'].includes(CLS(src.type))?'sword':'hit');
   fx.push({x:center(t).x+(rng()-.5)*.4,y:center(t).y+(rng()-.5)*.4,t:0,k:'hit'});
@@ -618,7 +618,7 @@ function updBld(b,dt){
   }
   const q=b.queue[0];if(!q)return;const sdt=(b.sabotUntil>gameT?dt*.5:dt)*(players[b.owner].crowdMul||1)*(players[b.owner].monProd||1)*(SEASON===3?.8:1);// sabotiert: halbe Produktion
   if(q.tech){
-    q.t+=sdt;
+    q.t+=sdt*(pl.raceUntil>gameT?2:1);
     if(q.t>=q.total){b.queue.shift();applyTech(pl,q.tech);
       if(b.owner===0)toast('Forschung abgeschlossen: '+TECHS[q.tech].name+'.','good');uiDirty=true}
     return;
@@ -626,6 +626,7 @@ function updBld(b,dt){
   if(q.ep){
     q.t+=sdt;
     if(q.t>=q.total){b.queue.shift();pl.advancing=false;pl.epoch++;
+      if(!players.some(o=>o!==pl&&o.epoch>=pl.epoch)){pl.raceUntil=gameT+120;pl.raceEp=pl.epoch;toast((b.owner===0?'Dein Volk':'Die '+CIVS[pl.civ].name)+' erreichte als Erste die '+EPOCHS[pl.epoch]+'! 2 Minuten doppelte Forschung und +10 % Kampfkraft.',b.owner===0?'good':'warn')}
       for(const u of ents)if(u.kind==='unit'&&u.owner===b.owner&&!u.dead){const f=u.hp/u.maxhp;u.maxhp=uStat(u).hp;u.hp=Math.max(1,Math.round(u.maxhp*f))}
       if(b.owner===0)toast('Willkommen in der '+EPOCHS[pl.epoch]+'! Neue Einheiten und Gebäude sind verfügbar.','good');
       else toast('Der Gegner hat die '+EPOCHS[pl.epoch]+' erreicht.','warn');
@@ -1666,7 +1667,7 @@ function getCommands(){
   }else if(first.kind==='bld'&&first.built){
     const D=BLD[first.type];
     if(D.cmds){try{D.cmds(first,API).forEach((c,i)=>{if(c)cmds[10+i]={...c,dis:c.dis||(c.cost&&!canAfford(0,c.cost)),act:()=>{if(c.cost&&!canAfford(0,c.cost)){toast('Nicht genug Rohstoffe.','warn');return}if(c.cost)pay(0,c.cost);c.act();uiDirty=true}}})}catch(e){}}
-    const tl=trainsOf(first.type);let us=0;
+    const tl=trainsOf(first.type).filter(k=>!UNITS[k].civ||UNITS[k].civ===pl.civ);let us=0;
     for(const ut of tl){const U=UNITS[ut],locked=(U.minEpoch||0)>pl.epoch,full=U.max&&countUnits(0,ut)>=U.max;
       if(us===1&&first.type==='tc')us=2;if(us===4)us=5;
       cmds[us++]={label:uname(U,pl.epoch),cost:uCost(0,ut),desc:U.desc+' ('+U.label+')',dis:locked||full||!canAfford(0,uCost(0,ut))||first.queue.length>=6,short:!locked&&!full&&!canAfford(0,uCost(0,ut)),need:locked?'Benötigt '+EPOCHS[U.minEpoch]:full?'Höchstens '+U.max+' gleichzeitig':null,act:()=>{if(!queueUnit(first,ut))toast('Nicht genug Rohstoffe.','warn');uiDirty=true}};
@@ -1798,6 +1799,8 @@ function updateTop(){
   $('#clock').textContent=SEAS_I[SEASON]+' '+(WX.kind==='rain'?'🌧 ':WX.kind==='snow'?'❄ ':WX.night>.5?'☾ ':'☀ ')+(timeLimit?fmtTime(gameT)+' / '+timeLimit+':00':fmtTime(gameT));$('#clock').title=SEAS[SEASON]+' ('+SEAS_D[SEASON]+', wechselt alle 3 Minuten). '+WXN[WX.kind]+(WX.night>.5?', Nacht: weniger Sicht, der Gegner greift eher an':'');
   const idle=ents.filter(e=>e.owner===0&&e.type==='worker'&&e.order.t==='idle').length;$('#idleN').textContent=idle;
   const wb=$('#wonderBanner');const wt=players.find(p=>p.wonderT>0);
+  const rc=players.find(p=>p.raceUntil>gameT);
+  if(!wt&&rc){wb.hidden=false;wb.textContent=(rc.i===0?'Dein Volk':CIVS[rc.civ].name)+' erreichte als Erste die '+EPOCHS[rc.raceEp]+': Vorsprung noch '+fmtTime(rc.raceUntil-gameT);}else
   if(wt){wb.hidden=false;wb.textContent=(wt.i===0?'Dein Weltwunder':'Feindliches Weltwunder')+': '+fmtTime(wt.wonderT)}else wb.hidden=true;
 }
 
