@@ -254,7 +254,7 @@ label.opt{font-size:14px;padding:5px 12px}
   <label class="setRow"><span>Grafikqualität</span><select id="setQ"><option value="2">Hoch (alle Effekte)</option><option value="1">Mittel (ohne Partikel)</option><option value="0">Niedrig (ohne Partikel und Vignette)</option></select></label>
   <label class="setRow"><span>Automatisch speichern (alle 30 s)</span><input type="checkbox" id="setAuto"></label>
   <h3>Tastenbelegung</h3>
-  <div class="setKeys"><span>P</span>Pause<span>Z</span>Freie Kamera<span>F10</span>Einstellungen öffnen<span>Esc</span>Auswahl aufheben / Fenster schließen<span>Shift + Rechtsklick</span>Wegpunkte setzen<span>Mausrad</span>Zoomen<span>Pfeiltasten / Bildrand</span>Kamera bewegen</div>
+  <div class="setKeys"><span>P</span>Pause<span>Z</span>Freie Kamera<span>F10</span>Einstellungen öffnen<span>Esc</span>Auswahl aufheben / Fenster schließen<span>Shift + Rechtsklick</span>Wegpunkte setzen<span>Mausrad</span>Zoomen<span>WASD / Pfeiltasten / Bildrand</span>Kamera bewegen<span>Shift + W/A/S/D</span>Befehl auf diesem Platz</div>
   <div class="row"><button class="go" id="setClose">Weiter</button><button class="opt" id="setMenu">Speichern und Hauptmenü</button></div>
 </div></div>
 <div class="overlay" id="startScreen">
@@ -298,7 +298,7 @@ label.opt{font-size:14px;padding:5px 12px}
     <div class="help">
       <b>Linksklick / Ziehen</b><span>Einheiten auswählen (Doppelklick: alle gleichen Typs)</span>
       <b>Rechtsklick</b><span>Bewegen, Sammeln, Bauen, Angreifen, Sammelpunkt setzen</span>
-      <b>Pfeiltasten / Rand</b><span>Karte verschieben, Mausrad zoomt, Minikarte anklicken</span>
+      <b>WASD / Pfeiltasten / Rand</b><span>Karte verschieben, Mausrad zoomt, Minikarte anklicken</span>
       <b>Q W E R T · A S D F G</b><span>Befehlsfelder unten rechts</span>
       <b>H · . · N · P · Esc</b><span>Stadtzentrum, untätiger Arbeiter, Technologiebaum, Pause, Abbrechen</span>
       <b>Touch</b><span>Ziehen verschiebt die Karte, Tippen wählt aus oder gibt einen Befehl. Gedrückt halten und ziehen zieht einen Auswahlrahmen, Doppeltippen wählt alle gleichen Einheiten.</span>
@@ -1980,10 +1980,10 @@ function wh(g,b,a){const {x,y,s,pc}=a,base=y+s-4;
   for(let i=0;i<3;i++){g.fillStyle=['#a07a48','#b8b8b0','#e9c54a'][i];g.fillRect(x+6+i*6,base-6,5,6)}}
 EmpireXY.register({
   id:'kern-lagerhaus',name:'Kern: Lagerhaus',version:'1.0.0',core:true,
-  description:'Jede Ressource hat ein Lagerlimit von 1000. Jedes Lagerhaus erhöht es um 500.',
+  description:'Jede Ressource hat ein Lagerlimit von 2000. Jedes Lagerhaus erhöht es um 1000.',
   buildings:{
     warehouse:{name:'Lagerhaus',size:2,hp:800,cost:{wood:150},time:25,sight:4,slot:31,draw:wh,ai:{minWorkers:10},
-      desc:'Erhöht das Lagerlimit jeder Ressource um 500 (Grundlimit 1000). Ist ein Lager voll, hören die Arbeiter auf zu sammeln.'},
+      desc:'Erhöht das Lagerlimit jeder Ressource um 1000 (Grundlimit 2000). Ist ein Lager voll, hören die Arbeiter auf zu sammeln.'},
   },
 });
 })();
@@ -2884,6 +2884,7 @@ let ME=0,LOCAL=0,MP=null,CMDX=false;
 const uiRand=Math.random; // für reine Grafik-Effekte, damit der Zufall der Simulation unberührt bleibt
 const FORMS=['keine','Schildwall','Keil','Schützenlinie'];
 const SLOTKEYS=['Q','W','E','R','T','A','S','D','F','G','Y','X','C','V','B','U','I','O','M','J','K','L'];
+const WASD={w:'ArrowUp',a:'ArrowLeft',s:'ArrowDown',d:'ArrowRight'};const slotKeyLabel=k=>WASD[(k||'').toLowerCase()]?'⇧'+k:(k||'');
 
 const UNITS=XY.units, BLD=XY.buildings, RESDEF=XY.nodes, TECHS=XY.techs;
 const DIFF=[
@@ -2920,9 +2921,9 @@ function addRes(type,x,y){
   if(!inb(x,y)||block[idx(x,y)]!==0||terr[idx(x,y)]===1)return null;
   const d=RESDEF[type];
   const r=addEnt({kind:'res',type,rt:d.rt,x,y,size:1,amount:d.amt,max:d.amt,v:rng(),owner:-1});
-  block[idx(x,y)]=r.id;return r;
+  block[idx(x,y)]=r.id;if(type==='tree')treeShadowDirty(x,y);return r;
 }
-function clearRes(x,y){const i=idx(x,y),id=block[i];if(id>0){const e=byId.get(id);if(e&&e.kind==='res'){e.dead=true;block[i]=0}}}
+function clearRes(x,y){const i=idx(x,y),id=block[i];if(id>0){const e=byId.get(id);if(e&&e.kind==='res'){e.dead=true;block[i]=0;treeShadowDirty(x,y)}}}
 
 let CUSTOM_MAP=null,useCustomMap=false;try{CUSTOM_MAP=JSON.parse(localStorage.getItem('empire-xy.karte')||'null')}catch(e){}
 function applyCustomMap(M){
@@ -3082,8 +3083,8 @@ function newGame(d,seed,mp){
   aiTimer=0;popT=0;pathT=0;visT=0;SEASON=0;lastAlarm=-99;
   syncRegistry();
   rng=mulberry32(seed);diff=d;curSeed=seed;
-  ents=[];corpses=[];byId=new Map();nextId=1;block=new Int32Array(W*H);gate=new Uint8Array(W*H);terr=new Uint8Array(W*H);vis=new Uint8Array(W*H);exp=new Uint8Array(W*H);
-  proj=[];fx=[];sel=[];gameT=0;over=false;placing=null;aMode=false;groups={};
+  ents=[];corpses=[];stumpDecals=[];resetTreeShadows();egrid=null;byId=new Map();nextId=1;block=new Int32Array(W*H);gate=new Uint8Array(W*H);terr=new Uint8Array(W*H);vis=new Uint8Array(W*H);exp=new Uint8Array(W*H);
+  proj=[];fx=[];sel=[];gameT=0;capT.length=0;over=false;placing=null;aMode=false;groups={};
   players=MP?MP.players.map((p,i)=>Object.assign(newPlayer(i,!!p.ai),{name:p.name},p.ai?{aiDiff:Math.max(0,Math.min(2,p.diff|0)),aiT:0}:{})):[newPlayer(0,false),newPlayer(1,true)];
   genMap();renderTerrain();
   bases.forEach((b,p)=>{
@@ -3127,8 +3128,12 @@ function spawnUnit(p,type,x,y){
   const u=addEnt({kind:'unit',type,owner:p,x,y,r:d.r,hp:0,cd:0,ang:[-Math.PI*.25,Math.PI*.75,Math.PI*.25,-Math.PI*.75][p]??0,order:{t:'idle'},path:null,pathCD:0,carry:0,ct:null,scan:rng()*.5,anim:rng()*6});
   u.hp=uStat(u).hp;u.maxhp=u.hp;return u;
 }
+// Baumstumpf: angefällter Baum. Darauf darf gebaut werden, der Stumpf verschwindet dann
+function stumpAt(i){const id=block[i];if(id<=0)return null;const e=byId.get(id);return e&&!e.dead&&e.kind==='res'&&e.type==='tree'&&e.amount<e.max?e:null}
 function placeBld(p,type,x,y,done){
   const d=BLD[type];
+  if(!d.water)for(let yy=y;yy<y+d.size;yy++)for(let xx=x;xx<x+d.size;xx++){const st=inb(xx,yy)&&stumpAt(idx(xx,yy));if(st)kill(st)}
+  if(!d.water&&stumpDecals.length)stumpDecals=stumpDecals.filter(t=>t.x<x||t.x>=x+d.size||t.y<y||t.y>=y+d.size);
   const b=addEnt({kind:'bld',type,owner:p,x,y,size:d.size,built:!!done,prog:done?1:0,hp:done?Math.round(d.hp*(1+players[p].fx.bldHp)):1,maxhp:Math.round(d.hp*(1+players[p].fx.bldHp)),queue:[],rally:null,cd:0,seen:p===LOCAL});
   if(!d.walk)for(let yy=y;yy<y+d.size;yy++)for(let xx=x;xx<x+d.size;xx++){block[idx(xx,yy)]=b.id;if(d.gate)gate[idx(xx,yy)]=p+1}
   // push units out of the footprint
@@ -3142,10 +3147,10 @@ function canPlace(p,type,x,y){
   if(d.monument&&ents.some(e=>e.type===type&&!e.dead&&(e.mep??players[e.owner].epoch)===players[p].epoch))return false;
   if(d.water){const i=idx(x,y);if(terr[i]!==1||block[i]!==-1||(p===ME&&!CMDX&&!exp[i]))return false;for(const e of ents)if(e.type==='bridge'&&!e.dead&&e.x===x&&e.y===y)return false;return true}
   for(let yy=y;yy<y+d.size;yy++)for(let xx=x;xx<x+d.size;xx++){
-    const i=idx(xx,yy);if(block[i]!==0||terr[i]===1)return false;
+    const i=idx(xx,yy);if((block[i]!==0&&!stumpAt(i))||terr[i]===1)return false;
     if(p===ME&&!CMDX&&!exp[i])return false;
-    for(const e of ents)if(e.kind==='bld'&&BLD[e.type].walk&&!e.dead&&xx>=e.x&&xx<e.x+e.size&&yy>=e.y&&yy<e.y+e.size)return false;
   }
+  for(const e of ents)if(e.kind==='bld'&&!e.dead&&BLD[e.type].walk&&e.x<x+d.size&&e.x+e.size>x&&e.y<y+d.size&&e.y+e.size>y)return false;
   if(d.shore){let w=0;for(let yy=y-1;yy<=y+d.size;yy++)for(let xx=x-1;xx<=x+d.size;xx++)if(inb(xx,yy)&&terr[idx(xx,yy)]===1)w++;if(w<2)return false}
   return true;
 }
@@ -3166,7 +3171,9 @@ const alive=e=>e&&!e.dead;
 function canAfford(p,c){for(const k in c)if(players[p].res[k]<c[k])return false;return true}
 function pay(p,c){for(const k in c)players[p].res[k]-=c[k]}
 // Einkommen je Rohstoff der letzten 60 Sekunden (für die Anzeige oben)
-function resCap(pl){let n=0;for(const e of ents)if(e.type==='warehouse'&&e.owner===pl.i&&e.built&&!e.dead)n++;return 1000+500*n}
+// Lagerlimit je Rohstoff: 2000, jedes Lagerhaus +1000. Pro Spielzeitpunkt zwischengespeichert, weil jeder sammelnde Arbeiter es abfragt
+const capT=[],capV=[];
+function resCap(pl){if(capT[pl.i]===gameT&&capV[pl.i]!==undefined)return capV[pl.i];let n=0;for(const e of ents)if(e.type==='warehouse'&&e.owner===pl.i&&e.built&&!e.dead)n++;capT[pl.i]=gameT;return capV[pl.i]=2000+1000*n}
 function income(pl,r,v){(pl.tot=pl.tot||{})[r]=(pl.tot[r]||0)+v;(pl.inc=pl.inc||[]).push([gameT,r,v])}
 function incomeRate(pl,r){if(!pl.inc)return 0;while(pl.inc.length&&pl.inc[0][0]<gameT-60)pl.inc.shift();let s=0;for(const x of pl.inc)if(x[1]===r)s+=x[2];return Math.round(s*60/Math.min(60,Math.max(10,gameT)))}
 function refund(p,c){for(const k in c)players[p].res[k]+=c[k]}
@@ -3347,9 +3354,19 @@ function nearestDrop(p,x,y){
 // Flugzeuge treffen nur Fernkämpfer, Flak, Schiffe, Türme und andere Flugzeuge, keine Granaten und keine Nahkämpfer
 const isAir=e=>!!(e&&e.kind==='unit'&&UNITS[e.type]&&UNITS[e.type].air);
 function canHit(u,t){if(!isAir(t))return true;if(u.kind!=='unit')return true;const D=UNITS[u.type];if(!D)return false;if(D.air||D.aa)return true;return D.proj===1&&D.range>=2}
+// Raster aller Einheiten und Gebäude (8x8 Felder), einmal pro Spielschritt erstellt: enemyNear prüft nur die Nachbarzellen statt aller Objekte
+const EG=8,EGW=Math.ceil(W/EG),EGH=Math.ceil(H/EG);let egrid=null,egridT=-1,egridE=null;
+function enemyGrid(){
+  if(egrid&&egridT===gameT&&egridE===ents)return egrid;
+  egrid=[];for(let i=0;i<EGW*EGH;i++)egrid.push([]);
+  for(const e of ents){if(e.dead||e.owner<0||e.kind==='res')continue;egrid[Math.min(EGH-1,Math.max(0,(e.y/EG)|0))*EGW+Math.min(EGW-1,Math.max(0,(e.x/EG)|0))].push(e)}
+  egridT=gameT;egridE=ents;return egrid;
+}
 function enemyNear(u,radius,wantBld){
-  let best=null,bd=radius;
-  for(const e of ents){
+  let best=null,bd=radius;const G=enemyGrid(),cand=[];
+  for(let cy=Math.max(0,Math.floor((u.y-radius-6)/EG));cy<=Math.min(EGH-1,Math.floor((u.y+radius+1)/EG));cy++)
+    for(let cx=Math.max(0,Math.floor((u.x-radius-6)/EG));cx<=Math.min(EGW-1,Math.floor((u.x+radius+1)/EG));cx++){const a=G[cy*EGW+cx];for(let i=0;i<a.length;i++)cand.push(a[i])}
+  for(const e of cand){
     if(e.dead||e.owner<0||e.owner===u.owner||aiS&&aiS.allied||e.kind==='unit'&&hidden(e)&&Math.hypot(e.x-u.x,e.y-u.y)>2.5)continue;
     if(e.kind==='res')continue;
     if(e.kind==='bld'&&!wantBld)continue;
@@ -3378,7 +3395,7 @@ function damage(t,dmg,src){if(src&&src.kind==='unit'&&WX.night>.5)dmg*=.8;if(src
   if(t.hp<=0)kill(t,src);
 }
 let lastAlarm=-99,ping=null,pingT=0;
-let corpses=[];
+let corpses=[],stumpDecals=[];// stumpDecals: Stümpfe ganz gefällter Bäume, nur Grafik, blockieren nichts
 function kill(e,src){
   e.dead=true;
   const mech=e.kind==='unit'&&UNITS[e.type]&&(UNITS[e.type].air||CLS(e.type)==='vehicle');
@@ -3391,7 +3408,7 @@ function kill(e,src){
     if(e.queue.some(q=>q.ep))players[e.owner].advancing=false;
     for(let k=0;k<6;k++)fx.push({x:e.x+rng()*e.size,y:e.y+rng()*e.size,t:-k*.1,k:'smoke'});
     if(e.type==='wonder')players[e.owner].wonderT=-1;
-  }else if(e.kind==='res'){block[idx(e.x,e.y)]=0}
+  }else if(e.kind==='res'){block[idx(e.x,e.y)]=0;treeShadowDirty(e.x,e.y);if(e.type==='tree'&&e.amount<=.001){stumpDecals.push({x:e.x,y:e.y});if(stumpDecals.length>500)stumpDecals.shift()}}
   else{fx.push({x:e.x,y:e.y,t:0,k:'die',c:PCOL[e.owner]})}
   if(e.owner>=0&&e.kind!=='res'){players[e.owner].st.lost++;if(src&&src.owner>=0)players[src.owner].st.killed++}
   recalcPop();
@@ -3470,10 +3487,15 @@ function updUnit(u,dt){
       if(u.carry>=10+players[u.owner].fx.carry){order(u,{t:'return',resume:o});break}
       if(distEnt(u,r)<=.5){
         u.path=null;const c=center(r);u.ang=Math.atan2(c.y-u.y,c.x-u.x);
+        if(r.kind==='bld'&&BLD[r.type].walk){// Bauer steht auf dem Feld und arbeitet sich langsam die Furchen entlang
+          const m=.4,span=r.size-2*m,ph=gameT*.12+u.id*.7,lane=Math.floor(ph/Math.PI)%3,fx=r.x+m+span*(.5-.5*Math.cos(ph)),fy=r.y+m+span*(lane+.5)/3;
+          const dx=fx-u.x,dy=fy-u.y,dd=Math.hypot(dx,dy);
+          if(dd>.05){const st=Math.min(dd,(dd>.6?1.2:.35)*dt);u.x+=dx/dd*st;u.y+=dy/dd*st;u.ang=Math.atan2(dy,dx)}
+          if(dd>.6)break}
         const rate={wood:.85,food:r.kind==='bld'?.6:.95,stone:.65,gold:.65}[o.rt]*(players[u.owner].moodMul||1)*(players[u.owner].toolMul||1)*(r.kind==='bld'?farmBoost(r):1)*(1+.06*players[u.owner].epoch)*(1+(players[u.owner].fx.gather[o.rt]||0))*(players[u.owner].ai?DIFF[aiDiffOf(u.owner)].gather:1)*(SEASON===0&&o.rt==='food'?1.3:SEASON===2&&o.rt==='wood'?1.25:1);
         const amt=Math.min(rate*dt,r.kind==='res'?r.amount:99);
         u.carry+=amt;u.ct=o.rt;u.working=true;if(u.owner===ME&&visibleEnt(u)&&onScreen(u))sfx(o.rt==='wood'?'chop':o.rt==='food'?'':'mine');
-        if(r.kind==='res'){r.amount-=amt;if(r.amount<=0.001)kill(r)}
+        if(r.kind==='res'){if(r.amount>=r.max&&r.type==='tree')treeShadowDirty(r.x,r.y);r.amount-=amt;if(r.amount<=0.001)kill(r)}
       }else approach(u,r,dt);
       break;}
     case 'return':{
@@ -4088,6 +4110,7 @@ function drawRes(g,r){
     if(r.amount<r.max){const s=stumpSprite();g.drawImage(s,x,y,32,32);return}
     const s=treeSprite(r.v),t=performance.now()/1000,wind=WX.kind==='storm'?3:WX.kind==='rain'?1.6:1,hit=r.hitT>gameT?Math.sin(t*40)*.05:0;
     const sw=(Math.sin(t*1.3+r.x*.7+r.y*.4)*.025+Math.sin(t*2.9+r.x)*.01)*wind+hit;
+    if(g===ctx){const z=cam.z*dpr;g.setTransform(z,0,0,z,(x+16-cam.x)*z,(y+28-cam.y)*z);g.transform(1,0,sw,1,0,0);g.drawImage(s,-24,-60,48,64);g.setTransform(z,0,0,z,-cam.x*z,-cam.y*z);return}
     g.save();g.translate(x+16,y+28);g.transform(1,0,sw,1,0,0);g.drawImage(s,-24,-60,48,64);g.restore();return}
   if(r.type==='berry'){
     g.drawImage(bushSprite(r.v),x,y,32,32);
@@ -4567,6 +4590,7 @@ function render(){
     const sx=tx*T+(h%23),sy=ty*T+((h>>5)%27);ctx.strokeStyle=`rgba(225,245,250,${al})`;ctx.lineWidth=1.4;ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(sx+6,sy-1);ctx.stroke();
   }
   ctx.lineCap='butt';
+  if(stumpDecals.length){const sp=stumpSprite();for(const t of stumpDecals)if(t.x>=tx0&&t.x<=tx1&&t.y>=ty0&&t.y<=ty1&&exp[idx(t.x,t.y)])ctx.drawImage(sp,t.x*T,t.y*T,32,32)}
   const list=[];
   for(const e of ents){
     if(e.dead)continue;const s=e.size||1;
@@ -4598,12 +4622,12 @@ function render(){
     if(age>.35)ctx.filter='saturate(.55) brightness(.8)';drawUnit(ctx,c);ctx.restore()}
   // Sonnenschatten (wie in Empire Earth 2): Silhouetten wandern mit dem Sonnenstand über den Tag
   {const dp=(gameT%240)/120;if(dp<1&&WX.night<.9){const k=(dp-.5)*-2.2,sy=.38+.5*Math.abs(dp-.5),al=(.3*(1-WX.night)*(WX.kind==='sun'?1:.55)).toFixed(3);
-    ctx.save();ctx.globalAlpha=+al;
+    ctx.save();ctx.globalAlpha=+al;drawTreeShadows(Math.round(dp*48),tx0,ty0,tx1,ty1);ctx.transform(1,0,k,sy,0,0);
     for(const e of list){let spr,bx,by,dx,dy,w,h;
       if(e.kind==='bld'&&e.built&&!BLD[e.type].draw&&!BLD[e.type].line){const sp=bldSprite(e.type,players[e.owner].epoch,e.owner);spr=shadowSprite(sp,'b'+e.type+players[e.owner].epoch+e.owner);bx=e.x*T+e.size*T/2;by=e.y*T+e.size*T-4;dx=e.x*T-4-bx;dy=e.y*T-36-by;w=sp.lw;h=sp.lh}
-      else if(e.kind==='res'&&e.type==='tree'&&!(e.amount<e.max)){const sp=treeSprite(e.v);spr=shadowSprite(sp,'t'+e.v);bx=e.x*T+16;by=e.y*T+28;dx=-24;dy=-60;w=48;h=64}
       else continue;
-      const z=cam.z*dpr;ctx.setTransform(z,0,0,z,(bx-cam.x)*z,(by-cam.y)*z);ctx.transform(1,0,k,sy,0,0);ctx.drawImage(spr,dx,dy,w,h)}
+      // eine Scherung für alle: Fußpunkt b in den gescherten Raum umrechnen statt pro Objekt die Matrix neu zu setzen
+      ctx.drawImage(spr,bx-k*by/sy+dx,by/sy+dy,w,h)}
     ctx.restore()}}
   for(const e of list){if(e.kind==='res')drawRes(ctx,e);else if(e.kind==='bld'){drawBld(ctx,e);if(e.built&&FLAGB[e.type])drawFlag(ctx,e)}
     else if(e.hitT&&gameT-e.hitT<.1){ctx.save();ctx.filter='brightness(1.9)';drawUnit(ctx,e);ctx.restore()}else drawUnit(ctx,e)}
@@ -4700,12 +4724,36 @@ function render(){
     for(let i=0;i<n;i++){const sp=WX.kind==='rain'?620:60,x=((i*97.3+t*(WX.kind==='rain'?120:25))%(viewW+40))-20,y=((i*61.7+t*sp)%(viewH+40))-20;
       if(WX.kind==='rain'){ctx.moveTo(x,y);ctx.lineTo(x-3,y+11)}else{ctx.fillRect(x+Math.sin(t+i)*6,y,2,2)}}
     if(WX.kind==='rain')ctx.stroke()}
-  const vg=ctx.createRadialGradient(viewW/2,viewH/2,Math.min(viewW,viewH)*.45,viewW/2,viewH/2,Math.max(viewW,viewH)*.75);
-  vg.addColorStop(0,'rgba(0,0,0,0)');vg.addColorStop(1,'rgba(0,0,0,.35)');ctx.fillStyle=vg;ctx.fillRect(0,0,viewW,viewH);
+  if(!vigC||vigC.w!==viewW||vigC.h!==viewH){const vg=ctx.createRadialGradient(viewW/2,viewH/2,Math.min(viewW,viewH)*.45,viewW/2,viewH/2,Math.max(viewW,viewH)*.75);
+    vg.addColorStop(0,'rgba(0,0,0,0)');vg.addColorStop(1,'rgba(0,0,0,.35)');vigC={w:viewW,h:viewH,g:vg}}
+  ctx.fillStyle=vigC.g;ctx.fillRect(0,0,viewW,viewH);
   if(drag&&drag.box){ctx.strokeStyle='#9ef0a0';ctx.fillStyle='rgba(158,240,160,.08)';const x=Math.min(drag.sx,mouse.x),y=Math.min(drag.sy,mouse.y),w=Math.abs(mouse.x-drag.sx),h=Math.abs(mouse.y-drag.sy);ctx.fillRect(x,y,w,h);ctx.strokeRect(x+.5,y+.5,w,h)}
   if(paused&&started&&!over){ctx.fillStyle='rgba(0,0,0,.4)';ctx.fillRect(0,0,viewW,viewH);ctx.fillStyle='#e9be72';ctx.font='600 32px "Alegreya SC",Georgia,serif';ctx.textAlign='center';ctx.fillText('Pause',viewW/2,viewH/2);ctx.textAlign='left'}
 }
-let marker=null;
+let marker=null,vigC=null;
+// Baumschatten: je 8x8 Felder vorgezeichnet und nur neu gezeichnet, wenn die Sonne einen Schritt weiterwandert,
+// ein Baum gefällt wird oder neues Land erkundet ist. Spart hunderte gescherte Einzelbilder pro Bild.
+const SHC=8,SHPX=96,SHPY=48,shadowCache=new Map();let shadowVer=new Int32Array(Math.ceil(W/SHC)*Math.ceil(H/SHC));
+function treeShadowDirty(x,y){shadowVer[((y/SHC)|0)*Math.ceil(W/SHC)+((x/SHC)|0)]++}
+function resetTreeShadows(){shadowCache.clear();shadowVer=new Int32Array(Math.ceil(W/SHC)*Math.ceil(H/SHC))}
+function drawTreeShadows(step,tx0,ty0,tx1,ty1){
+  const CW=Math.ceil(W/SHC),k=(step/48-.5)*-2.2,sy=.38+.5*Math.abs(step/48-.5);
+  for(let cy=Math.max(0,Math.floor((ty0-2)/SHC));cy<=Math.min(Math.ceil(H/SHC)-1,Math.floor((ty1+2)/SHC));cy++)
+  for(let cx=Math.max(0,Math.floor((tx0-3)/SHC));cx<=Math.min(CW-1,Math.floor((tx1+3)/SHC));cx++){
+    let ex=0;for(let y=cy*SHC;y<Math.min(H,cy*SHC+SHC);y++)for(let x=cx*SHC;x<Math.min(W,cx*SHC+SHC);x++)ex+=exp[idx(x,y)];
+    const id=cy*CW+cx,key=step+':'+shadowVer[id]+':'+ex;let c=shadowCache.get(id);
+    if(!c||c.key!==key){
+      if(!c){if(shadowCache.size>90)shadowCache.delete(shadowCache.keys().next().value);c={cv:document.createElement('canvas')};c.cv.width=SHC*T+SHPX*2;c.cv.height=SHC*T+SHPY*2}
+      c.key=key;shadowCache.delete(id);shadowCache.set(id,c);
+      const g=c.cv.getContext('2d');g.setTransform(1,0,0,1,0,0);g.clearRect(0,0,c.cv.width,c.cv.height);
+      const ox=cx*SHC*T-SHPX,oy=cy*SHC*T-SHPY;g.setTransform(1,0,k,sy,0,0);
+      for(let y=cy*SHC;y<Math.min(H,cy*SHC+SHC);y++)for(let x=cx*SHC;x<Math.min(W,cx*SHC+SHC);x++){const i=idx(x,y);if(!exp[i]||block[i]<=0)continue;const e=byId.get(block[i]);
+        if(!e||e.dead||e.kind!=='res'||e.type!=='tree'||e.amount<e.max)continue;
+        const bx=x*T+16-ox,by=y*T+28-oy;g.drawImage(shadowSprite(treeSprite(e.v),'t'+e.v),bx-k*by/sy-24,by/sy-60,48,64)}
+    }
+    ctx.drawImage(c.cv,cx*SHC*T-SHPX,cy*SHC*T-SHPY);
+  }
+}
 
 function renderMini(){
   if(!ents)return;
@@ -4840,7 +4888,7 @@ function buildCmds(){
   for(let i=0;i<n;i++){
     const c=cmds[i];const b=document.createElement('button');b.className='cmd';
     if(!c){b.style.visibility='hidden';b.tabIndex=-1;box.appendChild(b);continue}
-    b.innerHTML=`<kbd>${SLOTKEYS[i]||''}</kbd><span class="n">${c.label}</span><span class="c">${c.cost?costHTML(c.cost):''}</span>`;
+    b.innerHTML=`<kbd>${slotKeyLabel(SLOTKEYS[i])}</kbd><span class="n">${c.label}</span><span class="c">${c.cost?costHTML(c.cost):''}</span>`;
     b.disabled=!!c.dis&&!c.short;if(c.short)b.classList.add('short');if(c.tech)b.classList.add('tech');if(c.cat)b.classList.add('cat');if(c.on)b.classList.add('on');
     b.addEventListener('click',()=>{if(c.need&&c.dis){toast(c.need,'warn');return}if(c.short&&c.dis){toast('Nicht genug Rohstoffe.','warn');return}sfx('click');runCmd(c)});
     b.addEventListener('pointerenter',ev=>showTip(c,b));b.addEventListener('pointerleave',hideTip);
@@ -4957,8 +5005,42 @@ function pickAt(wx,wy){
   for(const e of ents){if(e.dead||e.kind!=='unit'||!visibleEnt(e))continue;const d=isAir(e)&&e.airX!==undefined?Math.min(Math.hypot(e.airX/T-wx,e.airY/T-wy),Math.hypot(e.x-wx,e.y-wy)):Math.hypot(e.x-wx,e.y-wy);if(d<e.r+.25&&d<bd){bd=d;best=e}}
   if(best)return best;
   for(const e of ents){if(e.dead||e.kind==='unit'||!visibleEnt(e))continue;if(wx>=e.x&&wx<e.x+e.size&&wy>=e.y&&wy<e.y+e.size)return e}
+  // Gebäude und Bäume ragen über ihr Feld hinaus: auch der sichtbare obere Teil zählt als Treffer
+  for(const e of ents){if(e.dead||e.kind==='unit'||!visibleEnt(e))continue;const up=e.kind==='bld'?(BLD[e.type].walk||BLD[e.type].line?0:1.1):e.type==='tree'&&!(e.amount<e.max)?1.4:0;
+    if(up&&wx>=e.x&&wx<e.x+e.size&&wy>=e.y-up&&wy<e.y)return e}
   return null;
 }
+// Mauszeiger je nach Aktion: Hotspot liegt genau an der Spitze, damit der Klick dort landet, wo der Zeiger hinzeigt
+const CUR=(()=>{const c=(svg,x,y,fb)=>`url("data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">'+svg+'</svg>')}") ${x} ${y}, ${fb}`;
+  const sh='stroke="#1b1206" stroke-width="1.6" stroke-linejoin="round"';
+  return{
+    normal:c(`<path d="M2 2 L2 23 L8 17.5 L12.5 27 L16 25.4 L11.6 16.2 L19.5 16.2 Z" fill="#f1d38c" ${sh}/>`,2,2,'default'),
+    select:c(`<path d="M2 2 L2 23 L8 17.5 L12.5 27 L16 25.4 L11.6 16.2 L19.5 16.2 Z" fill="#fff4cf" ${sh}/><circle cx="23" cy="23" r="5" fill="none" stroke="#9ef0a0" stroke-width="2"/>`,2,2,'pointer'),
+    move:c(`<path d="M2 2 L2 23 L8 17.5 L12.5 27 L16 25.4 L11.6 16.2 L19.5 16.2 Z" fill="#f1d38c" ${sh}/><ellipse cx="24" cy="26" rx="6" ry="3" fill="none" stroke="#e9be72" stroke-width="2"/>`,2,2,'default'),
+    attack:c(`<path d="M2 2 L6 2 L22 18 L18 22 L2 6 Z" fill="#d8dde2" ${sh}/><path d="M16 24 L24 16 M20 22 L27 29 M22 20 L29 27" stroke="#1b1206" stroke-width="4" stroke-linecap="round"/><path d="M16 24 L24 16 M20 22 L27 29" stroke="#c0392b" stroke-width="2" stroke-linecap="round"/>`,2,2,'crosshair'),
+    wood:c(`<path d="M5 29 L21 9" stroke="#1b1206" stroke-width="4.5" stroke-linecap="round"/><path d="M5 29 L21 9" stroke="#9a6a3a" stroke-width="2.5" stroke-linecap="round"/><path d="M15 3 C21 1 28 6 27 13 L19 10 Z" fill="#c9ced3" ${sh}/>`,15,3,'pointer'),
+    mine:c(`<path d="M6 29 L20 11" stroke="#1b1206" stroke-width="4.5" stroke-linecap="round"/><path d="M6 29 L20 11" stroke="#9a6a3a" stroke-width="2.5" stroke-linecap="round"/><path d="M3 9 C10 3 22 3 29 10 C22 7 10 7 3 9 Z" fill="#c9ced3" ${sh}/>`,3,9,'pointer'),
+    food:c(`<path d="M8 29 L14 19" stroke="#1b1206" stroke-width="4.5" stroke-linecap="round"/><path d="M8 29 L14 19" stroke="#9a6a3a" stroke-width="2.5" stroke-linecap="round"/><path d="M14 19 C10 8 18 2 27 4 C20 6 16 11 17 19 Z" fill="#c9ced3" ${sh}/>`,27,4,'pointer'),
+    build:c(`<path d="M18 13 L5 28" stroke="#1b1206" stroke-width="4.5" stroke-linecap="round"/><path d="M18 13 L5 28" stroke="#9a6a3a" stroke-width="2.5" stroke-linecap="round"/><path d="M12 6 L22 2 L30 10 L26 14 L20 10 L16 12 Z" fill="#9aa1a8" ${sh}/>`,16,16,'copy'),
+    grab:'grabbing'};
+})();
+let curNow='',curT=0;
+function pickCursor(){
+  if(drag&&drag.pan)return CUR.grab;
+  if(placing)return CUR.build;
+  if(!mouse.inside||drag)return CUR.normal;
+  const w=toWorld(mouse.x,mouse.y),t=pickAt(w.x,w.y),mine=sel.filter(e=>e.owner===ME&&e.kind==='unit');
+  if(aMode)return CUR.attack;
+  if(!mine.length)return t&&t.kind!=='res'?CUR.select:CUR.normal;
+  if(t&&t.owner>=0&&t.owner!==ME)return CUR.attack;
+  const wk=mine.some(u=>u.type==='worker');
+  if(wk&&t&&t.kind==='res')return t.rt==='wood'?CUR.wood:t.rt==='food'?CUR.food:CUR.mine;
+  if(wk&&t&&t.kind==='bld'&&t.owner===ME&&(!t.built||t.hp<t.maxhp))return CUR.build;
+  if(wk&&t&&t.kind==='bld'&&t.owner===ME&&t.type==='farm')return CUR.food;
+  if(t&&t.owner===ME)return CUR.select;
+  return CUR.move;
+}
+function updateCursor(dt){curT-=dt;if(curT>0&&!(drag&&drag.pan)&&!placing)return;curT=.08;const c=pickCursor();if(c!==curNow){curNow=c;cv.style.cursor=c}}
 function rightCommand(wx,wy,tid){
   const mine=sel.filter(e=>e.owner===ME);if(!mine.length)return;
   if(MP&&!CMDX){const t=pickAt(wx,wy);sendCmd('rc',{x:wx,y:wy,t:t?t.id:0,sh:shiftHeld,am:aMode});
@@ -5100,9 +5182,11 @@ mm.addEventListener('pointerup',()=>{mmDrag=false});
 
 window.addEventListener('keydown',e=>{
   if(!started||over)return;
-  if(e.target.tagName==='INPUT')return;
+  const tg=e.target;if(tg&&(tg.tagName==='INPUT'||tg.tagName==='TEXTAREA'||tg.tagName==='SELECT'||tg.isContentEditable))return;
   const k=e.key;
   if(k.startsWith('Arrow')){keys.add(k);e.preventDefault();return}
+  // W/A/S/D bewegen die Kamera wie die Pfeiltasten; die Befehle auf diesen Plätzen liegen auf Shift + W/A/S/D
+  {const wk=WASD[k.toLowerCase()];if(wk&&!e.shiftKey&&!e.ctrlKey&&!e.altKey&&!e.metaKey){keys.add(wk);e.preventDefault();return}}
   if(k==='Escape'&&!$('#techScreen').hidden){toggleTech(false);return}
   if(k==='n'||k==='N'){toggleTech();return}
   if(k==='Escape'&&(!$('#diploPanel').hidden||!$('#savePanel').hidden)){$('#diploPanel').hidden=true;$('#savePanel').hidden=true;return}
@@ -5120,7 +5204,7 @@ window.addEventListener('keydown',e=>{
   if(i>=0&&curCmds[i]){const c=curCmds[i];if(c.need&&c.dis){toast(c.need,'warn');return}if(c.dis){toast('Nicht genug Rohstoffe.','warn');return}sfx('click');runCmd(c)}
 });
 let lastGroup=null,lastGroupT=0,idleIx=0,zoomT=0,zoomAt=null;const camV={x:0,y:0};
-window.addEventListener('keyup',e=>keys.delete(e.key));
+window.addEventListener('keyup',e=>{keys.delete(e.key);const a=WASD[e.key.toLowerCase()];if(a)keys.delete(a)});
 window.addEventListener('blur',()=>keys.clear());
 function selectIdle(){
   const idle=ents.filter(e=>e.owner===ME&&e.type==='worker'&&e.order.t==='idle');
@@ -5254,7 +5338,7 @@ XY.mp={
 function mpUi(){const mp=!!MP;$('#btnTribute').hidden=mp;$('#btnSave').hidden=mp;document.querySelectorAll('[data-speed]').forEach(b=>b.disabled=mp);if(mp){gameSpeed=1;document.querySelectorAll('[data-speed]').forEach(b=>b.classList.toggle('on',b.dataset.speed==='1'))}}
 
 // ================= main loop =================
-let last=performance.now(),acc=0;
+let last=performance.now(),acc=0,topT=0,miniT=0;// HUD und Minikarte 10-15 Mal pro Sekunde statt in jedem Bild
 let gameSpeed=1;
 document.querySelectorAll('[data-speed]').forEach(b=>b.onclick=()=>{gameSpeed=+b.dataset.speed;document.querySelectorAll('[data-speed]').forEach(x=>x.classList.toggle('on',x===b))});
 window.__speed=()=>gameSpeed;
@@ -5280,10 +5364,10 @@ function frame(now){
     const key=selKey();
     if(key!==uiKey||uiDirty){uiKey=key;uiDirty=false;buildInfo();buildCmds();hideTip()}
     uiT-=dt;if(uiT<=0){uiT=.2;refreshInfo();refreshCmds()}
-    updateTop();
-    cv.style.cursor=placing?'copy':aMode?'crosshair':'default';
+    topT-=dt;if(topT<=0){topT=.1;updateTop()}
+    updateCursor(dt);
   }
-  render();renderMini();
+  render();miniT-=dt;if(miniT<=0||mmDrag){miniT=1/15;renderMini()}
   requestAnimationFrame(frame);
 }
 
@@ -5313,8 +5397,8 @@ function loadGame(d){
     if(e.kind==='bld'&&BLD[e.type].water&&e.built)block[idx(e.x,e.y)]=0;
     if(e.kind==='unit')e.path=null;
     if(e.kind==='bld')e.queue=e.queue.filter(q=>q.ep||(q.tech&&TECHS[q.tech])||(q.u&&UNITS[q.u]));}
-  nextId=d.nextId;bases=d.bases;aiS=d.aiS;players=d.players;gameT=d.gameT;
-  proj=[];fx=[];sel=[];over=false;placing=null;aMode=false;groups={};
+  nextId=d.nextId;bases=d.bases;aiS=d.aiS;players=d.players;gameT=d.gameT;capT.length=0;
+  proj=[];fx=[];sel=[];stumpDecals=[];resetTreeShadows();over=false;placing=null;aMode=false;groups={};
   renderTerrain();recalcPop();updateVis(true);
   if(d.cam){zoomT=0;cam.z=d.cam.z;cam.x=d.cam.x;cam.y=d.cam.y;clampCam()}
   XY.emit('load',API,d);
@@ -5460,6 +5544,7 @@ function autoPlayer(){ // lets the player side be run by the same AI for soak te
   try{aiThink()}finally{window.__ai0=aiS;aiS=a;for(const e of ents)swap(e);players=save;players[0].i=0;players[1].i=1;bases=b}
 }
 window.__rc=(x,y,sh)=>{shiftHeld=!!sh;rightCommand(x,y);shiftHeld=false};
+window.__camGet=()=>({x:cam.x/T,y:cam.y/T});window.__cap=p=>resCap(players[p]);
 window.__ex={start:(d,s)=>{newGame(d,s);started=true},step:n=>{for(let i=0;i<n&&!over;i++)step(DT)},select:a=>select(a),get:()=>({t:gameT,over,players,ents})};
 window.__spawn=(p,t,x,y)=>spawnUnit(p,t,x,y);window.__reveal=()=>{exp.fill(1);vis.fill(1)};window.__place=(p,t,x,y)=>placeBld(p,t,x,y,true);window.__can=(p,t,x,y)=>canPlace(p,t,x,y);window.__water=(x,y)=>terr[idx(x|0,y|0)]===1;window.__cam=(x,y)=>{cam.x=x*T;cam.y=y*T};window.__move=(u,x,y)=>cmdMove([u],x,y,false);window.__limit=m=>{timeLimit=m};window.__placeU=(p,t,x,y)=>placeBld(p,t,x,y,false);
 })();
