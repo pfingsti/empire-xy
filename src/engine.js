@@ -974,6 +974,12 @@ function wearPaths(){// Trampelpfade: wo oft gelaufen wird, wird das Gras zu Erd
   const g=terrC.getContext('2d');g.save();
   for(const u of ents){if(u.dead||u.kind!=='unit'||!u.moving||UNITS[u.type].naval)continue;const i=idx(u.x|0,u.y|0);if(terr[i]===1)continue;
     g.fillStyle='rgba(112,92,62,.045)';g.beginPath();g.ellipse(u.x*T,u.y*T+4,5,3,0,0,7);g.fill()}
+  // Pflaster um das Stadtzentrum ab Epoche 3: unregelmäßige Steinplatten mit Fugen
+  for(const b of ents){if(b.dead||b.type!=='tc'||!b.built||b.paved||!players[b.owner]||players[b.owner].epoch<3)continue;b.paved=1;
+    const cx=(b.x+b.size/2)*T,cy=(b.y+b.size/2)*T,R=(b.size/2+1.6)*T;let sd=b.id*97+13;const rr=()=>(sd=(sd*16807)%2147483647)/2147483647;
+    for(let y=cy-R;y<cy+R;y+=7)for(let x=cx-R+((y/7|0)%2)*4;x<cx+R;x+=8){const d=Math.hypot(x-cx,y-cy)/R;if(d>1||rr()<d*d*.7)continue;
+      const tx=x/T|0,ty=y/T|0;if(!inb(tx,ty)||terr[idx(tx,ty)]===1)continue;const v=118+rr()*40|0;
+      g.fillStyle=`rgba(${v+6},${v},${v-12},${.9-d*.4})`;g.fillRect(x+.5,y+.5,7,6);g.fillStyle='rgba(0,0,0,.12)';g.fillRect(x+.5,y+5.5,7,1)}}
   g.restore()}
 function step(dt){
   gameT+=dt;if((pathT+=dt)>=.5){pathT=0;wearPaths()}
@@ -1361,6 +1367,17 @@ function bldSprite(type,rep,owner){
     }
   });
 }
+const FLAGB={tc:1,barracks:1,castle:1,fort:1,milcamp:1};
+function drawFlag(g,b){// wehende Stoff-Fahne in Spielerfarbe, Wind wie bei den Bäumen
+  const x=(b.x+b.size-.35)*T,y=b.y*T-8,h=26,w=16,c=PCOL[b.owner]||'#888';g.save();
+  g.strokeStyle='#4a3a28';g.lineWidth=1.6;g.beginPath();g.moveTo(x,y+h);g.lineTo(x,y-h*.2);g.stroke();
+  g.fillStyle='#b89a50';g.beginPath();g.arc(x,y-h*.2,1.6,0,7);g.fill();
+  const t=gameT*4+b.id;g.beginPath();g.moveTo(x,y-h*.15);
+  for(let i=1;i<=8;i++){const u=i/8;g.lineTo(x+u*w,y-h*.15+Math.sin(t-u*4)*u*2.5)}
+  for(let i=8;i>=0;i--){const u=i/8;g.lineTo(x+u*w,y-h*.15+10+Math.sin(t-u*4)*u*2.5)}
+  g.closePath();g.fillStyle=c;g.globalAlpha=.92;g.fill();
+  g.globalAlpha=.22;g.fillStyle='#000';g.beginPath();for(let i=0;i<=8;i++){const u=i/8;g.lineTo(x+u*w,y-h*.15+10+Math.sin(t-u*4)*u*2.5-(Math.cos(t-u*4)>0?3:0))}g.lineTo(x,y-h*.15+10);g.fill();
+  g.restore()}
 function drawBld(g,b){drawBld0(g,b);if(aiS&&aiS.married&&b.type==='tc'){const x=(b.x+b.size/2)*T,y=b.y*T-30+Math.sin(gameT*3)*2;g.fillStyle='#e0546a';g.beginPath();g.moveTo(x,y+7);g.bezierCurveTo(x-10,y-1,x-5,y-8,x,y-3);g.bezierCurveTo(x+5,y-8,x+10,y-1,x,y+7);g.fill()}}
 function drawBld0(g,b){
   const D=BLD[b.type],x=b.x*T,y=b.y*T,s=b.size*T,ep=players[b.owner].epoch,pc=PCOL[b.owner];
@@ -1608,7 +1625,7 @@ function render(){
       else continue;
       const z=cam.z*dpr;ctx.setTransform(z,0,0,z,(bx-cam.x)*z,(by-cam.y)*z);ctx.transform(1,0,k,sy,0,0);ctx.drawImage(spr,dx,dy,w,h)}
     ctx.restore()}}
-  for(const e of list){if(e.kind==='res')drawRes(ctx,e);else if(e.kind==='bld')drawBld(ctx,e);
+  for(const e of list){if(e.kind==='res')drawRes(ctx,e);else if(e.kind==='bld'){drawBld(ctx,e);if(e.built&&FLAGB[e.type])drawFlag(ctx,e)}
     else if(e.hitT&&gameT-e.hitT<.1){ctx.save();ctx.filter='brightness(1.9)';drawUnit(ctx,e);ctx.restore()}else drawUnit(ctx,e)}
   // ambient particles: dust, wood chips, chimney smoke
   if(!paused&&started){
