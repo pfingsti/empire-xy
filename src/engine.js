@@ -1787,7 +1787,19 @@ cv.addEventListener('pointermove',e=>{
   if(drag&&drag.pan){cam.x=drag.cx-(mouse.x-drag.sx)/cam.z;cam.y=drag.cy-(mouse.y-drag.sy)/cam.z;clampCam();return}
   if(drag&&!drag.box&&Math.hypot(mouse.x-drag.sx,mouse.y-drag.sy)>6)drag.box=true;
 });
-cv.addEventListener('pointerleave',()=>{mouse.inside=false});
+cv.addEventListener('pointerleave',()=>{mouse.inside=false;$('#hoverTip').hidden=true});
+// Schwebe-Info über Einheiten und Gebäuden: Name, Besitzer und Werte
+let hoverLast=null;
+setInterval(()=>{
+  const tip=$('#hoverTip');if(!started||!mouse.inside||drag||placing||mouse.pointerType==='touch'){tip.hidden=true;return}
+  const w=toWorld(mouse.x,mouse.y),e=pickAt(w.x,w.y);if(!e||e.kind==='res'){tip.hidden=true;hoverLast=null;return}
+  const own=e.owner===0?'Dein Reich':e.owner===1?'Gegner':'',ep=e.owner>=0?players[e.owner].epoch:0;let h='';
+  if(e.kind==='unit'){const st=uStat(e),U=UNITS[e.type];
+    h=`<b>${uname(U,ep)}</b><span>${own}</span><br>Leben ${Math.ceil(e.hp)}/${e.maxhp||st.hp}`+(st.atk>0?` · Angriff ${Math.round(st.atk)}`:'')+(st.range>1.5?` · Reichweite ${Math.round(st.range)}`:'')+` · Tempo ${st.speed.toFixed(1)}`;}
+  else{const D=BLD[e.type];h=`<b>${bname(D,ep)}</b><span>${own}${e.built?'':' · im Bau '+Math.round(e.prog*100)+' %'}</span><br>Leben ${Math.ceil(e.hp)}/${e.maxhp}`+(D.atk?` · Angriff ${D.atk}`:'')+(D.pop?` · Wohnraum +${D.pop}`:'');}
+  if(h!==hoverLast){tip.innerHTML=h;hoverLast=h}
+  tip.hidden=false;const r=cv.getBoundingClientRect();tip.style.left=Math.min(innerWidth-tip.offsetWidth-8,r.left+mouse.x+16)+'px';tip.style.top=Math.max(4,r.top+mouse.y-tip.offsetHeight-10)+'px';
+},120);
 cv.addEventListener('pointerup',e=>{
   const r=cv.getBoundingClientRect();mouse.x=e.clientX-r.left;mouse.y=e.clientY-r.top;
   if(wallDrag&&placing){const w=toWorld(mouse.x,mouse.y);placeLine(wallLine(wallDrag.x,wallDrag.y,Math.floor(w.x),Math.floor(w.y)),e.shiftKey);wallDrag=null;return}

@@ -90,6 +90,8 @@ button:focus-visible{outline:2px solid var(--bronze-hi);outline-offset:1px}
 .cmd.on{border-color:var(--bronze-hi);box-shadow:0 0 0 1px var(--bronze-hi) inset}
 .dot{display:inline-block;width:7px;height:7px;border-radius:2px;margin-right:2px;vertical-align:0}
 
+#hoverTip{position:fixed;z-index:19;background:rgba(15,22,25,.94);border:1px solid var(--line);padding:6px 9px;border-radius:4px;font-size:12px;line-height:1.4;pointer-events:none;white-space:nowrap}
+#hoverTip b{display:block;font-size:13px}#hoverTip span{color:var(--muted)}
 #tip{position:fixed;z-index:20;background:#0f1619;border:1px solid var(--bronze);padding:8px 10px;border-radius:4px;max-width:260px;font-size:13px;line-height:1.35;pointer-events:none}
 #tip h4{margin:0 0 3px;font-family:var(--f-display);font-weight:500;font-size:15px;color:var(--bronze-hi)}
 #tip .need{color:var(--danger)}
@@ -202,6 +204,7 @@ label.opt{font-size:14px;padding:5px 12px}
   </footer>
 </div>
 <div id="tip" hidden></div>
+<div id="hoverTip" hidden></div>
 
 <div class="overlay" id="startScreen">
   <div class="card">
