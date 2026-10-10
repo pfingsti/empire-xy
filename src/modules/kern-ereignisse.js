@@ -31,6 +31,7 @@ EmpireXY.register({
   description:'Pest, Einwanderung und Aufstand mit Entscheidungen alle 3 bis 5 Minuten.',
   hooks:{
     tick(api,dt){
+      if(api.mp)return; // Ereignisse mit Entscheidungsfenster nur im Einzelspiel
       const pl=api.players[0];if(!pl||pl.defeated)return;
       if(pl.eventUntil&&api.time>pl.eventUntil){pl.eventUntil=0;pl.eventGather=1;pl.eventMood=0}
       if(pl.nextEvent===undefined)pl.nextEvent=api.time+180+Math.random()*120;

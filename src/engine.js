@@ -794,7 +794,7 @@ function tryNudge(u,dx,dy){const nx=u.x+dx,ny=u.y+dy;passOwner=u.owner;passNaval
 // ================= visibility =================
 let visT=0;
 function updateVis(force){
-  vis.fill(0);
+  vis.fill(spectating?1:0);if(spectating)exp.fill(1);
   for(const e of ents){if(e.dead||(e.owner!==ME&&!(!MP&&aiS&&aiS.allied&&e.owner===1)))continue;
     const s=e.kind==='unit'?uStat(e).sight:(e.built?BLD[e.type].sight:2),c=center(e),r2=s*s;
     const x0=Math.max(0,Math.floor(c.x-s)),x1=Math.min(W-1,Math.ceil(c.x+s)),y0=Math.max(0,Math.floor(c.y-s)),y1=Math.min(H-1,Math.ceil(c.y+s));
@@ -1001,6 +1001,7 @@ const API={
   spawnUnit,uCost,get aiS(){return aiS},water:(x,y)=>inb(x|0,y|0)&&terr[idx(x|0,y|0)]===1,get gate(){return gate},idx,W,placeBld,toast,damage,order,applyTech,techState,center,distEnt,alive,isMil,uStat,
   heal(e,amt){e.hp=Math.min(e.maxhp,e.hp+amt)},
   revealAll(){exp.fill(1)},sel:()=>sel,kill,nearestRes,
+  get me(){return ME},get local(){return LOCAL},get mp(){return !!MP},
   fx(x,y,k){fx.push({x,y,t:0,k:k||'hit'})},
 };
 // ================= main step =================
@@ -1070,7 +1071,7 @@ function endGame(win,text,keep){
   $('#endStats').style.gridTemplateColumns='auto'+' auto'.repeat(cols.length);$('#endBars').style.gridTemplateColumns='auto'+' 1fr'.repeat(cols.length);
   $('.evh .lg').innerHTML=cols.map((c,i)=>`<i style="background:${PCOL[order[i]]}"></i>${c.replace(/[&<>]/g,'')}`).join(' ');
   $('#againBtn').textContent=MP?'Zum Hauptmenü':'Neues Spiel';
-  let wb=$('#watchBtn');if(!wb){wb=document.createElement('button');wb.className='opt';wb.id='watchBtn';wb.textContent='Weiter zuschauen';$('#againBtn').after(wb);wb.onclick=()=>{$('#endScreen').hidden=true;exp.fill(1)}}
+  let wb=$('#watchBtn');if(!wb){wb=document.createElement('button');wb.className='opt';wb.id='watchBtn';wb.textContent='Weiter zuschauen';$('#againBtn').after(wb);wb.onclick=()=>{$('#endScreen').hidden=true;spectating=true;updateVis()}}
   wb.hidden=!keep;
   const rows=[['Ausgebildet','trained'],['Gefallen / zerstört','lost'],['Besiegte Feinde','killed'],['Gesammelte Rohstoffe','gathered'],['Gebäude errichtet','built']];
   const val=(pl,k)=>k==='techs'?Object.keys(pl.techs).length:k==='epoch'?EPOCHS[pl.epoch]:k==='score'?score(pl):Math.round(pl.st[k]||0);
@@ -2286,6 +2287,55 @@ $('#btnTribute').onclick=()=>{if(!started||over)return;$('#savePanel').hidden=tr
 setInterval(diploRender,1000);
 $('#btnSound').textContent=soundOn?'Ton an':'Ton aus';$('#btnSound').onclick=()=>{soundOn=!soundOn;try{localStorage.setItem('empire-xy.ton',soundOn?'1':'0')}catch(e){}$('#btnSound').textContent=soundOn?'Ton an':'Ton aus';sfx('click')};
 
+// ================= Mehrspieler: Befehle im Gleichschritt (Lockstep) =================
+// Im Mehrspieler ändert ein Klick den Spielstand nicht sofort. Er wird als Befehl an den Gastgeber geschickt,
+// der ihn für einen bestimmten Takt einplant. Alle Rechner führen dieselben Befehle im selben Takt aus.
+function runCmd(c){if(MP&&!c.ui&&!CMDX){sendCmd('cmd',{key:c.key});return}c.act()}
+function sendCmd(k,a){if(!XY.net)return;XY.net.command({k,s:sel.filter(e=>e.owner===ME).map(e=>e.id),a:a||{}})}
+const EXEC={
+  cmd(a){const c=getCommands().find(c=>c&&c.key===a.key);if(c&&!c.ui&&!c.dis)c.act()},
+  rc(a){shiftHeld=!!a.sh;aMode=!!a.am;rightCommand(+a.x,+a.y,a.t|0)},
+  ac(a){const u=sel.filter(x=>x.kind==='unit');if(!u.length)return;const t=a.t&&alive(byId.get(a.t))?byId.get(a.t):null;
+    if(t&&t.owner>=0&&t.owner!==ME)cmdTarget(u,t);else cmdMove(u,+a.x,+a.y,true)},
+  place(a){if(!BLD[a.b])return;placing=a.b;tryPlace(a.x|0,a.y|0,true)},
+  line(a){if(!BLD[a.b]||!BLD[a.b].line||!Array.isArray(a.tiles))return;placing=a.b;placeLine(a.tiles.slice(0,200).map(t=>[t[0]|0,t[1]|0]),true)},
+  cq(a){const b=byId.get(a.b);if(alive(b)&&b.owner===ME)cancelQ(b,a.i|0)},
+  prio(a){const b=byId.get(a.b);if(alive(b)&&b.owner===ME&&[2,1,.5].includes(a.v))b.prio=a.v},
+  tech(a){const t=TECHS[a.id];if(!t)return;const bs=ents.filter(e=>e.kind==='bld'&&e.owner===ME&&e.type===t.at&&e.built&&!e.dead).sort((x,y)=>x.queue.length-y.queue.length);if(bs.length)queueTech(bs[0],a.id)},
+  trib(a){const to=players[a.to],pl=players[ME],r=a.r,n=Math.min(a.n|0,500);if(!to||to===pl||to.defeated||!RES.includes(r)||n<=0||pl.res[r]<n)return;
+    pl.res[r]-=n;to.res[r]+=n;if(to.i===LOCAL){ME=LOCAL;toast(pl.name+' schickt dir '+n+' '+RESN[r]+'.','good')}},
+  leave(){players[ME].left=true}, // Spieler hat das Spiel verlassen: scheidet beim nächsten Prüfen aus
+};
+// führt einen Befehl von Spieler p aus (auf allen Rechnern im selben Takt, daher nur vom Spielstand abhängig)
+function execCmd(p,c){
+  if(!players[p]||players[p].defeated&&c.k!=='leave'||!EXEC[c.k])return;
+  const sv={ME,sel,shiftHeld,aMode,placing,marker,buildCat};
+  ME=p;CMDX=true;sel=(Array.isArray(c.s)?c.s:[]).map(id=>byId.get(id)).filter(e=>e&&!e.dead&&e.owner===p);
+  const mr=Math.random;Math.random=rng;
+  try{EXEC[c.k](c.a||{})}catch(err){console.warn('Befehl',c,err)}
+  finally{Math.random=mr;ME=sv.ME;CMDX=false;sel=sv.sel.filter(e=>!e.dead);shiftHeld=sv.shiftHeld;aMode=sv.aMode;placing=sv.placing;if(p!==LOCAL)marker=sv.marker;buildCat=sv.buildCat;uiDirty=true}
+}
+// Prüfsumme des Spielstands, um auseinanderlaufende Spiele (Desync) zu erkennen
+function stateHash(){let h=2166136261;const mix=v=>{h=Math.imul(h^(v|0),16777619)};
+  mix(nextId);mix(Math.round(gameT*30));for(const pl of players){for(const r of RES)mix(Math.round(pl.res[r]*10));mix(pl.epoch)}
+  for(const e of ents){if(e.dead)continue;mix(e.id);mix(Math.round(e.x*1000));mix(Math.round(e.y*1000));mix(Math.round(e.hp*100))}
+  return h>>>0}
+let spectating=false;
+// Schnittstelle für den Baustein kern-multiplayer
+XY.game={
+  DT,
+  start(cfg){$('#startScreen').hidden=true;$('#endScreen').hidden=true;resize();spectating=false;newGame(1,cfg.seed,cfg);started=true;paused=false;over=false;$('#btnPause').textContent='Pause';mpUi()},
+  step(){const mr=Math.random;Math.random=rng;try{step(DT)}finally{Math.random=mr}},
+  exec:execCmd,hash:stateHash,cmd:(k,a)=>sendCmd(k,a),
+  get running(){return started&&!over},get time(){return gameT},get me(){return LOCAL},
+  get players(){return players||[]},PCOL,CIVS:()=>CIVS,
+  setPaused(on){paused=!!on;$('#btnPause').textContent=paused?'Weiter':'Pause'},
+  toast(m,k){toast(m,k)},
+  quit(){MP=null;ME=LOCAL=0;started=false;over=false;paused=false;$('#endScreen').hidden=true;$('#startScreen').hidden=false;mpUi();showContinue()},
+  end(text){if(started&&!over)endGame(false,text)},
+};
+function mpUi(){const mp=!!MP;$('#btnTribute').hidden=mp;$('#btnSave').hidden=mp;document.querySelectorAll('[data-speed]').forEach(b=>b.disabled=mp);if(mp){gameSpeed=1;document.querySelectorAll('[data-speed]').forEach(b=>b.classList.toggle('on',b.dataset.speed==='1'))}}
+
 // ================= main loop =================
 let last=performance.now(),acc=0;
 let gameSpeed=1;
@@ -2293,7 +2343,8 @@ document.querySelectorAll('[data-speed]').forEach(b=>b.onclick=()=>{gameSpeed=+b
 window.__speed=()=>gameSpeed;
 function frame(now){
   const dt=Math.min(.1,(now-last)/1000);last=now;
-  if(started&&!paused&&!over){
+  if(MP&&started&&(!over||spectating)){if(XY.net)XY.net.advance(dt)}
+  else if(started&&!paused&&!over){
     acc+=dt*gameSpeed;let n=0,mx=5*Math.max(1,gameSpeed);while(acc>=DT&&n<mx){step(DT);acc-=DT;n++}if(n>=mx)acc=0;
   }
   if(started){
@@ -2323,7 +2374,7 @@ function frame(now){
 // ================= autosave =================
 let curSeed=0,saveT=0;const SAVE_KEY='empire-xy.spielstand';
 function saveGame(key){
-  if(!started||over||!ents)return false;key=typeof key==='string'?key:SAVE_KEY;
+  if(!started||over||!ents||MP)return false;key=typeof key==='string'?key:SAVE_KEY;
   try{
     const data={v:1,seed:curSeed,diff,epStart,epEnd,timeLimit,WX,gameT,nextId,bases,aiS,players,terr:Array.from(terr),exp:Array.from(exp),
       ents:ents.filter(e=>!e.dead),cam:{x:cam.x,y:cam.y,z:cam.z},saved:Date.now()};
@@ -2461,7 +2512,7 @@ function drawTrade(){if(!tradeOpen)return;const c=$('#tradeCv'),g=c.getContext('
 $('#startBtn').onclick=()=>{timeLimit=+$('#limitSel').value;useCustomMap=!!(CUSTOM_MAP&&$('#useCustom').checked);
   $('#startScreen').hidden=true;resize();newGame(chosenDiff,seed);started=true;paused=false;$('#btnPause').textContent='Pause';
 };
-$('#againBtn').onclick=()=>{showContinue();$('#endScreen').hidden=true;started=false;over=false;seed=(Math.random()*99999)|0;$('#seedN').textContent=seed;$('#startScreen').hidden=false};
+$('#againBtn').onclick=()=>{if(MP){if(XY.net)XY.net.leave();else XY.game.quit();return}showContinue();$('#endScreen').hidden=true;started=false;over=false;seed=(Math.random()*99999)|0;$('#seedN').textContent=seed;$('#startScreen').hidden=false};
 window.addEventListener('resize',resize);
 resize();showContinue();requestAnimationFrame(frame);
 

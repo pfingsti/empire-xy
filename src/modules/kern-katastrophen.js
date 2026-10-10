@@ -29,6 +29,7 @@ EmpireXY.register({
       desc:'Ägyptische Einheit. Schwer gepanzerter Streitwagen, überrennt Fußvolk.',bonus:{infantry:1.4}},
   },
   hooks:{
+    start(){pend=null;lava.length=0},
     tick(api,dt){
       const ents=api.ents;
       for(const u of ents)if(u.kind==='unit'&&!u.dead&&u.hp<u.maxhp&&(EmpireXY.units[u.type]||{}).regen)api.heal(u,EmpireXY.units[u.type].regen*dt);

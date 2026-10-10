@@ -21,17 +21,17 @@ EmpireXY.register({
       desc:'Holt bis 10 Felder um den Hafen Perlen aus dem Wasser. Perlen verkauft der Marktplatz teuer.'},
   },
   buildings:{
-    market:{cmds:(b,api)=>[{label:'Perlen verkaufen',desc:'10 Perlen gegen 120 Gold. Perlen sind ein Luxusgut, das nur Taucher finden.',dis:(api.players[0].pearls||0)<10,
-      act:()=>{const pl=api.players[0];if((pl.pearls||0)<10){api.toast('Zu wenig Perlen.','warn');return}pl.pearls-=10;pl.res.gold+=120;api.income(pl,'gold',120);api.toast('Perlen verkauft: +120 Gold.','good')}}]},
+    market:{cmds:(b,api)=>[{label:'Perlen verkaufen',desc:'10 Perlen gegen 120 Gold. Perlen sind ein Luxusgut, das nur Taucher finden.',dis:(api.players[api.me].pearls||0)<10,
+      act:()=>{const pl=api.players[api.me];if((pl.pearls||0)<10){api.toast('Zu wenig Perlen.','warn');return}pl.pearls-=10;pl.res.gold+=120;api.income(pl,'gold',120);api.toast('Perlen verkauft: +120 Gold.','good')}}]},
   },
   hooks:{
     tick(api,dt){
-      const pl=api.players[0];if(!pl)return;
+      const pl=api.players[api.me];if(!pl)return;
       if(!wired){const b=document.getElementById('btnChron');if(b){wired=true;b.onclick=()=>{const p=document.getElementById('chronPanel');p.hidden=!p.hidden;['savePanel','diploPanel'].forEach(id=>{const e=document.getElementById(id);if(e&&!p.hidden)e.hidden=true});render(lastPl)}}}
       lastPl=pl;
       // Perlen
       for(const u of api.ents){if(u.type!=='diver'||u.dead||u.moving)continue;const d=api.ents.find(e=>e.kind==='bld'&&e.type==='dock'&&e.built&&!e.dead&&e.owner===u.owner&&Math.hypot(e.x-u.x,e.y-u.y)<10);
-        if(d){u.pearlAcc=(u.pearlAcc||0)+.12*dt;if(u.pearlAcc>=1){u.pearlAcc-=1;const p=api.players[u.owner];p.pearls=(p.pearls||0)+1;if(u.owner!==0&&p.pearls>=10){p.pearls-=10;p.res.gold+=120}}}}
+        if(d){u.pearlAcc=(u.pearlAcc||0)+.12*dt;if(u.pearlAcc>=1){u.pearlAcc-=1;const p=api.players[u.owner];p.pearls=(p.pearls||0)+1;if(p.ai&&p.pearls>=10){p.pearls-=10;p.res.gold+=120}}}}
       if(pl.pearls){pl.goods=pl.goods||{};pl.goods.pearls=pl.pearls}else if(pl.goods)pl.goods.pearls=0;
       // Chronik: einmal pro Sekunde den Stand vergleichen
       pl.chT=(pl.chT||0)-dt;if(pl.chT>0)return;pl.chT=1;
@@ -44,7 +44,7 @@ EmpireXY.register({
         if(pl.st[k]>=n&&!c[k+n]){c[k+n]=1;log(pl,api,txt)}
       for(const n of [25,50,100,150])if(pl.pop>=n&&!c['pop'+n]){c['pop'+n]=1;log(pl,api,n+' Einwohner.')}
       if((pl.pearls||0)>=1&&!c.pearl){c.pearl=1;log(pl,api,'Erste Perle aus dem Meer geholt.')}
-      for(const b of api.ents)if(b.kind==='bld'&&b.owner===0&&b.built&&!b.chron&&['wonder','monument','temple','market','castle','guild','mercs'].includes(b.type)){b.chron=1;log(pl,api,(b.type==='monument'?'Epochenwunder':b.type==='wonder'?'Weltwunder':b.type==='temple'?'Tempel':b.type==='market'?'Marktplatz':b.type==='castle'?'Burg':b.type==='guild'?'Assassinengilde':'Söldnerlager')+' errichtet.')}
+      for(const b of api.ents)if(b.kind==='bld'&&b.owner===api.me&&b.built&&!b.chron&&['wonder','monument','temple','market','castle','guild','mercs'].includes(b.type)){b.chron=1;log(pl,api,(b.type==='monument'?'Epochenwunder':b.type==='wonder'?'Weltwunder':b.type==='temple'?'Tempel':b.type==='market'?'Marktplatz':b.type==='castle'?'Burg':b.type==='guild'?'Assassinengilde':'Söldnerlager')+' errichtet.')}
       if(pl.heroDeadUntil>api.time&&!c.heroDead){c.heroDead=1;log(pl,api,'Unser Held ist gefallen.')}else if(!(pl.heroDeadUntil>api.time))c.heroDead=0;
       render(pl);
     },

@@ -32,6 +32,7 @@ EmpireXY.register({
     tick(api,dt){
       const ents=api.ents,me=api.players[0],ai=api.players[1];if(!me||!ai)return;const S=api.aiS;
       for(const pl of api.players){pl.templar=ents.some(b=>b.type==='templar'&&b.built&&!b.dead&&b.owner===pl.i);pl.lodge=ents.some(b=>b.type==='lodge'&&b.built&&!b.dead&&b.owner===pl.i)}
+      if(api.mp)return; // Botschafter und Aufstände gibt es nur gegen die KI
       // Botschafter am feindlichen Stadtzentrum
       for(const u of ents){if(u.type!=='envoy'||u.dead||u.owner!==0||u.talked)continue;
         const tc=ents.find(e=>e.kind==='bld'&&e.type==='tc'&&e.owner===1&&!e.dead&&Math.hypot(e.x+e.size/2-u.x,e.y+e.size/2-u.y)<e.size/2+2.5);if(!tc)continue;u.talked=1;

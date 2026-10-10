@@ -42,10 +42,10 @@ EmpireXY.register({
       for(const b of api.ents){if(b.type!=='monument'||b.dead)continue;
         if(b.mep===undefined){b.mep=api.players[b.owner].epoch;}
         if(!b.built)continue;const pl=api.players[b.owner],e=MON[Math.min(9,b.mep)][2];
-        if(!b.announced){b.announced=1;api.toast((b.owner===0?'Unser Epochenwunder steht: ':'Ein Gegner hat ein Epochenwunder errichtet: ')+MON[Math.min(9,b.mep)][0]+'.',b.owner===0?'good':'warn')}
+        if(!b.announced){b.announced=1;api.toast((b.owner===api.me?'Unser Epochenwunder steht: ':'Ein Gegner hat ein Epochenwunder errichtet: ')+MON[Math.min(9,b.mep)][0]+'.',b.owner===api.me?'good':'warn')}
         if(e.gather)pl.monGather+=e.gather;if(e.atk)pl.monAtk+=e.atk;if(e.prod)pl.monProd+=e.prod;if(e.mood)pl.monMood+=e.mood;
         if(e.gold){b.goldAcc=(b.goldAcc||0)+e.gold*dt;if(b.goldAcc>=1){pl.res.gold+=1;api.income(pl,'gold',1);b.goldAcc-=1}}
-        if(e.reveal&&b.owner===0&&!b.revealed){b.revealed=1;api.revealAll()}
+        if(e.reveal&&b.owner===api.me&&!b.revealed){b.revealed=1;api.revealAll()}
       }
     },
   },
