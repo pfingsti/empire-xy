@@ -228,15 +228,15 @@ function newGame(d,seed){
 // ================= entities =================
 // Wetter und Tageszeit: Sonne, Regen (−20 % Tempo), Schnee (−10 %); ein Tag dauert 8 Minuten, nachts sinkt die Sicht
 let WX={kind:'sun',until:150,speed:1,night:0};
-const WXN={sun:'Sonnenschein',rain:'Regen: alle Truppen 20 % langsamer',snow:'Schneefall: alle Truppen 10 % langsamer'};
+const WXN={sun:'Sonnenschein',rain:'Regen: alle Truppen 10 % langsamer',snow:'Schneefall: Bewegung halbiert',storm:'Sturm: keine Schiffe aus den Häfen'};
 const SEAS=['Frühling','Sommer','Herbst','Winter'],SEAS_I=['🌱','☀','🍂','❄'],SEAS_D=['Nahrung +30 %','Bauen +20 %','Holz +25 %','Produktion −20 %, Bewegung −30 %'];let SEASON=0;
 function weatherTick(){
-  {const sn=Math.floor(gameT/180)%4;if(sn!==SEASON){SEASON=sn;if(started)toast(SEAS[sn]+' beginnt: '+SEAS_D[sn]+'.');if(sn===3){WX.kind='snow';WX.speed=.9;WX.until=gameT+180}else if(WX.kind==='snow'){WX.until=gameT}}}
-  const ph=(gameT/480)%1;WX.night=Math.max(0,Math.min(1,(Math.cos(ph*Math.PI*2)*-1-.35)*1.6));// 0 Tag … 1 tiefe Nacht
-  if(gameT>=WX.until){const r=rng(),ep=players[0].epoch,old=WX.kind;WX.kind=SEASON===3?'snow':r<.55?'sun':r<.82||ep>6?'rain':'snow';WX.until=gameT+90+rng()*150;
-    WX.speed=WX.kind==='rain'?.8:WX.kind==='snow'?.9:1;if(started&&old!==WX.kind)toast(WXN[WX.kind]+'.')}
+  {const sn=Math.floor(gameT/180)%4;if(sn!==SEASON){SEASON=sn;if(started)toast(SEAS[sn]+' beginnt: '+SEAS_D[sn]+'.');if(sn===3){WX.kind='snow';WX.speed=.5;WX.until=gameT+180}else if(WX.kind==='snow'){WX.until=gameT}}}
+  {const ph=gameT%240;WX.night=ph<120?Math.max(0,Math.min(1,(ph-117)/3)):Math.max(0,Math.min(1,(237-ph)/3));const n=WX.night>.5;if(started&&n!==WX.wasN){WX.wasN=n;toast(n?'Die Nacht bricht herein: −20 % Angriff, Bogenschützen sehen nichts.':'Der Tag bricht an.')}}// alle 120 s Tag/Nacht
+  if(gameT>=WX.until){const r=rng(),ep=players[0].epoch,old=WX.kind;WX.kind=SEASON===3?'snow':r<.12?'storm':r<.6?'sun':r<.85&&ep<=4?'rain':ep<=4?'rain':'sun';WX.until=gameT+90+rng()*150;
+    WX.speed=WX.kind==='rain'?.9:WX.kind==='snow'?.5:1;if(started&&old!==WX.kind)toast(WXN[WX.kind]+'.')}
 }
-function uStat(u){const d=UNITS[u.type],pl=players[u.owner],f=pl.fx,t=CLS(u.type),e=pl.epoch,m=1+.17*e;return{hp:Math.round(d.hp*m*(1+(f.hp[t]||0))),atk:d.atk*m*(1+(f.atk[t]||0)),range:(d.range+(f.range[t]||0))*(u.form===3?1.4:1),rate:d.rate,speed:d.speed*(1+.03*e)*(1+(f.speed[t]||0))*(d.naval?1:WX.speed*(SEASON===3?.7:1))*(u.rallyUntil>gameT?1.2:1)*(u.form===1?.5:u.form===3?.02:1),sight:Math.max(2,d.sight-WX.night*2)}}
+function uStat(u){const d=UNITS[u.type],pl=players[u.owner],f=pl.fx,t=CLS(u.type),e=pl.epoch,m=1+.17*e;return{hp:Math.round(d.hp*m*(1+(f.hp[t]||0))),atk:d.atk*m*(1+(f.atk[t]||0)),range:(d.range+(f.range[t]||0))*(u.form===3?1.4:1),rate:d.rate,speed:d.speed*(1+.03*e)*(1+(f.speed[t]||0))*(d.naval?1:WX.speed)*(u.rallyUntil>gameT?1.2:1)*(u.form===1?.5:u.form===3?.02:1),sight:Math.max(2,d.sight-WX.night*2)}}
 function spawnUnit(p,type,x,y){
   const d=UNITS[type];
   const u=addEnt({kind:'unit',type,owner:p,x,y,r:d.r,hp:0,cd:0,ang:p?Math.PI*.75:-Math.PI*.25,order:{t:'idle'},path:null,pathCD:0,carry:0,ct:null,scan:rng()*.5,anim:rng()*6});
@@ -281,6 +281,7 @@ const alive=e=>e&&!e.dead;
 function canAfford(p,c){for(const k in c)if(players[p].res[k]<c[k])return false;return true}
 function pay(p,c){for(const k in c)players[p].res[k]-=c[k]}
 // Einkommen je Rohstoff der letzten 60 Sekunden (für die Anzeige oben)
+function resCap(pl){let n=0;for(const e of ents)if(e.type==='warehouse'&&e.owner===pl.i&&e.built&&!e.dead)n++;return 1000+500*n}
 function income(pl,r,v){(pl.tot=pl.tot||{})[r]=(pl.tot[r]||0)+v;(pl.inc=pl.inc||[]).push([gameT,r,v])}
 function incomeRate(pl,r){if(!pl.inc)return 0;while(pl.inc.length&&pl.inc[0][0]<gameT-60)pl.inc.shift();let s=0;for(const x of pl.inc)if(x[1]===r)s+=x[2];return Math.round(s*60/Math.min(60,Math.max(10,gameT)))}
 function refund(p,c){for(const k in c)players[p].res[k]+=c[k]}
@@ -473,7 +474,7 @@ function enemyNear(u,radius,wantBld){
 
 // ================= combat =================
 const vetRank=u=>(u.kills||0)>=5?2:(u.kills||0)>=2?1:0,vetMul=u=>u&&u.rank?(u.rank===2?1.15:1.05):1;
-function damage(t,dmg,src){if(src&&aiS&&aiS.allied&&src.owner>=0&&t.owner>=0&&src.owner!==t.owner)return;
+function damage(t,dmg,src){if(src&&src.kind==='unit'&&WX.night>.5)dmg*=.8;if(src&&aiS&&aiS.allied&&src.owner>=0&&t.owner>=0&&src.owner!==t.owner)return;
   if(t.dead)return;
   if(src&&src.buffUntil>gameT)dmg*=1.2;if(src&&src.templeT>gameT)dmg*=1.1;if(src&&src.form===2)dmg*=1.3;if(src&&src.owner>=0&&players[src.owner]&&players[src.owner].templar&&(src.type==='knight'||CLS(src.type)==='cavalry'))dmg*=1.3;if(t.form===1)dmg*=UNITS[t.type]&&UNITS[t.type].shield?.5:.7;if(src&&src.owner>=0&&players[src.owner]&&players[src.owner].raceUntil>gameT)dmg*=1.1;if(t.campT>gameT)dmg*=.6;else if(t.form===2)dmg*=1.2;if(src&&src.owner!=null&&players[src.owner]&&players[src.owner].monAtk)dmg*=1+players[src.owner].monAtk;if(src&&src.kind==='unit'&&t.kind==='unit'&&t.hp>0&&t.hp<=dmg*vetMul(src)){src.kills=(src.kills||0)+1;const r=vetRank(src);if(r>(src.rank||0)){src.rank=r;if(src.type!=='hero'){src.maxhp=Math.round(src.maxhp*(r===1?1.05:1.1));if(src.owner===0&&r===2)toast(uname(UNITS[src.type],players[0].epoch)+' ist jetzt ein Veteran.','good')}}}
   if(src)dmg*=vetMul(src);if(t.rank)dmg/=t.rank===2?1.15:1.05;if(src&&src.vetAuraT>gameT&&!src.rank)dmg*=1.08;
@@ -514,7 +515,8 @@ function attackTick(u,t,dt,st){
   const d=distEnt(u,t);
   if(d<=st.range+.05){
     u.path=null;const c=center(t);u.ang=Math.atan2(c.y-u.y,c.x-u.x);
-    if(u.cd<=0){
+    if(u.cd<=0&&WX.night>.5&&CLS(u.type)==='ranged'){u.cd=.5}
+    else if(u.cd<=0){
       u.cd=st.rate;u.swing=.25;
       const D=UNITS[u.type],ep=players[u.owner].epoch;
       if(D.proj===2){ // ballistic shell: flies to where the target is now, splash on impact
@@ -573,6 +575,7 @@ function updUnit(u,dt){
         if(r){o.target=r.id;u.path=null}else{if(u.carry>0)order(u,{t:'return',resume:null});else order(u,{t:'idle'});break}
       }
       if(u.carry>0&&u.ct!==o.rt){order(u,{t:'return',resume:o});break}
+      if(players[u.owner].res[o.rt]>=resCap(players[u.owner])){u.working=false;if(u.carry>0)order(u,{t:'return',resume:o});break}
       if(u.carry>=10+players[u.owner].fx.carry){order(u,{t:'return',resume:o});break}
       if(distEnt(u,r)<=.5){
         u.path=null;const c=center(r);u.ang=Math.atan2(c.y-u.y,c.x-u.x);
@@ -586,7 +589,7 @@ function updUnit(u,dt){
       let d=o.drop?byId.get(o.drop):null;
       if(!alive(d)||!d.built){d=nearestDrop(u.owner,u.x,u.y);if(!d){order(u,{t:'idle'});break}o.drop=d.id;u.path=null}
       if(distEnt(u,d)<=.5){
-        const pl=players[u.owner];pl.res[u.ct]+=u.carry;pl.st.gathered+=u.carry;income(pl,u.ct,u.carry);u.carry=0;
+        const pl=players[u.owner];pl.res[u.ct]=Math.max(pl.res[u.ct],Math.min(resCap(pl),pl.res[u.ct]+u.carry));pl.st.gathered+=u.carry;income(pl,u.ct,u.carry);u.carry=0;
         if(o.resume){const r=o.resume;order(u,r)}else order(u,{t:'idle'});
       }else approach(u,d,dt);
       break;}
@@ -654,6 +657,7 @@ function updBld(b,dt){
     return;
   }
   const U=UNITS[q.u];
+  if(U.naval&&WX.kind==='storm'){q.blocked=true;return}
   if(!q.started){if(pl.pop+U.pop>pl.cap){q.blocked=true;if(b.owner===0&&gameT-(b.popWarn||-99)>15){b.popWarn=gameT;toast('Bevölkerungslimit erreicht. Baue Wohnhäuser.','warn')}return}q.started=true;q.blocked=false;recalcPop();if(b.prio===2){const c=q.cost||U.cost;if(Object.keys(c).every(r=>pl.res[r]>=c[r])){for(const r in c)pl.res[r]-=c[r];q.boost=true}}}
   q.t+=sdt*(q.boost?2:b.prio===.5?.5:1);
   if(q.t>=q.total){
@@ -1612,8 +1616,9 @@ function render(){
   if(marker&&marker.t>0){ctx.strokeStyle=marker.c;ctx.lineWidth=2;const r=(1-marker.t)*10+4;ctx.beginPath();ctx.ellipse(marker.x*T,marker.y*T,r,r*.55,0,0,7);ctx.stroke();ctx.lineWidth=1}
   // box
   ctx.setTransform(dpr,0,0,dpr,0,0);
-  if(WX.night>0){ctx.fillStyle=`rgba(10,18,48,${WX.night*.42})`;ctx.fillRect(0,0,viewW,viewH)}
-  if(WX.kind!=='sun'){const t=performance.now()/1000,n=WX.kind==='rain'?140:90;ctx.fillStyle=ctx.strokeStyle=WX.kind==='rain'?'rgba(190,210,235,.45)':'rgba(245,248,255,.85)';ctx.lineWidth=1;
+  if(WX.night>0){ctx.fillStyle=`rgba(0,0,0,${WX.night*.35})`;ctx.fillRect(0,0,viewW,viewH)}
+  if(WX.kind==='storm'){const t=performance.now()/1000;ctx.fillStyle='rgba(40,50,60,.18)';ctx.fillRect(0,0,viewW,viewH);ctx.strokeStyle='rgba(200,210,220,.35)';ctx.lineWidth=1;ctx.beginPath();for(let i=0;i<120;i++){const x=((i*131.7+t*700)%(viewW+80))-40,y=((i*57.3+t*260)%(viewH+40))-20;ctx.moveTo(x,y);ctx.lineTo(x-18,y+6)}ctx.stroke();if(Math.sin(t*1.7)>.995){ctx.fillStyle='rgba(255,255,255,.25)';ctx.fillRect(0,0,viewW,viewH)}}
+  else if(WX.kind!=='sun'){const t=performance.now()/1000,n=WX.kind==='rain'?140:90;ctx.fillStyle=ctx.strokeStyle=WX.kind==='rain'?'rgba(190,210,235,.45)':'rgba(245,248,255,.85)';ctx.lineWidth=1;
     if(WX.kind==='rain'){ctx.fillStyle='rgba(60,75,95,.12)';ctx.fillRect(0,0,viewW,viewH);ctx.beginPath()}
     for(let i=0;i<n;i++){const sp=WX.kind==='rain'?620:60,x=((i*97.3+t*(WX.kind==='rain'?120:25))%(viewW+40))-20,y=((i*61.7+t*sp)%(viewH+40))-20;
       if(WX.kind==='rain'){ctx.moveTo(x,y);ctx.lineTo(x-3,y+11)}else{ctx.fillRect(x+Math.sin(t+i)*6,y,2,2)}}
@@ -1818,7 +1823,7 @@ function refreshInfo(){
 }
 function updateTop(){
   const pl=players[0];
-  for(const r of RES){const el=$('#r-'+r),v=Math.floor(pl.res[r]);if(el.textContent!=v)el.textContent=v;
+  const rcap=resCap(pl);for(const r of RES){const el=$('#r-'+r),v=Math.floor(pl.res[r]);if(el.textContent!=v)el.textContent=v;el.parentNode.classList.toggle('full',pl.res[r]>=rcap);el.parentNode.title=el.parentNode.title.split(' (')[0]+' (Lager '+rcap+')';
     const ir=incomeRate(pl,r),ie=$('#i-'+r);if(ie){const t=ir>0?'+'+ir+'/min':'';if(ie.textContent!==t)ie.textContent=t}}
   const gd=pl.goods,ge=$('#r-goods');if(ge&&gd){const L=[['wheat','Weizen'],['flour','Mehl'],['planks','Bretter'],['blocks','Quader'],['ore','Erz'],['tools','Werkzeug'],['pearls','Perlen']].filter(([k])=>(gd[k]||0)>=1),on=L.length>0;ge.hidden=!on;if(on){const t=L.map(([k,n])=>n+' '+Math.floor(gd[k])).join(' · ');if(ge.textContent!==t){ge.textContent=t;ge.title='Waren aus deinen Produktionsketten. Werkzeug beschleunigt alle Arbeiter um '+Math.round(((pl.toolMul||1)-1)*100)+' %.'}}}
   const md=$('#r-mood');if(md){const m=Math.round(pl.mood??50),t=m+'';if(md.textContent!==t){md.textContent=t;md.style.color=m>=65?'var(--ok)':m<35?'var(--danger)':'';md.parentNode.title='Beliebtheit '+m+' von 100: '+(pl.moodWhy||'')+' Sammeltempo '+Math.round((pl.moodMul||1)*100)+' %.'}}
@@ -1833,7 +1838,7 @@ function updateTop(){
   if(rh.dataset.sig!==rsig){rh.dataset.sig=rsig;rh.hidden=!rq.length;rh.innerHTML=rq.map(r=>`<div class="rq" data-id="${r.id}"><span>${TECHS[r.id].name}</span><em></em><i><b></b></i></div>`).join('')}
   rq.forEach((r,i)=>{const row=rh.children[i];if(!row)return;row.querySelector('b').style.width=(r.f*100)+'%';row.querySelector('em').textContent=r.wait?'wartet':Math.floor(r.f*100)+'% · '+Math.ceil(r.left)+' s'});
   if(!$('#techScreen').hidden)$('#techCols').querySelectorAll('.tk.running').forEach(btn=>{const r=rq.find(x=>x.id===btn.dataset.id);const st=btn.querySelector('.st');if(r&&st)st.textContent=r.wait?'Wartet in Warteschlange':'Wird erforscht: '+Math.floor(r.f*100)+'%';let bar=btn.querySelector('.pb');if(!bar){bar=document.createElement('i');bar.className='pb';bar.innerHTML='<b></b>';btn.appendChild(bar)}bar.firstChild.style.width=(r?r.f*100:0)+'%'});
-  $('#clock').textContent=(players[0].depotXfer>gameT?'⇄ ':'')+SEAS_I[SEASON]+' '+(WX.kind==='rain'?'🌧 ':WX.kind==='snow'?'❄ ':WX.night>.5?'☾ ':'☀ ')+(timeLimit?fmtTime(gameT)+' / '+timeLimit+':00':fmtTime(gameT));$('#clock').title=SEAS[SEASON]+' ('+SEAS_D[SEASON]+', wechselt alle 3 Minuten). '+WXN[WX.kind]+(WX.night>.5?', Nacht: weniger Sicht, der Gegner greift eher an':'');
+  $('#clock').textContent=(players[0].depotXfer>gameT?'⇄ ':'')+SEAS_I[SEASON]+' '+(WX.kind==='rain'?'🌧 ':WX.kind==='snow'?'❄ ':WX.kind==='storm'?'🌪 ':'')+(WX.night>.5?'🌙 ':'☀ ')+(timeLimit?fmtTime(gameT)+' / '+timeLimit+':00':fmtTime(gameT));$('#clock').title=SEAS[SEASON]+' ('+SEAS_D[SEASON]+', wechselt alle 3 Minuten). '+WXN[WX.kind]+(WX.night>.5?', Nacht: weniger Sicht, der Gegner greift eher an':'');
   const idle=ents.filter(e=>e.owner===0&&e.type==='worker'&&e.order.t==='idle').length;$('#idleN').textContent=idle;
   const wb=$('#wonderBanner');const wt=players.find(p=>p.wonderT>0);
   const rc=players.find(p=>p.raceUntil>gameT);
