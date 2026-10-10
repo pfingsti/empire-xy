@@ -235,7 +235,7 @@ function newGame(d,seed){
   XY.emit('start',API);
   const tc=ents.find(e=>e.type==='tc'&&e.owner===0);centerOn(tc.x+1.5,tc.y+1.5);
   select([tc]);
-  toast('Dein Volk erwacht in der Steinzeit. Sammle Nahrung und Holz.', 'good');
+  toast('Dein Volk erwacht in der '+EPOCHS[players[0].epoch]+'. Sammle Nahrung und Holz.', 'good');
   toast('Du führst die '+CIVS[players[0].civ].name+' ('+CIVS[players[0].civ].bonus+'). Gegner: '+CIVS[players[1].civ].name+'.');
 }
 
@@ -979,6 +979,8 @@ const API={
   heal(e,amt){e.hp=Math.min(e.maxhp,e.hp+amt)},
   revealAll(){exp.fill(1)},sel:()=>sel,kill,nearestRes,
   fx(x,y,k){fx.push({x,y,t:0,k:k||'hit'})},
+  free:(x,y)=>inb(x|0,y|0)&&block[idx(x|0,y|0)]===0&&terr[idx(x|0,y|0)]!==1,get bases(){return bases},
+  endGame:(win,text)=>endGame(win,text),centerOn:(x,y)=>centerOn(x,y),epochName:i=>EPOCHS[i],
 };
 // ================= main step =================
 let aiTimer=0,popT=0;
@@ -1027,7 +1029,7 @@ function checkEnd(){
   }
 }
 function endGame(win,text){
-  if(over)return;over=true;clearSave();
+  if(over)return;over=true;clearSave();XY.emit('end',API,win,text);
   $('#endTitle').textContent=win?'Sieg':'Niederlage';
   $('#endText').textContent=text+' Spielzeit '+fmtTime(gameT)+', erreichte Epoche: '+EPOCHS[players[0].epoch]+'.';
   const rows=[['Ausgebildet','trained'],['Gefallen / zerstört','lost'],['Besiegte Feinde','killed'],['Gesammelte Rohstoffe','gathered'],['Gebäude errichtet','built']];
@@ -1676,7 +1678,7 @@ function render(){
   for(const e of list){if(e.kind==='res')drawRes(ctx,e);else if(e.kind==='bld'){drawBld(ctx,e);if(e.built&&FLAGB[e.type])drawFlag(ctx,e)}
     else if(e.hitT&&gameT-e.hitT<.1){ctx.save();ctx.filter='brightness(1.9)';drawUnit(ctx,e);ctx.restore()}else drawUnit(ctx,e)}
   // ambient particles: dust, wood chips, chimney smoke
-  if(!paused&&started){
+  if(!paused&&started&&SET.q>=2){
     for(const e of list){
       if(e.kind==='unit'){if(e.moving&&Math.random()<.04)spawnVfx(e.x,e.y+.25,'dust');
         if(e.working&&e.order.rt==='wood'){const tr=byId.get(e.order.target);if(tr)tr.hitT=gameT+.3}if(e.working&&e.order.rt==='wood'&&Math.random()<.05)spawnVfx(e.x+Math.cos(e.ang)*.4,e.y+Math.sin(e.ang)*.4-.2,'chip',{vx:(Math.random()-.5)*1.5,vy:-1.2})}
@@ -1730,6 +1732,7 @@ function render(){
     const gr=ctx.createRadialGradient(cx,cy,0,cx,cy,r);gr.addColorStop(0,'rgba(10,20,30,.13)');gr.addColorStop(1,'rgba(10,20,30,0)');ctx.fillStyle=gr;ctx.fillRect(cx-r,cy-r,r*2,r*2)}
   // fog
   ctx.imageSmoothingEnabled=true;ctx.drawImage(fogC,0,0,W,H,0,0,W*T,H*T);
+  XY.emit('draw',ctx,DRAW_API);// Bausteine zeichnen in Weltkoordinaten (z. B. Missionsziele)
   // placement ghost
   if(placing&&mouse.inside&&BLD[placing].line){
     const w=toWorld(mouse.x,mouse.y),tl=wallDrag?wallLine(wallDrag.x,wallDrag.y,Math.floor(w.x),Math.floor(w.y)):[[Math.floor(w.x),Math.floor(w.y)]];
@@ -1755,7 +1758,7 @@ function render(){
   if(marker&&marker.t>0){ctx.strokeStyle=marker.c;ctx.lineWidth=2;const r=(1-marker.t)*10+4;ctx.beginPath();ctx.ellipse(marker.x*T,marker.y*T,r,r*.55,0,0,7);ctx.stroke();ctx.lineWidth=1}
   // box
   ctx.setTransform(dpr,0,0,dpr,0,0);
-  {// Farbstimmung: warmes Licht bei Tagesanbruch und Abend, Vignette
+  if(SET.q>=1){// Farbstimmung: warmes Licht bei Tagesanbruch und Abend, Vignette
     const ph=gameT%120,edge=Math.max(0,1-Math.min(ph,120-ph)/15),day=1-WX.night;
     if(edge>0&&day>.2){ctx.fillStyle=`rgba(255,140,60,${(.08*edge*day).toFixed(3)})`;ctx.fillRect(0,0,viewW,viewH)}
     if(!window.__vig||window.__vig.w!==viewW||window.__vig.h!==viewH){const g=ctx.createRadialGradient(viewW/2,viewH/2,Math.min(viewW,viewH)*.45,viewW/2,viewH/2,Math.hypot(viewW,viewH)*.6);g.addColorStop(0,'rgba(0,0,0,0)');g.addColorStop(1,'rgba(10,8,4,.32)');window.__vig={w:viewW,h:viewH,g}}
@@ -1796,6 +1799,7 @@ function renderMini(){
 // ================= UI =================
 let uiDirty=true,uiKey='',uiT=0;
 // ---- Klang: synthetische Platzhalter-Effekte (WebAudio), Ein/Aus über die Taste „Ton“
+let SET={vol:.8,q:2,auto:1,vox:1};try{Object.assign(SET,JSON.parse(localStorage.getItem('empire-xy.set')||'{}'))}catch(e){}
 let actx=null,soundOn=true;try{soundOn=localStorage.getItem('empire-xy.ton')!=='0'}catch(e){}
 const sfxLast={};
 const onScreen=u=>{const sx=(u.x*T-cam.x)*cam.z,sy=(u.y*T-cam.y)*cam.z;return sx>-40&&sy>-40&&sx<viewW+40&&sy<viewH+40};
@@ -1804,7 +1808,7 @@ function sfx(k){
   try{if(!actx)actx=new (window.AudioContext||window.webkitAudioContext)();if(actx.state==='suspended')actx.resume();}catch(e){return}
   const tone=(type,f1,f2,a,d,v,dl)=>{const t=actx.currentTime+(dl||0),o=actx.createOscillator(),g=actx.createGain();o.connect(g);g.connect(actx.destination);
     o.type=type;o.frequency.setValueAtTime(f1,t);o.frequency.exponentialRampToValueAtTime(f2,t+a+d);
-    g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(v,t+a);g.gain.exponentialRampToValueAtTime(.0001,t+a+d);o.start(t);o.stop(t+a+d+.05)};
+    g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(Math.max(.0002,v*SET.vol),t+a);g.gain.exponentialRampToValueAtTime(.0001,t+a+d);o.start(t);o.stop(t+a+d+.05)};
   const P={click:['triangle',660,520,.005,.06,.05],good:['sine',523,784,.01,.35,.08],warn:['square',220,180,.01,.3,.04],
     hit:['square',140,70,.002,.08,.03],shot:['triangle',900,300,.002,.09,.025],boom:['sawtooth',90,30,.005,.35,.07],
     chop:['square',260,120,.001,.05,.025],mine:['triangle',1500,1100,.001,.07,.02],sword:['sawtooth',2200,1400,.001,.06,.018]}[k];
@@ -1820,10 +1824,22 @@ function toast(msg,kind){
   setTimeout(()=>{el.style.opacity='0';setTimeout(()=>el.remove(),700)},5200);
 }
 function costHTML(c){return Object.keys(c).map(k=>`<b><span class="dot" style="background:${RES_COL[k]}"></span>${c[k]}</b>`).join('')}
+// Siedlerstimmen: kurze gesprochene Antworten beim Auswählen eigener Einheiten (Web Speech, sonst Murmelton)
+const VOX={worker:['Ja?','Was gibt es zu tun?','Bereit zur Arbeit.','Jawohl.','Hier bin ich.','Wo soll ich hin?'],
+  infantry:['Zu Befehl!','Bereit!','Für das Reich!','Schwert gezogen.','Jawohl, Herr!'],ranged:['Bogen gespannt.','Ziel erfasst?','Bereit!','Wir decken euch.'],
+  cavalry:['Aufsitzen!','Die Pferde sind bereit.','Zu Befehl!','Reiter bereit!'],siege:['Geschütz bereit.','Wohin zielen wir?','Laden!'],naval:['Segel gesetzt.','Leinen los!','Aye!'],hero:['Ich führe euch!','Für Ruhm und Ehre!','Sprecht!']};
+let voxT=0,voxV=null;
+function voice(u){if(!soundOn||SET.vol<=0)return;const now=performance.now();if(now-voxT<700)return;voxT=now;
+  const lk=UNITS[u.type]&&UNITS[u.type].hero?'hero':UNITS[u.type]&&UNITS[u.type].naval?'naval':LOOK(u.type);const L=VOX[lk]||VOX.worker,txt=L[(Math.random()*L.length)|0];
+  const pitch={worker:1.1,infantry:.8,ranged:1,cavalry:.85,siege:.7,naval:.9,hero:.75}[lk]||1;
+  try{const ss=window.speechSynthesis;if(ss&&window.SpeechSynthesisUtterance){if(!voxV){const vs=ss.getVoices();voxV=vs.find(v=>/^de/i.test(v.lang))||null}
+    ss.cancel();const ut=new SpeechSynthesisUtterance(txt);ut.lang='de-DE';if(voxV)ut.voice=voxV;ut.pitch=pitch*(.9+Math.random()*.2);ut.rate=1.05;ut.volume=SET.vol;ss.speak(ut);return}}catch(e){}
+  sfx('click')}
 function select(list,add){
   if(add){for(const e of list)if(!sel.includes(e))sel.push(e)}else sel=list.slice();
   // only one non-unit or foreign thing at a time
   if(sel.length>1)sel=sel.filter(e=>e.kind==='unit'&&e.owner===0).length?sel.filter(e=>e.kind==='unit'&&e.owner===0):[sel[0]];
+  {const u=list.find(e=>e.kind==='unit'&&e.owner===0&&!e.dead);if(u&&started&&SET.vox!==0)voice(u)}
   uiDirty=true;placing=null;aMode=false;
 }
 function selKey(){return sel.map(e=>e.id).join(',')+'|'+players[0].epoch+'|'+(placing||'')+(aMode?'A':'')+'|'+(sel[0]&&sel[0].kind==='bld'?(sel[0].built?1:0):'')}
@@ -2262,7 +2278,7 @@ function frame(now){
     if(zoomT&&Math.abs(zoomT-cam.z)>.0005){const a=zoomAt||{x:viewW/2,y:viewH/2},before=toWorld(a.x,a.y);cam.z+=(zoomT-cam.z)*Math.min(1,dt*14);cam.x=before.x*T-a.x/cam.z;cam.y=before.y*T-a.y/cam.z}
     clampCam();
     if(marker)marker.t-=dt*1.5;
-    saveT+=dt;if(saveT>30&&!paused){saveT=0;saveGame()}
+    saveT+=dt;if(saveT>30&&!paused&&SET.auto){saveT=0;saveGame()}
     if(!paused){for(const v of vfx){v.t+=dt;v.x+=v.vx*dt;v.y+=v.vy*dt;if(v.k==='chip')v.vy+=4*dt}vfx=vfx.filter(v=>v.t<(v.k==='smoke2'?3:v.k==='chip'?.6:.8))}
     const key=selKey();
     if(key!==uiKey||uiDirty){uiKey=key;uiDirty=false;buildInfo();buildCmds();hideTip()}
@@ -2282,6 +2298,7 @@ function saveGame(key){
   try{
     const data={v:1,seed:curSeed,diff,epStart,epEnd,timeLimit,WX,gameT,nextId,bases,aiS,players,terr:Array.from(terr),exp:Array.from(exp),
       ents:ents.filter(e=>!e.dead),cam:{x:cam.x,y:cam.y,z:cam.z},saved:Date.now()};
+    XY.emit('save',data);
     if(key==='__file'){return JSON.stringify(data)}
     localStorage.setItem(key,JSON.stringify(data));return true;
   }catch(e){return false}
@@ -2303,6 +2320,7 @@ function loadGame(d){
   proj=[];fx=[];sel=[];over=false;placing=null;aMode=false;groups={};
   renderTerrain();recalcPop();updateVis(true);
   if(d.cam){zoomT=0;cam.z=d.cam.z;cam.x=d.cam.x;cam.y=d.cam.y;clampCam()}
+  XY.emit('load',API,d);
   toast('Spielstand geladen ('+fmtTime(gameT)+').','good');
 }
 function showContinue(){const d=readSave(),b=$('#continueBtn');b.hidden=!d;if(d)b.textContent='Weiterspielen ('+fmtTime(d.gameT)+', '+EPOCHS_NAME(d)+')';
@@ -2413,9 +2431,26 @@ function drawTrade(){if(!tradeOpen)return;const c=$('#tradeCv'),g=c.getContext('
     g.fillStyle=col;g.beginPath();g.moveTo(bx,by);g.lineTo(bx-12*Math.cos(an-.4),by-12*Math.sin(an-.4));g.lineTo(bx-12*Math.cos(an+.4),by-12*Math.sin(an+.4));g.fill();i++}
   $('#tradeInfo').textContent=i?i+' aktive Handelsroute'+(i>1?'n':'')+'. Blau: deine, Rot: gegnerische.':'Keine aktiven Handelsrouten. Karawanen per Rechtsklick auf einen zweiten Markt schicken.';
   requestAnimationFrame(drawTrade)}
-$('#startBtn').onclick=()=>{timeLimit=+$('#limitSel').value;useCustomMap=!!(CUSTOM_MAP&&$('#useCustom').checked);
+$('#startBtn').onclick=()=>{timeLimit=+$('#limitSel').value;epStart=+$('#epStartSel').value;epEnd=+$('#epEndSel').value;chosenCiv=$('#civSel').value||chosenCiv;useCustomMap=!!(CUSTOM_MAP&&$('#useCustom').checked);
   $('#startScreen').hidden=true;resize();newGame(chosenDiff,seed);started=true;paused=false;$('#btnPause').textContent='Pause';
 };
+{// Einstellungen: im Spiel und im Hauptmenü erreichbar, gespeichert im Browser
+  const sv=()=>{try{localStorage.setItem('empire-xy.set',JSON.stringify(SET))}catch(e){}};let wasP=false;
+  const open=()=>{$('#setSound').checked=soundOn;$('#setVol').value=Math.round(SET.vol*100);$('#setVolN').textContent=Math.round(SET.vol*100)+' %';$('#setQ').value=SET.q;$('#setAuto').checked=!!SET.auto;$('#setVox').checked=SET.vox!==0;
+    $('#setMenu').hidden=!started||over;wasP=paused;if(started)paused=true;$('#setPanel').hidden=false};
+  const close=()=>{$('#setPanel').hidden=true;if(started)paused=wasP};
+  $('#btnSet').onclick=open;$('#setBtn2').onclick=open;$('#setClose').onclick=close;
+  $('#setSound').onchange=e=>{soundOn=e.target.checked;try{localStorage.setItem('empire-xy.ton',soundOn?'1':'0')}catch(_){}const b=$('#btnSound');if(b)b.textContent=soundOn?'Ton an':'Ton aus'};
+  $('#setVol').oninput=e=>{SET.vol=e.target.value/100;$('#setVolN').textContent=e.target.value+' %';sv()};
+  $('#setQ').onchange=e=>{SET.q=+e.target.value;sv()};$('#setAuto').onchange=e=>{SET.auto=e.target.checked?1:0;sv()};$('#setVox').onchange=e=>{SET.vox=e.target.checked?1:0;sv()};
+  $('#setMenu').onclick=()=>{close();$('#btnMenu').click()};
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('#setPanel').hidden)close();else if(e.key==='F10'){e.preventDefault();if($('#setPanel').hidden)open();else close()}});
+}
+$('#btnMenu').onclick=()=>{if(!started||over)return;saveGame();started=false;paused=true;['#endScreen','#credits','#tradePanel'].forEach(q=>{const e=$(q);if(e)e.hidden=true});showContinue();$('#startScreen').hidden=false;toast('Spiel gespeichert. Mit „Weiterspielen“ geht es weiter.','good')};
+// Spielstart von außen (Kampagne): eigene Schwierigkeit, Karte, Epochen, Volk und Zeitlimit
+XY.game={start(o){o=o||{};timeLimit=o.limit||0;useCustomMap=false;if(o.epStart!=null)epStart=o.epStart;if(o.epEnd!=null)epEnd=o.epEnd;if(o.civ&&CIVS[o.civ])chosenCiv=o.civ;
+  $('#startScreen').hidden=true;$('#endScreen').hidden=true;over=false;resize();newGame(o.diff!=null?o.diff:chosenDiff,o.seed!=null?o.seed:(Math.random()*99999)|0);started=true;paused=false;$('#btnPause').textContent='Pause'},
+  menu(){$('#againBtn').click()},get started(){return started&&!over}};
 $('#againBtn').onclick=()=>{showContinue();$('#endScreen').hidden=true;started=false;over=false;seed=(Math.random()*99999)|0;$('#seedN').textContent=seed;$('#startScreen').hidden=false};
 window.addEventListener('resize',resize);
 resize();showContinue();requestAnimationFrame(frame);
