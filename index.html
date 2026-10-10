@@ -189,6 +189,9 @@ label.opt{font-size:14px;padding:5px 12px}
 #tradePanel{position:fixed;top:64px;right:12px;z-index:65;background:var(--panel,#1b2328);border:1px solid var(--bronze);border-radius:8px;padding:8px;width:min(340px,92vw)}#tradePanel canvas{width:100%;height:auto;display:block;image-rendering:pixelated}.tph{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
 .res.full{animation:resFull .8s infinite}@keyframes resFull{50%{color:#ff5a4a;background:rgba(255,60,40,.18)}}
 .cmd.cat{background:linear-gradient(#3a2f1e,#2a2216);border-color:#6b5532}.cmd.cat.on{background:linear-gradient(#7a5a26,#4e3a18);border-color:var(--bronze-hi);color:#fff3c4}
+#setPanel{z-index:60}.setBox{background:#1d1a15;border:1px solid #6b5a3a;border-radius:8px;padding:20px 24px;min-width:min(420px,92vw);max-width:92vw;color:#e8dfc8;display:flex;flex-direction:column;gap:10px}
+.setBox h2{margin:0 0 4px}.setBox h3{margin:8px 0 0;font-size:14px;color:#c9b27a}.setRow{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.setKeys{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:13px}.setKeys span{background:#2e2920;border:1px solid #5a4a30;border-radius:4px;padding:1px 6px;font-family:monospace;justify-self:start}
 </style>
 
 <div id="app">
@@ -213,7 +216,7 @@ label.opt{font-size:14px;padding:5px 12px}
     <button class="tbtn" id="btnChron" title="Meilensteine dieser Partie">Chronik</button>
     <button class="tbtn" id="btnSave" title="Spielstand in einen von drei Speicherplätzen sichern">Speichern</button>
     <button class="tbtn" id="btnSound" title="Soundeffekte ein- oder ausschalten">Ton an</button>
-    <button class="tbtn" id="btnMenu" title="Speichern und zurück ins Hauptmenü">Hauptmenü</button><button class="tbtn" id="btnPause" title="Pause (P)">Pause</button><span class="spd"><button class="tbtn" data-speed=".5">½×</button><button class="tbtn on" data-speed="1">1×</button><button class="tbtn" data-speed="2">2×</button><button class="tbtn" data-speed="4">4×</button></span>
+    <button class="tbtn" id="btnSet" title="Einstellungen (F10)">⚙ Einstellungen</button><button class="tbtn" id="btnMenu" title="Speichern und zurück ins Hauptmenü">Hauptmenü</button><button class="tbtn" id="btnPause" title="Pause (P)">Pause</button><span class="spd"><button class="tbtn" data-speed=".5">½×</button><button class="tbtn on" data-speed="1">1×</button><button class="tbtn" data-speed="2">2×</button><button class="tbtn" data-speed="4">4×</button></span>
     <span id="updBox" hidden><span id="updText"></span> <button class="tbtn" id="updBtn" hidden>Jetzt neu starten</button></span>
   </header>
   <main id="stage">
@@ -237,6 +240,18 @@ label.opt{font-size:14px;padding:5px 12px}
   <div class="row" style="gap:6px;flex-wrap:wrap;justify-content:center"><button class="tbtn" id="edNew">Leere Karte</button><button class="tbtn" id="edSave">Karte speichern</button><button class="tbtn" id="edLoad">Karte laden</button><input type="file" id="edFile" accept=".json,application/json" hidden><button class="go" id="edDone">Fertig</button></div>
   <p class="hint" style="margin:0;max-width:640px;text-align:center">Male mit der Maus. Start 1 ist dein Stadtzentrum, Start 2 das der KI. Mit „Fertig“ wird die Karte gemerkt und kann im Startmenü als eigene Karte gewählt werden.</p>
 </div>
+<div class="overlay" id="setPanel" hidden><div class="setBox">
+  <h2>Einstellungen</h2>
+  <label class="setRow"><span>Ton</span><input type="checkbox" id="setSound"></label>
+  <label class="setRow"><span>Lautstärke</span><input type="range" id="setVol" min="0" max="100" step="5"><b id="setVolN"></b></label>
+  <div class="setRow"><span>Spielgeschwindigkeit</span><span><button class="tbtn" data-speed=".5">½×</button><button class="tbtn on" data-speed="1">1×</button><button class="tbtn" data-speed="2">2×</button><button class="tbtn" data-speed="4">4×</button></span></div>
+  <label class="setRow"><span>Einheitenstimmen beim Auswählen</span><input type="checkbox" id="setVox"></label>
+  <label class="setRow"><span>Grafikqualität</span><select id="setQ"><option value="2">Hoch (alle Effekte)</option><option value="1">Mittel (ohne Partikel)</option><option value="0">Niedrig (ohne Partikel und Vignette)</option></select></label>
+  <label class="setRow"><span>Automatisch speichern (alle 30 s)</span><input type="checkbox" id="setAuto"></label>
+  <h3>Tastenbelegung</h3>
+  <div class="setKeys"><span>P</span>Pause<span>Z</span>Freie Kamera<span>F10</span>Einstellungen öffnen<span>Esc</span>Auswahl aufheben / Fenster schließen<span>Shift + Rechtsklick</span>Wegpunkte setzen<span>Mausrad</span>Zoomen<span>Pfeiltasten / Bildrand</span>Kamera bewegen</div>
+  <div class="row"><button class="go" id="setClose">Weiter</button><button class="opt" id="setMenu">Speichern und Hauptmenü</button></div>
+</div></div>
 <div class="overlay" id="startScreen">
   <div class="card">
     <h1>Empire XY</h1>
@@ -261,7 +276,7 @@ label.opt{font-size:14px;padding:5px 12px}
       <button class="opt" id="seedBtn" aria-pressed="true">Zufällig #<span id="seedN"></span></button>
       <button class="opt" id="reroll" aria-pressed="false">Neu würfeln</button>
     </div>
-    <div class="row"><button class="go" id="startBtn">Reich gründen</button><button class="opt" id="continueBtn" hidden>Weiterspielen</button></div>
+    <div class="row"><button class="go" id="startBtn">Reich gründen</button><button class="opt" id="continueBtn" hidden>Weiterspielen</button><button class="opt" id="setBtn2">⚙ Einstellungen</button></div>
     <div class="row"><button class="opt" id="editBtn">Karte bearbeiten</button><label class="epsel" id="customRow" hidden><input type="checkbox" id="useCustom"> eigene Karte verwenden</label></div>
     <div class="row"><a href="#" id="verLink" title="Credits" onclick="return false">v1.0</a></div>
     <div class="row" id="loadRow" hidden><span class="lbl">Laden</span><span id="loadSlots"></span></div>
@@ -3841,7 +3856,7 @@ function render(){
   for(const e of list){if(e.kind==='res')drawRes(ctx,e);else if(e.kind==='bld'){drawBld(ctx,e);if(e.built&&FLAGB[e.type])drawFlag(ctx,e)}
     else if(e.hitT&&gameT-e.hitT<.1){ctx.save();ctx.filter='brightness(1.9)';drawUnit(ctx,e);ctx.restore()}else drawUnit(ctx,e)}
   // ambient particles: dust, wood chips, chimney smoke
-  if(!paused&&started){
+  if(!paused&&started&&SET.q>=2){
     for(const e of list){
       if(e.kind==='unit'){if(e.moving&&Math.random()<.04)spawnVfx(e.x,e.y+.25,'dust');
         if(e.working&&e.order.rt==='wood'){const tr=byId.get(e.order.target);if(tr)tr.hitT=gameT+.3}if(e.working&&e.order.rt==='wood'&&Math.random()<.05)spawnVfx(e.x+Math.cos(e.ang)*.4,e.y+Math.sin(e.ang)*.4-.2,'chip',{vx:(Math.random()-.5)*1.5,vy:-1.2})}
@@ -3921,7 +3936,7 @@ function render(){
   if(marker&&marker.t>0){ctx.strokeStyle=marker.c;ctx.lineWidth=2;const r=(1-marker.t)*10+4;ctx.beginPath();ctx.ellipse(marker.x*T,marker.y*T,r,r*.55,0,0,7);ctx.stroke();ctx.lineWidth=1}
   // box
   ctx.setTransform(dpr,0,0,dpr,0,0);
-  {// Farbstimmung: warmes Licht bei Tagesanbruch und Abend, Vignette
+  if(SET.q>=1){// Farbstimmung: warmes Licht bei Tagesanbruch und Abend, Vignette
     const ph=gameT%120,edge=Math.max(0,1-Math.min(ph,120-ph)/15),day=1-WX.night;
     if(edge>0&&day>.2){ctx.fillStyle=`rgba(255,140,60,${(.08*edge*day).toFixed(3)})`;ctx.fillRect(0,0,viewW,viewH)}
     if(!window.__vig||window.__vig.w!==viewW||window.__vig.h!==viewH){const g=ctx.createRadialGradient(viewW/2,viewH/2,Math.min(viewW,viewH)*.45,viewW/2,viewH/2,Math.hypot(viewW,viewH)*.6);g.addColorStop(0,'rgba(0,0,0,0)');g.addColorStop(1,'rgba(10,8,4,.32)');window.__vig={w:viewW,h:viewH,g}}
@@ -3962,6 +3977,7 @@ function renderMini(){
 // ================= UI =================
 let uiDirty=true,uiKey='',uiT=0;
 // ---- Klang: synthetische Platzhalter-Effekte (WebAudio), Ein/Aus über die Taste „Ton“
+let SET={vol:.8,q:2,auto:1,vox:1};try{Object.assign(SET,JSON.parse(localStorage.getItem('empire-xy.set')||'{}'))}catch(e){}
 let actx=null,soundOn=true;try{soundOn=localStorage.getItem('empire-xy.ton')!=='0'}catch(e){}
 const sfxLast={};
 const onScreen=u=>{const sx=(u.x*T-cam.x)*cam.z,sy=(u.y*T-cam.y)*cam.z;return sx>-40&&sy>-40&&sx<viewW+40&&sy<viewH+40};
@@ -3970,7 +3986,7 @@ function sfx(k){
   try{if(!actx)actx=new (window.AudioContext||window.webkitAudioContext)();if(actx.state==='suspended')actx.resume();}catch(e){return}
   const tone=(type,f1,f2,a,d,v,dl)=>{const t=actx.currentTime+(dl||0),o=actx.createOscillator(),g=actx.createGain();o.connect(g);g.connect(actx.destination);
     o.type=type;o.frequency.setValueAtTime(f1,t);o.frequency.exponentialRampToValueAtTime(f2,t+a+d);
-    g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(v,t+a);g.gain.exponentialRampToValueAtTime(.0001,t+a+d);o.start(t);o.stop(t+a+d+.05)};
+    g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(Math.max(.0002,v*SET.vol),t+a);g.gain.exponentialRampToValueAtTime(.0001,t+a+d);o.start(t);o.stop(t+a+d+.05)};
   const P={click:['triangle',660,520,.005,.06,.05],good:['sine',523,784,.01,.35,.08],warn:['square',220,180,.01,.3,.04],
     hit:['square',140,70,.002,.08,.03],shot:['triangle',900,300,.002,.09,.025],boom:['sawtooth',90,30,.005,.35,.07],
     chop:['square',260,120,.001,.05,.025],mine:['triangle',1500,1100,.001,.07,.02],sword:['sawtooth',2200,1400,.001,.06,.018]}[k];
@@ -3986,10 +4002,22 @@ function toast(msg,kind){
   setTimeout(()=>{el.style.opacity='0';setTimeout(()=>el.remove(),700)},5200);
 }
 function costHTML(c){return Object.keys(c).map(k=>`<b><span class="dot" style="background:${RES_COL[k]}"></span>${c[k]}</b>`).join('')}
+// Siedlerstimmen: kurze gesprochene Antworten beim Auswählen eigener Einheiten (Web Speech, sonst Murmelton)
+const VOX={worker:['Ja?','Was gibt es zu tun?','Bereit zur Arbeit.','Jawohl.','Hier bin ich.','Wo soll ich hin?'],
+  infantry:['Zu Befehl!','Bereit!','Für das Reich!','Schwert gezogen.','Jawohl, Herr!'],ranged:['Bogen gespannt.','Ziel erfasst?','Bereit!','Wir decken euch.'],
+  cavalry:['Aufsitzen!','Die Pferde sind bereit.','Zu Befehl!','Reiter bereit!'],siege:['Geschütz bereit.','Wohin zielen wir?','Laden!'],naval:['Segel gesetzt.','Leinen los!','Aye!'],hero:['Ich führe euch!','Für Ruhm und Ehre!','Sprecht!']};
+let voxT=0,voxV=null;
+function voice(u){if(!soundOn||SET.vol<=0)return;const now=performance.now();if(now-voxT<700)return;voxT=now;
+  const lk=UNITS[u.type]&&UNITS[u.type].hero?'hero':UNITS[u.type]&&UNITS[u.type].naval?'naval':LOOK(u.type);const L=VOX[lk]||VOX.worker,txt=L[(Math.random()*L.length)|0];
+  const pitch={worker:1.1,infantry:.8,ranged:1,cavalry:.85,siege:.7,naval:.9,hero:.75}[lk]||1;
+  try{const ss=window.speechSynthesis;if(ss&&window.SpeechSynthesisUtterance){if(!voxV){const vs=ss.getVoices();voxV=vs.find(v=>/^de/i.test(v.lang))||null}
+    ss.cancel();const ut=new SpeechSynthesisUtterance(txt);ut.lang='de-DE';if(voxV)ut.voice=voxV;ut.pitch=pitch*(.9+Math.random()*.2);ut.rate=1.05;ut.volume=SET.vol;ss.speak(ut);return}}catch(e){}
+  sfx('click')}
 function select(list,add){
   if(add){for(const e of list)if(!sel.includes(e))sel.push(e)}else sel=list.slice();
   // only one non-unit or foreign thing at a time
   if(sel.length>1)sel=sel.filter(e=>e.kind==='unit'&&e.owner===0).length?sel.filter(e=>e.kind==='unit'&&e.owner===0):[sel[0]];
+  {const u=list.find(e=>e.kind==='unit'&&e.owner===0&&!e.dead);if(u&&started&&SET.vox!==0)voice(u)}
   uiDirty=true;placing=null;aMode=false;
 }
 function selKey(){return sel.map(e=>e.id).join(',')+'|'+players[0].epoch+'|'+(placing||'')+(aMode?'A':'')+'|'+(sel[0]&&sel[0].kind==='bld'?(sel[0].built?1:0):'')}
@@ -4428,7 +4456,7 @@ function frame(now){
     if(zoomT&&Math.abs(zoomT-cam.z)>.0005){const a=zoomAt||{x:viewW/2,y:viewH/2},before=toWorld(a.x,a.y);cam.z+=(zoomT-cam.z)*Math.min(1,dt*14);cam.x=before.x*T-a.x/cam.z;cam.y=before.y*T-a.y/cam.z}
     clampCam();
     if(marker)marker.t-=dt*1.5;
-    saveT+=dt;if(saveT>30&&!paused){saveT=0;saveGame()}
+    saveT+=dt;if(saveT>30&&!paused&&SET.auto){saveT=0;saveGame()}
     if(!paused){for(const v of vfx){v.t+=dt;v.x+=v.vx*dt;v.y+=v.vy*dt;if(v.k==='chip')v.vy+=4*dt}vfx=vfx.filter(v=>v.t<(v.k==='smoke2'?3:v.k==='chip'?.6:.8))}
     const key=selKey();
     if(key!==uiKey||uiDirty){uiKey=key;uiDirty=false;buildInfo();buildCmds();hideTip()}
@@ -4584,6 +4612,18 @@ function drawTrade(){if(!tradeOpen)return;const c=$('#tradeCv'),g=c.getContext('
 $('#startBtn').onclick=()=>{timeLimit=+$('#limitSel').value;epStart=+$('#epStartSel').value;epEnd=+$('#epEndSel').value;chosenCiv=$('#civSel').value||chosenCiv;useCustomMap=!!(CUSTOM_MAP&&$('#useCustom').checked);
   $('#startScreen').hidden=true;resize();newGame(chosenDiff,seed);started=true;paused=false;$('#btnPause').textContent='Pause';
 };
+{// Einstellungen: im Spiel und im Hauptmenü erreichbar, gespeichert im Browser
+  const sv=()=>{try{localStorage.setItem('empire-xy.set',JSON.stringify(SET))}catch(e){}};let wasP=false;
+  const open=()=>{$('#setSound').checked=soundOn;$('#setVol').value=Math.round(SET.vol*100);$('#setVolN').textContent=Math.round(SET.vol*100)+' %';$('#setQ').value=SET.q;$('#setAuto').checked=!!SET.auto;$('#setVox').checked=SET.vox!==0;
+    $('#setMenu').hidden=!started||over;wasP=paused;if(started)paused=true;$('#setPanel').hidden=false};
+  const close=()=>{$('#setPanel').hidden=true;if(started)paused=wasP};
+  $('#btnSet').onclick=open;$('#setBtn2').onclick=open;$('#setClose').onclick=close;
+  $('#setSound').onchange=e=>{soundOn=e.target.checked;try{localStorage.setItem('empire-xy.ton',soundOn?'1':'0')}catch(_){}const b=$('#btnSound');if(b)b.textContent=soundOn?'Ton an':'Ton aus'};
+  $('#setVol').oninput=e=>{SET.vol=e.target.value/100;$('#setVolN').textContent=e.target.value+' %';sv()};
+  $('#setQ').onchange=e=>{SET.q=+e.target.value;sv()};$('#setAuto').onchange=e=>{SET.auto=e.target.checked?1:0;sv()};$('#setVox').onchange=e=>{SET.vox=e.target.checked?1:0;sv()};
+  $('#setMenu').onclick=()=>{close();$('#btnMenu').click()};
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('#setPanel').hidden)close();else if(e.key==='F10'){e.preventDefault();if($('#setPanel').hidden)open();else close()}});
+}
 $('#btnMenu').onclick=()=>{if(!started||over)return;saveGame();started=false;paused=true;['#endScreen','#credits','#tradePanel'].forEach(q=>{const e=$(q);if(e)e.hidden=true});showContinue();$('#startScreen').hidden=false;toast('Spiel gespeichert. Mit „Weiterspielen“ geht es weiter.','good')};
 // Spielstart von außen (Kampagne): eigene Schwierigkeit, Karte, Epochen, Volk und Zeitlimit
 XY.game={start(o){o=o||{};timeLimit=o.limit||0;useCustomMap=false;if(o.epStart!=null)epStart=o.epStart;if(o.epEnd!=null)epEnd=o.epEnd;if(o.civ&&CIVS[o.civ])chosenCiv=o.civ;
