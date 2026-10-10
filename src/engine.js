@@ -1867,7 +1867,7 @@ window.addEventListener('keydown',e=>{
   if(k.startsWith('Arrow')){keys.add(k);e.preventDefault();return}
   if(k==='Escape'&&!$('#techScreen').hidden){toggleTech(false);return}
   if(k==='n'||k==='N'){toggleTech();return}
-  if(k==='Escape'&&!$('#diploPanel').hidden){$('#diploPanel').hidden=true;return}
+  if(k==='Escape'&&(!$('#diploPanel').hidden||!$('#savePanel').hidden)){$('#diploPanel').hidden=true;$('#savePanel').hidden=true;return}
   if(k==='Escape'){if(placing||aMode){placing=null;aMode=false;uiDirty=true}else select([]);return}
   if(k==='p'||k==='P'||k==='Pause'){togglePause();return}
   if(paused)return;
@@ -1951,7 +1951,7 @@ $('#diploPeace').onclick=()=>{const pl=players[0],pc=Math.round(400*Math.pow(1.6
 $('#diploWar').onclick=()=>{if(!(aiS.peaceUntil>gameT))return;aiS.peaceUntil=0;aiS.nextAttack=gameT+20;
   for(const pl of players)if(pl.mood!=null&&pl.i===0)pl.mood=Math.max(0,pl.mood-10);
   toast('Du hast den Krieg erklärt. Der Gegner rüstet sich zum Gegenschlag.','warn');sfx('warn');diploRender()};
-$('#btnTribute').onclick=()=>{if(!started||over)return;$('#diploPanel').hidden=!$('#diploPanel').hidden;diploRender()};
+$('#btnTribute').onclick=()=>{if(!started||over)return;$('#savePanel').hidden=true;$('#diploPanel').hidden=!$('#diploPanel').hidden;diploRender()};
 setInterval(diploRender,1000);
 $('#btnSound').textContent=soundOn?'Ton an':'Ton aus';$('#btnSound').onclick=()=>{soundOn=!soundOn;try{localStorage.setItem('empire-xy.ton',soundOn?'1':'0')}catch(e){}$('#btnSound').textContent=soundOn?'Ton an':'Ton aus';sfx('click')};
 
@@ -1988,15 +1988,15 @@ function frame(now){
 // ================= start screen =================
 // ================= autosave =================
 let curSeed=0,saveT=0;const SAVE_KEY='empire-xy.spielstand';
-function saveGame(){
-  if(!started||over||!ents)return;
+function saveGame(key){
+  if(!started||over||!ents)return false;key=typeof key==='string'?key:SAVE_KEY;
   try{
     const data={v:1,seed:curSeed,diff,epStart,epEnd,timeLimit,gameT,nextId,bases,aiS,players,terr:Array.from(terr),exp:Array.from(exp),
       ents:ents.filter(e=>!e.dead),cam:{x:cam.x,y:cam.y,z:cam.z},saved:Date.now()};
-    localStorage.setItem(SAVE_KEY,JSON.stringify(data));
-  }catch(e){}
+    localStorage.setItem(key,JSON.stringify(data));return true;
+  }catch(e){return false}
 }
-function readSave(){try{const d=JSON.parse(localStorage.getItem(SAVE_KEY));return d&&d.v===1?d:null}catch(e){return null}}
+function readSave(key){try{const d=JSON.parse(localStorage.getItem(key||SAVE_KEY));return d&&d.v===1?d:null}catch(e){return null}}
 function clearSave(){try{localStorage.removeItem(SAVE_KEY)}catch(e){}}
 function loadGame(d){
   syncRegistry();rng=mulberry32(d.seed);curSeed=d.seed;diff=d.diff;epStart=d.epStart||0;epEnd=d.epEnd!==undefined?d.epEnd:99;timeLimit=d.timeLimit||0;
@@ -2014,7 +2014,18 @@ function loadGame(d){
   if(d.cam){zoomT=0;cam.z=d.cam.z;cam.x=d.cam.x;cam.y=d.cam.y;clampCam()}
   toast('Spielstand geladen ('+fmtTime(gameT)+').','good');
 }
-function showContinue(){const d=readSave(),b=$('#continueBtn');b.hidden=!d;if(d)b.textContent='Weiterspielen ('+fmtTime(d.gameT)+', '+EPOCHS_NAME(d)+')'}
+function showContinue(){const d=readSave(),b=$('#continueBtn');b.hidden=!d;if(d)b.textContent='Weiterspielen ('+fmtTime(d.gameT)+', '+EPOCHS_NAME(d)+')';
+  const ls=[1,2,3].map(i=>[i,readSave(slotKey(i))]);$('#loadRow').hidden=!ls.some(x=>x[1]);
+  $('#loadSlots').innerHTML=ls.map(([i,d])=>`<button class="opt" data-load="${i}"${d?'':' disabled'}>Platz ${i}${d?' · '+fmtTime(d.gameT)+', '+EPOCHS_NAME(d):' · leer'}</button>`).join('')}
+// Drei manuelle Speicherplätze neben dem Auto-Save
+const slotKey=i=>SAVE_KEY+'.platz'+i;
+function slotLabel(i){const d=readSave(slotKey(i));if(!d)return 'Platz '+i+': leer';const t=new Date(d.saved||0);return 'Platz '+i+': '+fmtTime(d.gameT)+', '+EPOCHS_NAME(d)+' · gespeichert '+t.toLocaleString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}
+function renderSaveSlots(){$('#saveSlots').innerHTML=[1,2,3].map(i=>`<button class="tbtn" data-slot="${i}">${slotLabel(i)}</button>`).join('')}
+$('#btnSave').onclick=()=>{if(!started||over)return;const p=$('#savePanel');p.hidden=!p.hidden;$('#diploPanel').hidden=true;if(!p.hidden)renderSaveSlots()};
+$('#saveSlots').onclick=e=>{const b=e.target.closest('[data-slot]');if(!b)return;
+  if(saveGame(slotKey(+b.dataset.slot))){toast('Gespeichert auf Platz '+b.dataset.slot+'.','good');sfx('good')}else toast('Speichern nicht möglich, der Browser-Speicher ist voll oder gesperrt.','warn');renderSaveSlots()};
+$('#loadSlots').onclick=e=>{const b=e.target.closest('[data-load]');if(!b)return;const d=readSave(slotKey(+b.dataset.load));if(!d)return;
+  $('#startScreen').hidden=true;resize();try{loadGame(d);started=true;paused=false;$('#btnPause').textContent='Pause'}catch(err){toast('Dieser Spielstand konnte nicht geladen werden.','warn');$('#startScreen').hidden=false;showContinue()}};
 const EPOCHS_NAME=d=>{if(!XY.epochs.length)XY.build();const e=XY.epochs[d.players[0].epoch];return e?e.name:''};
 document.addEventListener('visibilitychange',()=>{if(document.hidden)saveGame()});
 window.addEventListener('beforeunload',saveGame);

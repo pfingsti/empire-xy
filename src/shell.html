@@ -35,6 +35,9 @@ button:focus-visible{outline:2px solid var(--bronze-hi);outline-offset:1px}
 #researchHud em{font-style:normal;color:var(--muted);font-variant-numeric:tabular-nums}
 #researchHud i,.tk .pb{grid-column:1/-1;display:block;height:4px;background:var(--line);border-radius:2px;overflow:hidden}
 #researchHud i b,.tk .pb b{display:block;height:100%;width:0;background:#6f9fc9}
+#savePanel{position:absolute;top:52px;right:10px;z-index:7;width:300px;max-width:calc(100vw - 32px);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px 12px;display:flex;flex-direction:column;gap:8px;box-shadow:0 8px 24px rgba(0,0,0,.45)}
+#savePanel h3{margin:0;font-size:15px}#savePanel .hint{margin:0;font-size:11px;color:var(--muted)}#saveSlots{display:flex;flex-direction:column;gap:6px}#saveSlots .tbtn{text-align:left}
+#loadSlots{display:flex;gap:6px;flex-wrap:wrap}
 #diploPanel{position:absolute;top:52px;right:10px;z-index:7;width:300px;max-width:calc(100vw - 32px);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px 12px;display:flex;flex-direction:column;gap:8px;box-shadow:0 8px 24px rgba(0,0,0,.45)}
 #diploPanel h3{margin:0;font-size:15px;letter-spacing:.04em}
 #diploPanel .st{margin:0;font-size:12px;color:var(--muted)}
@@ -188,6 +191,7 @@ label.opt{font-size:14px;padding:5px 12px}
     <button class="tbtn" id="btnBuild" title="Arbeiter wählen und Gebäude bauen">Bauen</button>
     <button class="tbtn" id="btnIdle" title="Untätigen Arbeiter wählen (.)">Untätig: <span id="idleN">0</span></button>
     <button class="tbtn" id="btnTribute" title="Diplomatie: Tribut zahlen oder Waffenstillstand anbieten">Diplomatie</button>
+    <button class="tbtn" id="btnSave" title="Spielstand in einen von drei Speicherplätzen sichern">Speichern</button>
     <button class="tbtn" id="btnSound" title="Soundeffekte ein- oder ausschalten">Ton an</button>
     <button class="tbtn" id="btnPause" title="Pause (P)">Pause</button>
     <span id="updBox" hidden><span id="updText"></span> <button class="tbtn" id="updBtn" hidden>Jetzt neu starten</button></span>
@@ -228,6 +232,7 @@ label.opt{font-size:14px;padding:5px 12px}
       <button class="opt" id="reroll" aria-pressed="false">Neu würfeln</button>
     </div>
     <div class="row"><button class="go" id="startBtn">Reich gründen</button><button class="opt" id="continueBtn" hidden>Weiterspielen</button></div>
+    <div class="row" id="loadRow" hidden><span class="lbl">Laden</span><span id="loadSlots"></span></div>
     <section class="mods" aria-labelledby="modsTitle">
       <div class="modsHead"><span class="lbl" id="modsTitle">Bausteine</span>
         <span class="row">
@@ -250,6 +255,11 @@ label.opt{font-size:14px;padding:5px 12px}
 </div>
 
 <div id="researchHud" hidden></div>
+<div id="savePanel" hidden>
+  <h3>Spielstand speichern</h3>
+  <div id="saveSlots"></div>
+  <p class="hint">Zusätzlich speichert das Spiel alle 30 Sekunden automatisch („Weiterspielen“ im Startmenü).</p>
+</div>
 <div id="diploPanel" hidden>
   <h3>Diplomatie</h3>
   <p class="st" id="diploState"></p>
