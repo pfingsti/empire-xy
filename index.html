@@ -3270,7 +3270,8 @@ function genMap(){
 // ================= terrain (rounded shores, depth-shaded water, grass mottling, relief light) =================
 const mixC=(a,b,t)=>[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t,a[2]+(b[2]-a[2])*t];
 const sstep=(a,b,x)=>{const t=Math.max(0,Math.min(1,(x-a)/(b-a)));return t*t*(3-2*t)};
-function renderTerrain(){
+let terrV=0;
+function renderTerrain(){terrV++;
   const PW=W*T,PH=H*T;terrC.width=PW;terrC.height=PH;const g=terrC.getContext('2d');
   const water=new Float32Array(W*H),deep=new Float32Array(W*H),worn=new Float32Array(W*H);
   for(let i=0;i<W*H;i++)water[i]=terr[i]===1?1:0;
@@ -5551,22 +5552,26 @@ function render(){
 }
 let marker=null;
 
+// Minimap wie in EE2: die echte Geländetextur verkleinert, Wälder als weiche dunkle Flächen, Punkte mit dunklem Rand
+let miniBase=null,miniKey='',miniForest=null,miniFT=-9;
 function renderMini(){
   if(!ents)return;
-  const w=mm.width,h=mm.height,sx=w/W,sy=h/H;
-  mctx.imageSmoothingEnabled=false;mctx.drawImage(terrMini,0,0,w,h);
-  for(const e of ents){
-    if(e.dead||!visibleEnt(e))continue;
-    if(e.kind==='res'){if(e.type==='tree')continue;mctx.fillStyle=RES_COL[e.rt];mctx.fillRect(e.x*sx,e.y*sy,sx,sy);continue}
-    mctx.fillStyle=PCOL[e.owner];
-    if(e.kind==='bld'){mctx.fillRect(e.x*sx,e.y*sy,e.size*sx,e.size*sy);mctx.strokeStyle='rgba(0,0,0,.55)';mctx.lineWidth=dpr*.8;mctx.strokeRect(e.x*sx,e.y*sy,e.size*sx,e.size*sy)}
-    else mctx.fillRect(e.x*sx-1.5*dpr,e.y*sy-1.5*dpr,3*dpr,3*dpr);
-  }
-  // trees as dark specks
-  mctx.fillStyle='rgba(20,50,25,.85)';
-  for(const e of ents)if(e.kind==='res'&&e.type==='tree'&&exp[idx(e.x,e.y)])mctx.fillRect(e.x*sx,e.y*sy,sx,sy);
+  const w=mm.width,h=mm.height,sx=w/W,sy=h/H,key=w+'x'+h+'|'+terrV;
+  if(key!==miniKey){miniKey=key;miniBase=document.createElement('canvas');miniBase.width=w;miniBase.height=h;const bg=miniBase.getContext('2d');bg.imageSmoothingEnabled=true;bg.imageSmoothingQuality='high';
+    // stufenweise verkleinern, damit die Textur weich und nicht flimmernd wird
+    let src=terrC,cw=terrC.width,ch=terrC.height;while(cw/2>w*1.5){const t=document.createElement('canvas');t.width=cw/2|0;t.height=ch/2|0;const tg=t.getContext('2d');tg.imageSmoothingQuality='high';tg.drawImage(src,0,0,t.width,t.height);src=t;cw=t.width;ch=t.height}
+    bg.drawImage(src,0,0,w,h);bg.fillStyle='rgba(20,24,18,.12)';bg.fillRect(0,0,w,h);miniFT=-9}
+  if(gameT-miniFT>2||gameT<miniFT){miniFT=gameT;if(!miniForest){miniForest=document.createElement('canvas');miniForest.width=W;miniForest.height=H}
+    const fg=miniForest.getContext('2d'),im=fg.createImageData(W,H),d=im.data;for(const e of ents)if(e.kind==='res'&&e.type==='tree'&&!e.dead){const i=idx(e.x,e.y)*4;d[i]=22;d[i+1]=44;d[i+2]=20;d[i+3]=225}fg.putImageData(im,0,0)}
+  mctx.imageSmoothingEnabled=true;mctx.drawImage(miniBase,0,0);mctx.filter=`blur(${(sx*.35).toFixed(2)}px)`;mctx.drawImage(miniForest,0,0,w,h);mctx.filter='none';
+  const dot=(x,y,r,c)=>{mctx.fillStyle='rgba(0,0,0,.6)';mctx.fillRect(x-r-dpr*.6,y-r-dpr*.6,2*r+dpr*1.2,2*r+dpr*1.2);mctx.fillStyle=c;mctx.fillRect(x-r,y-r,2*r,2*r)};
+  const MC={gold:'#d9b44a',stone:'#a9a69c',berry:'#a8384a',food:'#a8384a'};
+  for(const e of ents){if(e.dead||e.kind!=='res'||e.type==='tree'||!visibleEnt(e))continue;dot((e.x+.5)*sx,(e.y+.5)*sy,Math.max(1,sx*.45),MC[e.type]||RES_COL[e.rt])}
+  for(const e of ents){if(e.dead||e.kind!=='bld'||!visibleEnt(e))continue;mctx.fillStyle='rgba(0,0,0,.65)';mctx.fillRect(e.x*sx-dpr,e.y*sy-dpr,e.size*sx+2*dpr,e.size*sy+2*dpr);mctx.fillStyle=PCOL[e.owner];mctx.fillRect(e.x*sx,e.y*sy,e.size*sx,e.size*sy);mctx.fillStyle='rgba(255,255,255,.25)';mctx.fillRect(e.x*sx,e.y*sy,e.size*sx,Math.max(1,dpr*.8))}
+  for(const e of ents){if(e.dead||e.kind!=='unit'||!visibleEnt(e))continue;dot(e.x*sx,e.y*sy,1.3*dpr,PCOL[e.owner])}
   mctx.imageSmoothingEnabled=true;mctx.drawImage(fogC,0,0,w,h);
-  mctx.strokeStyle='#f1e6cf';mctx.lineWidth=dpr;mctx.strokeRect(cam.x/T*sx,cam.y/T*sy,viewW/cam.z/T*sx,viewH/cam.z/T*sy);
+  const cx=cam.x/T*sx,cy=cam.y/T*sy,cw=viewW/cam.z/T*sx,ch=viewH/cam.z/T*sy;mctx.lineWidth=3*dpr;mctx.strokeStyle='rgba(0,0,0,.45)';mctx.strokeRect(cx,cy,cw,ch);mctx.lineWidth=1.2*dpr;mctx.strokeStyle='rgba(241,230,207,.9)';mctx.strokeRect(cx,cy,cw,ch);
+  const vg=mctx.createRadialGradient(w/2,h/2,Math.min(w,h)*.35,w/2,h/2,Math.max(w,h)*.75);vg.addColorStop(0,'rgba(0,0,0,0)');vg.addColorStop(1,'rgba(0,0,0,.35)');mctx.fillStyle=vg;mctx.fillRect(0,0,w,h);
   if(ping&&pingT>0){mctx.strokeStyle='#ff6a5a';mctx.lineWidth=2*dpr;const r=(3-pingT)%1*14*dpr+4;mctx.beginPath();mctx.arc(ping.x*sx,ping.y*sy,r,0,7);mctx.stroke()}
 }
 
