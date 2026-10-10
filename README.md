@@ -47,3 +47,7 @@ Laden: im Browser über „Baustein laden“ im Hauptmenü. In der Desktop-App l
 - Update-Watcher: Die App prüft beim Start und danach alle 30 Minuten die GitHub Releases von `pfingsti/empire-xy`. Neue Versionen werden im Hintergrund geladen und beim nächsten Neustart installiert.
 - Weil das Repository privat ist, braucht die App einen Lese-Schlüssel. Lege auf GitHub einen fine-grained Token mit nur „Contents: read“ für dieses Repository an und speichere ihn als Repository-Secret `UPDATE_READ_TOKEN`. Der Release-Workflow schreibt ihn beim Bauen in die App.
 - Neue Version veröffentlichen: in `desktop/package.json` die Version erhöhen, committen, Tag setzen (`git tag v1.0.1 && git push --tags`). GitHub baut und veröffentlicht den Installer, alle installierten Spiele aktualisieren sich danach selbst.
+
+## Steam
+
+Steam-Fassung bauen: `cd desktop && npm install && npm run dist:steam` (ohne Installer und GitHub-Updates, mit Errungenschaften, Steam Cloud und Overlay). Alles Weitere, auch Store-Texte, Grafiken und Upload per SteamPipe: [steam/STEAM.md](steam/STEAM.md).

@@ -9,7 +9,7 @@
     "start": "electron .",
     "dist": "node ../build.js && electron-builder --win nsis --x64",
     "release": "node ../build.js && electron-builder --win nsis --x64 --publish always",
-    "dist:steam": "node ../build.js && electron-builder --config electron-builder.steam.js"
+    "dist:steam": "node ../build.js && electron-builder --win --x64 --config electron-builder.steam.js"
   },
   "dependencies": {
     "electron-updater": "6.3.9",

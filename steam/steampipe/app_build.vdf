@@ -1,0 +1,13 @@
+"AppBuild"
+{
+	"AppID"		"480"          // <- eigene App-ID aus Steamworks eintragen
+	"Desc"		"Empire XY Build"   // erscheint in Steamworks unter Builds
+	"BuildOutput"	"./output/"    // Logs und Cache von steamcmd
+	"ContentRoot"	"../../release/steam/win-unpacked/"   // Ergebnis von: cd desktop && npm run dist:steam
+	"SetLive"	""             // leer lassen = Build erst in Steamworks von Hand freischalten (empfohlen); "beta" = sofort auf Beta-Zweig
+	"Preview"	"0"            // "1" = Probelauf ohne Upload
+	"Depots"
+	{
+		"481"	"depot_build.vdf"   // <- eigene Depot-ID (meist App-ID + 1)
+	}
+}
