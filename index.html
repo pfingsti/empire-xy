@@ -1997,6 +1997,14 @@ function renderTerrain(){
     if(t===4){g.fillStyle='rgba(222,196,130,.85)';g.fillRect(x,y,T,T);g.fillStyle='rgba(180,150,90,.35)';for(let k=0;k<4;k++)g.fillRect(x+rng()*T,y+rng()*T,3,1)}
     else if(t===3){g.fillStyle='#6f6a62';g.fillRect(x,y,T,T);g.fillStyle='#8d877c';g.beginPath();g.moveTo(x+2,y+T-2);g.lineTo(x+T*.45,y+3);g.lineTo(x+T-2,y+T-2);g.closePath();g.fill();
       g.fillStyle='#e8ecee';g.beginPath();g.moveTo(x+T*.35,y+T*.3);g.lineTo(x+T*.45,y+3);g.lineTo(x+T*.56,y+T*.3);g.closePath();g.fill();g.fillStyle='rgba(0,0,0,.2)';g.beginPath();g.moveTo(x+T*.45,y+3);g.lineTo(x+T-2,y+T-2);g.lineTo(x+T*.5,y+T-2);g.closePath();g.fill()}}
+  {// Schilf und Kies an Uferkanten: Landfelder neben Wasser bekommen Halme und nasse Kanten
+    const g=terrC.getContext('2d');let sd=77;const rr=()=>(sd=(sd*16807)%2147483647)/2147483647;
+    for(let y=1;y<H-1;y++)for(let x=1;x<W-1;x++){if(terr[idx(x,y)]===1)continue;
+      const nb=[[1,0],[-1,0],[0,1],[0,-1]].filter(([a,b])=>terr[idx(x+a,y+b)]===1);if(!nb.length)continue;
+      for(const [a,b] of nb){const ex=(x+.5+a*.45)*T,ey=(y+.5+b*.45)*T;g.fillStyle='rgba(70,62,46,.35)';g.beginPath();g.ellipse(ex,ey,b?T*.5:T*.12,a?T*.5:T*.12,0,0,7);g.fill()}
+      if(rr()<.55){const [a,b]=nb[0];for(let k=0;k<7;k++){const bx=(x+.5+a*.3)*T+(rr()-.5)*T*(b?1:.4),byy=(y+.5+b*.3)*T+(rr()-.5)*T*(a?1:.4),h=5+rr()*7;
+        g.strokeStyle=rr()<.5?'#5e6a3a':'#7a7a46';g.lineWidth=.9;g.beginPath();g.moveTo(bx,byy);g.quadraticCurveTo(bx+1,byy-h*.6,bx+(rr()-.3)*3,byy-h);g.stroke();
+        if(rr()<.25){g.fillStyle='#5a4128';g.fillRect(bx-.8+(rr()-.5)*2,byy-h-3,1.6,3.5)}}}}}
   grade(terrC,.78,8,13);
 }
 
