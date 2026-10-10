@@ -1462,8 +1462,12 @@ function humanoid(g,u,ep,pc,dk){
     const aa=a+sw*.9-.2,hx2=x+Math.cos(a+.9)*5,hy2=by+Math.sin(a+.9)*4;
     if(ep===0){g.strokeStyle='#6b4a2a';g.lineWidth=3;g.beginPath();g.moveTo(hx2,hy2);g.lineTo(hx2+Math.cos(aa)*11,hy2+Math.sin(aa)*9-3);g.stroke();g.fillStyle='#5a3d22';g.beginPath();g.arc(hx2+Math.cos(aa)*11,hy2+Math.sin(aa)*9-3,2.4,0,7);g.fill()}
     else if(ep<=2){g.strokeStyle=ep===1?'#6b4a2a':'#c9ccd0';g.lineWidth=ep===1?1.5:2.2;g.beginPath();g.moveTo(hx2-Math.cos(aa)*3,hy2-Math.sin(aa)*3);g.lineTo(hx2+Math.cos(aa)*(ep===1?16:11),hy2+Math.sin(aa)*(ep===1?13:9)-3);g.stroke();
+      if(ep===2){// Klinge mit Spiegelkante, Parierstange und Knauf
+        const tx=hx2+Math.cos(aa)*11,ty=hy2+Math.sin(aa)*9-3;g.strokeStyle='rgba(255,255,255,.75)';g.lineWidth=.6;g.beginPath();g.moveTo(hx2+Math.cos(aa)*1.5,hy2+Math.sin(aa)*1.2-.9);g.lineTo(tx-.4,ty-.5);g.stroke();
+        g.strokeStyle='#7a5a2a';g.lineWidth=1.3;g.beginPath();g.moveTo(hx2-Math.sin(aa)*2.4,hy2+Math.cos(aa)*2);g.lineTo(hx2+Math.sin(aa)*2.4,hy2-Math.cos(aa)*2);g.stroke();
+        g.fillStyle='#7a5a2a';g.beginPath();g.arc(hx2-Math.cos(aa)*3.4,hy2-Math.sin(aa)*3.4,1,0,7);g.fill()}
       if(ep===1){g.fillStyle='#c9ccd0';const tx=hx2+Math.cos(aa)*16,ty=hy2+Math.sin(aa)*13-3;g.beginPath();g.arc(tx,ty,1.6,0,7);g.fill()}
-      const sx=x+Math.cos(a-1.1)*6,sy=by+Math.sin(a-1.1)*5;g.fillStyle='#5a4128';g.beginPath();g.ellipse(sx,sy,2.6,3.6,a,0,7);g.fill();g.strokeStyle=shade(pc,-35);g.lineWidth=.9;g.stroke();g.fillStyle='#8a8d90';g.beginPath();g.arc(sx,sy,.9,0,7);g.fill()}
+      const sx=x+Math.cos(a-1.1)*6,sy=by+Math.sin(a-1.1)*5;g.fillStyle='#5a4128';g.beginPath();g.ellipse(sx,sy,2.6,3.6,a,0,7);g.fill();g.strokeStyle=shade(pc,-35);g.lineWidth=.9;g.stroke();g.fillStyle='#8a8d90';g.beginPath();g.arc(sx,sy,.9,0,7);g.fill();g.fillStyle='#a8abae';for(let k=0;k<6;k++){const q=a+k*Math.PI/3;g.fillRect(sx+Math.cos(q)*1.9-.3,sy+Math.sin(q)*2.7-.3,.6,.6)}}
     else{g.strokeStyle='#3a2a1a';g.lineWidth=2.4;g.beginPath();g.moveTo(x-ca*3,by-sa*3);g.lineTo(x+ca*13,by+sa*10-2);g.stroke();g.strokeStyle='#cfd3d6';g.lineWidth=1;g.beginPath();g.moveTo(x+ca*13,by+sa*10-2);g.lineTo(x+ca*17,by+sa*13-2);g.stroke()}
   }else if(LOOK(u.type)==='ranged'){
     if(ep===0){g.strokeStyle='#8a6a40';g.lineWidth=1;const sp=gameT*(u.swing>0?20:4);g.beginPath();g.moveTo(x+ca*4,by);g.lineTo(x+ca*4+Math.cos(sp)*6,by+Math.sin(sp)*4);g.stroke()}
