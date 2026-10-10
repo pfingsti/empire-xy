@@ -1926,7 +1926,7 @@ function diploRender(){
   const peace=aiS.peaceUntil>gameT;
   $('#diploState').textContent=peace?'Waffenstillstand noch '+fmtTime(aiS.peaceUntil-gameT)+'.':aiS.attacking?'Der Gegner greift gerade an.':'Nächster Angriff frühestens in '+fmtTime(Math.max(0,aiS.nextAttack-gameT))+'.';
   $('#diploTrib').innerHTML=['food','wood','stone','gold'].map(r=>`<button class="tbtn" data-trib="${r}"${pl.res[r]<amt?' disabled':''}>${amt} ${RESN[r]}</button>`).join('');
-  const pc=Math.round(400*Math.pow(1.6,aiS.peaces||0));$('#diploPeace').textContent='Waffenstillstand für '+pc+' Gold';$('#diploPeace').disabled=peace||pl.res.gold<pc;
+  const pc=Math.round(400*Math.pow(1.6,aiS.peaces||0));$('#diploPeace').textContent='Waffenstillstand für '+pc+' Gold';$('#diploPeace').disabled=peace||pl.res.gold<pc;$('#diploWar').hidden=!peace;$('#diploPeace').hidden=peace;
 }
 function payTribute(r){
   const pl=players[0],n=aiS.tributes||0,amt=Math.round(100*Math.pow(1.4,n));
@@ -1939,6 +1939,9 @@ $('#diploPeace').onclick=()=>{const pl=players[0],pc=Math.round(400*Math.pow(1.6
   pl.res.gold-=pc;players[1].res.gold+=pc;aiS.peaces=(aiS.peaces||0)+1;aiS.peaceUntil=gameT+180;aiS.nextAttack=Math.max(aiS.nextAttack,aiS.peaceUntil);
   if(aiS.attacking){aiS.attacking=false;for(const e of ents)if(!e.dead&&e.owner===1&&isMil(e)){e.waveAt=null;order(e,{t:'idle'})}}
   toast('Waffenstillstand für drei Minuten geschlossen.','good');sfx('good');diploRender()};
+$('#diploWar').onclick=()=>{if(!(aiS.peaceUntil>gameT))return;aiS.peaceUntil=0;aiS.nextAttack=gameT+20;
+  for(const pl of players)if(pl.mood!=null&&pl.i===0)pl.mood=Math.max(0,pl.mood-10);
+  toast('Du hast den Krieg erklärt. Der Gegner rüstet sich zum Gegenschlag.','warn');sfx('warn');diploRender()};
 $('#btnTribute').onclick=()=>{if(!started||over)return;$('#diploPanel').hidden=!$('#diploPanel').hidden;diploRender()};
 setInterval(diploRender,1000);
 $('#btnSound').textContent=soundOn?'Ton an':'Ton aus';$('#btnSound').onclick=()=>{soundOn=!soundOn;try{localStorage.setItem('empire-xy.ton',soundOn?'1':'0')}catch(e){}$('#btnSound').textContent=soundOn?'Ton an':'Ton aus';sfx('click')};
