@@ -1616,6 +1616,11 @@ function render(){
   if(marker&&marker.t>0){ctx.strokeStyle=marker.c;ctx.lineWidth=2;const r=(1-marker.t)*10+4;ctx.beginPath();ctx.ellipse(marker.x*T,marker.y*T,r,r*.55,0,0,7);ctx.stroke();ctx.lineWidth=1}
   // box
   ctx.setTransform(dpr,0,0,dpr,0,0);
+  {// Farbstimmung: warmes Licht bei Tagesanbruch und Abend, Vignette
+    const ph=gameT%120,edge=Math.max(0,1-Math.min(ph,120-ph)/15),day=1-WX.night;
+    if(edge>0&&day>.2){ctx.fillStyle=`rgba(255,140,60,${(.08*edge*day).toFixed(3)})`;ctx.fillRect(0,0,viewW,viewH)}
+    if(!window.__vig||window.__vig.w!==viewW||window.__vig.h!==viewH){const g=ctx.createRadialGradient(viewW/2,viewH/2,Math.min(viewW,viewH)*.45,viewW/2,viewH/2,Math.hypot(viewW,viewH)*.6);g.addColorStop(0,'rgba(0,0,0,0)');g.addColorStop(1,'rgba(10,8,4,.32)');window.__vig={w:viewW,h:viewH,g}}
+    ctx.fillStyle=window.__vig.g;ctx.fillRect(0,0,viewW,viewH)}
   if(WX.night>0){ctx.fillStyle=`rgba(0,0,0,${WX.night*.35})`;ctx.fillRect(0,0,viewW,viewH)}
   if(WX.kind==='storm'){const t=performance.now()/1000;ctx.fillStyle='rgba(40,50,60,.18)';ctx.fillRect(0,0,viewW,viewH);ctx.strokeStyle='rgba(200,210,220,.35)';ctx.lineWidth=1;ctx.beginPath();for(let i=0;i<120;i++){const x=((i*131.7+t*700)%(viewW+80))-40,y=((i*57.3+t*260)%(viewH+40))-20;ctx.moveTo(x,y);ctx.lineTo(x-18,y+6)}ctx.stroke();if(Math.sin(t*1.7)>.995){ctx.fillStyle='rgba(255,255,255,.25)';ctx.fillRect(0,0,viewW,viewH)}}
   else if(WX.kind!=='sun'){const t=performance.now()/1000,n=WX.kind==='rain'?140:90;ctx.fillStyle=ctx.strokeStyle=WX.kind==='rain'?'rgba(190,210,235,.45)':'rgba(245,248,255,.85)';ctx.lineWidth=1;
@@ -1688,6 +1693,9 @@ function campToggle(us){if(!us.length)return;const cx=us.reduce((a,u)=>a+u.x,0)/
   const ex=ents.find(e=>e.type==='fieldcamp'&&!e.dead&&e.owner===0&&Math.hypot(e.x+1-cx,e.y+1-cy)<4);
   if(ex){ex.dead=true;ex.hp=0;toast('Feldlager abgebaut.');players[0].res.wood+=40;return}
   if(!BLD.fieldcamp)return;if(!canAfford(0,{wood:80})){toast('Feldlager kostet 80 Holz.','warn');return}pay(0,{wood:80});const b=placeBld(0,'fieldcamp',Math.round(cx-1),Math.round(cy-1),false);if(b)toast('Feldlager wird aufgeschlagen.','good')}
+const BCATS=[{n:'Wirtschaft',i:'🌾'},{n:'Handwerk',i:'⚒'},{n:'Militär',i:'⚔'},{n:'Befestigung',i:'🏰'},{n:'Kultur',i:'⛪'}];
+const BCAT_OF={house:0,farm:0,camp:0,mill:0,mine:0,warehouse:0,depot:0,market:0,dock:0,bridge:0,bakery:1,sawmill:1,mason:1,smith:1,barracks:2,range:2,stable:2,workshop:2,milcamp:2,mercs:2,fieldcamp:2,guild:2,wall:3,gate:3,tower:3,sniper:3,castle:3,temple:4,templar:4,lodge:4,monument:4,wonder:4,tc:4};
+const bcatOf=t=>BLD[t].cat!=null?BLD[t].cat:BCAT_OF[t]!=null?BCAT_OF[t]:0;let buildCat=0;
 function getCommands(){
   const cmds=[];if(!sel.length)return cmds;
   const pl=players[0],first=sel[0];
@@ -1695,8 +1703,10 @@ function getCommands(){
   if(first.kind==='unit'){
     const workers=sel.filter(u=>u.type==='worker');
     if(workers.length){
-      for(const t in BLD){if(BLD[t].slot==null)continue;const d=BLD[t],locked=(d.minEpoch||0)>pl.epoch;
-        cmds[d.slot]={label:bname(d,pl.epoch),cost:d.cost,desc:d.desc,dis:locked||!canAfford(0,d.cost),need:locked?'Benötigt '+EPOCHS[d.minEpoch]:null,short:!locked&&!canAfford(0,d.cost),on:placing===t,act:()=>{placing=placing===t?null:t;uiDirty=true}}}
+      const cat=BCATS[buildCat],list=Object.keys(BLD).filter(t=>BLD[t].slot!=null&&bcatOf(t)===buildCat).sort((x,y)=>BLD[x].slot-BLD[y].slot);
+      BCATS.forEach((c,i)=>{const n=Object.keys(BLD).filter(t=>BLD[t].slot!=null&&bcatOf(t)===i).length;if(n)cmds[i]={label:c.i+' '+c.n,desc:'Baumenü: '+c.n+' ('+n+' Gebäude).',on:buildCat===i,cat:true,act:()=>{buildCat=i;uiDirty=true}}});
+      list.forEach((t,k)=>{const d=BLD[t],locked=(d.minEpoch||0)>pl.epoch;const slot=k<8?5+k:7+k;
+        cmds[slot]={label:bname(d,pl.epoch),cost:d.cost,desc:d.desc,dis:locked||!canAfford(0,d.cost),need:locked?'Benötigt '+EPOCHS[d.minEpoch]:null,short:!locked&&!canAfford(0,d.cost),on:placing===t,act:()=>{placing=placing===t?null:t;uiDirty=true}}});
       cmds[14]={label:'Stopp',desc:'Aktuelle Tätigkeit abbrechen.',act:()=>{for(const u of sel)order(u,{t:'idle'})}};
     }else{
       cmds[0]={label:'Angriff­bewegung',desc:'Zum Ziel marschieren und unterwegs jeden Feind angreifen. Danach Rechtsklick auf die Karte.',on:aMode,act:()=>{aMode=!aMode;uiDirty=true}};
@@ -1744,7 +1754,7 @@ function buildCmds(){
     const c=cmds[i];const b=document.createElement('button');b.className='cmd';
     if(!c){b.style.visibility='hidden';b.tabIndex=-1;box.appendChild(b);continue}
     b.innerHTML=`<kbd>${SLOTKEYS[i]||''}</kbd><span class="n">${c.label}</span><span class="c">${c.cost?costHTML(c.cost):''}</span>`;
-    b.disabled=!!c.dis&&!c.short;if(c.short)b.classList.add('short');if(c.tech)b.classList.add('tech');if(c.on)b.classList.add('on');
+    b.disabled=!!c.dis&&!c.short;if(c.short)b.classList.add('short');if(c.tech)b.classList.add('tech');if(c.cat)b.classList.add('cat');if(c.on)b.classList.add('on');
     b.addEventListener('click',()=>{if(c.need&&c.dis){toast(c.need,'warn');return}if(c.short&&c.dis){toast('Nicht genug Rohstoffe.','warn');return}sfx('click');c.act()});
     b.addEventListener('pointerenter',ev=>showTip(c,b));b.addEventListener('pointerleave',hideTip);
     box.appendChild(b);c.el=b;
