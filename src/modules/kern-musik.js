@@ -31,18 +31,25 @@ function setWar(w){if(w===warLvl)return;warLvl=w;const t=ac.currentTime;
   gPeace.gain.linearRampToValueAtTime(w?0:1,t+2);gWar.gain.linearRampToValueAtTime(w?1:0,t+2)}
 let started=false;
 window.addEventListener('pointerdown',()=>{started=true},{once:true});
-function pirate(g,u,a){
-  const T=a.T,x=u.x*T,y=u.y*T;g.save();g.translate(x,y);g.rotate(u.ang||0);
-  g.fillStyle='#2a1c12';g.beginPath();g.moveTo(-15,-6);g.lineTo(12,-6);g.lineTo(18,0);g.lineTo(12,6);g.lineTo(-15,6);g.closePath();g.fill();
-  g.fillStyle='#4a3424';g.fillRect(-12,-3,22,6);g.restore();
-  g.fillStyle='#111';g.beginPath();g.moveTo(x-2,y-24);g.lineTo(x+12,y-14);g.lineTo(x-2,y-6);g.closePath();g.fill();g.fillStyle='#ddd';g.beginPath();g.arc(x+3,y-15,2.2,0,7);g.fill();
-  g.strokeStyle='#3a2a18';g.lineWidth=2;g.beginPath();g.moveTo(x-2,y-26);g.lineTo(x-2,y);g.stroke();
+function pirate(g,u,a){// Piratenschiff in Seitenansicht: schwarzer Rumpf, geflickte dunkle Segel, schwarze Flagge
+  const T=a.T,x=u.x*T,y=u.y*T,dir=Math.cos(u.ang||0)>=0?1:-1,t=a.time,L=34,bob=Math.sin(t*1.5+u.id)*.8;
+  g.save();g.translate(x,y+4);g.fillStyle='rgba(10,30,45,.3)';g.beginPath();g.ellipse(0,1.6,L*.56,2.6,0,0,7);g.fill();g.scale(dir,1);g.translate(0,bob);g.rotate(Math.sin(t*1.1+u.id)*.02);
+  const hg=g.createLinearGradient(0,-8,0,1);hg.addColorStop(0,'#3a2a1e');hg.addColorStop(1,'#140e0a');g.fillStyle=hg;
+  g.beginPath();g.moveTo(-L/2,-11);g.lineTo(-L/2+7,-8);g.lineTo(L/2-4,-7);g.quadraticCurveTo(L/2+2,-9,L/2+3,-10);g.quadraticCurveTo(L/2,0,L/2-6,1);g.lineTo(-L/2+4,1);g.quadraticCurveTo(-L/2-1,-2,-L/2,-11);g.fill();
+  g.fillStyle='#8a2a20';g.fillRect(-L/2+2,-6,L-6,.8);g.fillStyle='#0a0806';for(let k=-L/2+5;k<L/2-6;k+=4)g.fillRect(k,-4.6,1.6,1.4);
+  g.strokeStyle='rgba(255,230,190,.12)';g.lineWidth=.4;g.beginPath();for(let k=-3;k<0;k+=1.4){g.moveTo(-L/2+3,k);g.lineTo(L/2-6,k)}g.stroke();
+  for(const [mx,h] of [[-6,22],[6,26]]){g.strokeStyle='#2a1c12';g.lineWidth=1;g.beginPath();g.moveTo(mx,-7);g.lineTo(mx,-7-h);g.stroke();
+    for(const [y0,hh,w] of [[-7-h+1,h*.34,5],[-7-h+h*.38,h*.38,6]]){g.fillStyle='#3a3630';g.beginPath();g.moveTo(mx-w,y0);g.lineTo(mx+w,y0);g.quadraticCurveTo(mx+w+1.2,y0+hh*.5,mx+w*.9,y0+hh);g.lineTo(mx-w*.9,y0+hh);g.quadraticCurveTo(mx-w+1.2,y0+hh*.5,mx-w,y0);g.fill();
+      g.fillStyle='#4a453c';g.fillRect(mx-w*.5,y0+hh*.3,w*.6,hh*.3);g.fillStyle='rgba(0,0,0,.35)';g.beginPath();g.moveTo(mx+w*.4,y0+hh);g.lineTo(mx+w*.9,y0+hh);g.lineTo(mx+w*.7,y0+hh*.7);g.fill()}}
+  const wv=Math.sin(t*4+u.id)*.8;g.fillStyle='#0c0c0c';g.beginPath();g.moveTo(6,-33);g.quadraticCurveTo(1,-32+wv,-3,-32.4);g.lineTo(-3,-28);g.quadraticCurveTo(1,-28.6-wv,6,-28.6);g.closePath();g.fill();g.fillStyle='#ddd';g.beginPath();g.arc(1.4,-30.8,.9,0,7);g.fill();
+  g.strokeStyle='#2a1c12';g.lineWidth=.8;g.beginPath();g.moveTo(L/2+1,-10);g.lineTo(L/2+9,-14);g.stroke();g.strokeStyle='rgba(40,28,16,.5)';g.lineWidth=.3;g.beginPath();g.moveTo(L/2+8,-14);g.lineTo(6,-33);g.moveTo(-L/2,-11);g.lineTo(-6,-29);g.stroke();
+  g.restore();
 }
 EmpireXY.register({
   id:'kern-musik',name:'Kern: Musik, Festungsausbau, Piraten',version:'1.0.0',core:true,
   description:'Dynamische Musik je nach Lage, Bogentürme und Ölkessel, Piratenschiffe zum Entern.',
   units:{
-    pirate:{label:'Piratenschiff',cls:'ship',naval:true,ai:false,minEpoch:0,names:['Piratenschiff'],hp:220,atk:10,range:4,rate:2,speed:2,sight:7,cost:{},time:1,r:.5,pop:0,draw:pirate,proj:1,
+    pirate:{label:'Piratenschiff',cls:'ship',naval:true,ai:false,minEpoch:0,names:['Piratenschiff'],hp:220,atk:10,range:4,rate:2,speed:2,sight:7,cost:{},time:1,r:.5,pop:0,noShadow:true,draw:pirate,proj:1,
       desc:'Gekapertes Piratenschiff. Trägt Beute an Bord.'},
   },
   buildings:{
