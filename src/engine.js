@@ -232,7 +232,7 @@ function newGame(d,seed,mp){
   syncRegistry();
   rng=mulberry32(seed);diff=d;curSeed=seed;
   ents=[];corpses=[];byId=new Map();nextId=1;block=new Int32Array(W*H);gate=new Uint8Array(W*H);terr=new Uint8Array(W*H);vis=new Uint8Array(W*H);exp=new Uint8Array(W*H);
-  proj=[];fx=[];sel=[];gameT=0;over=false;placing=null;aMode=false;groups={};
+  proj=[];fx=[];sel=[];gameT=0;capT.length=0;over=false;placing=null;aMode=false;groups={};
   players=MP?MP.players.map((p,i)=>Object.assign(newPlayer(i,!!p.ai),{name:p.name},p.ai?{aiDiff:Math.max(0,Math.min(2,p.diff|0)),aiT:0}:{})):[newPlayer(0,false),newPlayer(1,true)];
   genMap();renderTerrain();
   bases.forEach((b,p)=>{
@@ -315,7 +315,9 @@ const alive=e=>e&&!e.dead;
 function canAfford(p,c){for(const k in c)if(players[p].res[k]<c[k])return false;return true}
 function pay(p,c){for(const k in c)players[p].res[k]-=c[k]}
 // Einkommen je Rohstoff der letzten 60 Sekunden (für die Anzeige oben)
-function resCap(pl){let n=0;for(const e of ents)if(e.type==='warehouse'&&e.owner===pl.i&&e.built&&!e.dead)n++;return 1000+500*n}
+// Lagerlimit je Rohstoff: 2000, jedes Lagerhaus +1000. Pro Spielzeitpunkt zwischengespeichert, weil jeder sammelnde Arbeiter es abfragt
+const capT=[],capV=[];
+function resCap(pl){if(capT[pl.i]===gameT&&capV[pl.i]!==undefined)return capV[pl.i];let n=0;for(const e of ents)if(e.type==='warehouse'&&e.owner===pl.i&&e.built&&!e.dead)n++;capT[pl.i]=gameT;return capV[pl.i]=2000+1000*n}
 function income(pl,r,v){(pl.tot=pl.tot||{})[r]=(pl.tot[r]||0)+v;(pl.inc=pl.inc||[]).push([gameT,r,v])}
 function incomeRate(pl,r){if(!pl.inc)return 0;while(pl.inc.length&&pl.inc[0][0]<gameT-60)pl.inc.shift();let s=0;for(const x of pl.inc)if(x[1]===r)s+=x[2];return Math.round(s*60/Math.min(60,Math.max(10,gameT)))}
 function refund(p,c){for(const k in c)players[p].res[k]+=c[k]}
@@ -2462,7 +2464,7 @@ function loadGame(d){
     if(e.kind==='bld'&&BLD[e.type].water&&e.built)block[idx(e.x,e.y)]=0;
     if(e.kind==='unit')e.path=null;
     if(e.kind==='bld')e.queue=e.queue.filter(q=>q.ep||(q.tech&&TECHS[q.tech])||(q.u&&UNITS[q.u]));}
-  nextId=d.nextId;bases=d.bases;aiS=d.aiS;players=d.players;gameT=d.gameT;
+  nextId=d.nextId;bases=d.bases;aiS=d.aiS;players=d.players;gameT=d.gameT;capT.length=0;
   proj=[];fx=[];sel=[];over=false;placing=null;aMode=false;groups={};
   renderTerrain();recalcPop();updateVis(true);
   if(d.cam){zoomT=0;cam.z=d.cam.z;cam.x=d.cam.x;cam.y=d.cam.y;clampCam()}

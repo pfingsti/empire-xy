@@ -7,10 +7,10 @@ function wh(g,b,a){const {x,y,s,pc}=a,base=y+s-4;
   for(let i=0;i<3;i++){g.fillStyle=['#a07a48','#b8b8b0','#e9c54a'][i];g.fillRect(x+6+i*6,base-6,5,6)}}
 EmpireXY.register({
   id:'kern-lagerhaus',name:'Kern: Lagerhaus',version:'1.0.0',core:true,
-  description:'Jede Ressource hat ein Lagerlimit von 1000. Jedes Lagerhaus erhöht es um 500.',
+  description:'Jede Ressource hat ein Lagerlimit von 2000. Jedes Lagerhaus erhöht es um 1000.',
   buildings:{
     warehouse:{name:'Lagerhaus',size:2,hp:800,cost:{wood:150},time:25,sight:4,slot:31,draw:wh,ai:{minWorkers:10},
-      desc:'Erhöht das Lagerlimit jeder Ressource um 500 (Grundlimit 1000). Ist ein Lager voll, hören die Arbeiter auf zu sammeln.'},
+      desc:'Erhöht das Lagerlimit jeder Ressource um 1000 (Grundlimit 2000). Ist ein Lager voll, hören die Arbeiter auf zu sammeln.'},
   },
 });
 })();
