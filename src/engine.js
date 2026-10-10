@@ -235,6 +235,7 @@ function placeBld(p,type,x,y,done){
 function canPlace(p,type,x,y){
   const d=BLD[type];
   if(x<1||y<1||x+d.size>W-1||y+d.size>H-1)return false;
+  if(d.water){const i=idx(x,y);if(terr[i]!==1||block[i]!==-1||(p===0&&!exp[i]))return false;for(const e of ents)if(e.type==='bridge'&&!e.dead&&e.x===x&&e.y===y)return false;return true}
   for(let yy=y;yy<y+d.size;yy++)for(let xx=x;xx<x+d.size;xx++){
     const i=idx(xx,yy);if(block[i]!==0||terr[i]===1)return false;
     if(p===0&&!exp[i])return false;
@@ -466,6 +467,7 @@ function kill(e,src){
   e.dead=true;
   if(e.kind==='unit'&&!(UNITS[e.type]&&UNITS[e.type].naval)&&visibleEnt(e)){corpses.push(Object.assign({},e,{moving:false,swing:0,working:false,carry:0,dt0:gameT,fall:Math.random()<.5?1:-1}));if(corpses.length>60)corpses.shift()}
   if(e.kind==='bld'){
+    if(BLD[e.type].water)block[idx(e.x,e.y)]=-1;
     if(!BLD[e.type].walk)for(let y=e.y;y<e.y+e.size;y++)for(let x=e.x;x<e.x+e.size;x++)if(block[idx(x,y)]===e.id){block[idx(x,y)]=0;gate[idx(x,y)]=0}
     for(const q of e.queue)if(q.u&&!q.started)refund(e.owner,q.cost||UNITS[q.u].cost);
     if(e.queue.some(q=>q.ep))players[e.owner].advancing=false;
@@ -940,6 +942,12 @@ function step(dt){
   visT-=dt;if(visT<=0){visT=.2;updateVis()}
   popT-=dt;if(popT<=0){popT=1;recalcPop();checkEnd()}
   pingT-=dt;weatherTick();
+  // Brückenstücke bauen sich vom Ufer oder vom letzten fertigen Stück aus selbst
+  for(const b of ents){if(b.dead||b.built||!BLD[b.type]||!BLD[b.type].water)continue;
+    let ok=false;for(const [ox,oy] of [[1,0],[-1,0],[0,1],[0,-1]]){const xx=b.x+ox,yy=b.y+oy;if(!inb(xx,yy))continue;const j=idx(xx,yy);if(terr[j]!==1){ok=true;break}
+      for(const o of ents)if(o.type==='bridge'&&o.built&&!o.dead&&o.x===xx&&o.y===yy){ok=true;break}if(ok)break}
+    if(!ok)continue;const inc=dt/BLD[b.type].time*(1+players[b.owner].fx.build);b.prog=Math.min(1,b.prog+inc);b.hp=Math.min(b.maxhp,b.hp+b.maxhp*inc);
+    if(b.prog>=1){b.built=true;block[idx(b.x,b.y)]=0;players[b.owner].st.built++}}
   XY.emit('tick',API,dt);
   if(timeLimit&&!over){const left=timeLimit*60-gameT;
     if(left<=60&&left+dt>60)toast('Noch eine Minute bis zum Zeitlimit!','warn');
@@ -1808,8 +1816,8 @@ function placeLine(tiles,keep){
   const d=BLD[placing];let n=0;const bs=[];
   for(const [gx,gy] of tiles){if(!canPlace(0,placing,gx,gy))continue;if(!canAfford(0,d.cost)){toast('Nicht genug Rohstoffe für die ganze Mauer.','warn');break}
     pay(0,d.cost);bs.push(placeBld(0,placing,gx,gy,false));n++}
-  if(!n)toast('Hier kann keine Mauer gebaut werden.','warn');
-  const ws=sel.filter(u=>u.kind==='unit'&&u.type==='worker');
+  if(!n)toast(d.water?'Brücken nur auf Wasser, ausgehend vom erkundeten Ufer.':'Hier kann keine Mauer gebaut werden.','warn');
+  const ws=d.water?[]:sel.filter(u=>u.kind==='unit'&&u.type==='worker');
   ws.forEach((u,i)=>{const b=bs[Math.floor(i*bs.length/ws.length)];if(b)order(u,{t:'build',target:b.id})});
   if(!keep||!canAfford(0,d.cost)){placing=null;uiDirty=true}
 }
@@ -2057,6 +2065,7 @@ function loadGame(d){
   for(const e of ents){byId.set(e.id,e);
     if(e.kind==='res')block[idx(e.x,e.y)]=e.id;
     else if(e.kind==='bld'&&!BLD[e.type].walk)for(let y=e.y;y<e.y+e.size;y++)for(let x=e.x;x<e.x+e.size;x++){block[idx(x,y)]=e.id;if(BLD[e.type].gate)gate[idx(x,y)]=e.owner+1}
+    if(e.kind==='bld'&&BLD[e.type].water&&e.built)block[idx(e.x,e.y)]=0;
     if(e.kind==='unit')e.path=null;
     if(e.kind==='bld')e.queue=e.queue.filter(q=>q.ep||(q.tech&&TECHS[q.tech])||(q.u&&UNITS[q.u]));}
   nextId=d.nextId;bases=d.bases;aiS=d.aiS;players=d.players;gameT=d.gameT;
@@ -2128,5 +2137,5 @@ function autoPlayer(){ // lets the player side be run by the same AI for soak te
   try{aiThink()}finally{window.__ai0=aiS;aiS=a;for(const e of ents)swap(e);players=save;players[0].i=0;players[1].i=1;bases=b}
 }
 window.__ex={start:(d,s)=>{newGame(d,s);started=true},step:n=>{for(let i=0;i<n&&!over;i++)step(DT)},get:()=>({t:gameT,over,players,ents})};
-window.__spawn=(p,t,x,y)=>spawnUnit(p,t,x,y);window.__place=(p,t,x,y)=>placeBld(p,t,x,y,true);window.__can=(p,t,x,y)=>canPlace(p,t,x,y);window.__water=(x,y)=>terr[idx(x|0,y|0)]===1;window.__cam=(x,y)=>{cam.x=x*T;cam.y=y*T};window.__move=(u,x,y)=>cmdMove([u],x,y,false);window.__limit=m=>{timeLimit=m};
+window.__spawn=(p,t,x,y)=>spawnUnit(p,t,x,y);window.__place=(p,t,x,y)=>placeBld(p,t,x,y,true);window.__can=(p,t,x,y)=>canPlace(p,t,x,y);window.__water=(x,y)=>terr[idx(x|0,y|0)]===1;window.__cam=(x,y)=>{cam.x=x*T;cam.y=y*T};window.__move=(u,x,y)=>cmdMove([u],x,y,false);window.__limit=m=>{timeLimit=m};window.__placeU=(p,t,x,y)=>placeBld(p,t,x,y,false);
 })();
