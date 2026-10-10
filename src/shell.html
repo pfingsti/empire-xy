@@ -79,6 +79,11 @@ button:focus-visible{outline:2px solid var(--bronze-hi);outline-offset:1px}
 .chips{display:flex;gap:4px;flex-wrap:wrap}
 .chip{border:1px solid var(--line);background:var(--panel-2);border-radius:3px;padding:2px 8px;font-size:13px;cursor:pointer}
 .chip:hover{border-color:var(--bronze)}
+.utabs{display:flex;gap:2px;flex-wrap:wrap;margin:4px 0;border-bottom:1px solid var(--line)}
+.utab{border:1px solid var(--line);border-bottom:none;background:var(--panel-2);border-radius:4px 4px 0 0;padding:2px 7px;font-size:12px;cursor:pointer;color:inherit}
+.utab b{margin-left:4px;color:var(--bronze)}
+.utab:hover:not(:disabled){border-color:var(--bronze)}
+.utab:disabled{opacity:.35;cursor:default}
 .hint{color:var(--muted);font-size:13px;line-height:1.4;max-width:60ch}
 .hint kbd{font-family:inherit;border:1px solid var(--line);border-bottom-width:2px;border-radius:3px;padding:0 4px;font-size:12px;color:var(--text)}
 

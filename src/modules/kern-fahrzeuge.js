@@ -83,7 +83,7 @@ function flyer(g,u,api,shape,o){
   const T=api.T,t=api.time;let x=u.x*T,y=u.y*T,a=u.ang;
   const alt=(o.alt||26)+(o.hover?Math.sin(t*2.2+u.id)*1.6:0);
   if(!u.moving&&!o.hover&&!(u.swing>0)){const ph=t*(o.circle||.8)+u.id*1.7,R=o.R||10;x+=Math.cos(ph)*R;y+=Math.sin(ph)*R*.55;a=Math.atan2(Math.cos(ph)*R*.55,-Math.sin(ph)*R)}
-  u.fx=x;u.fy=y-alt; // für Treffer und Auswahl
+  u.airX=x;u.airY=y-alt; // für Treffer und Auswahl
   g.save();g.translate(x+alt*.42,y+alt*.12);g.rotate(a);g.globalAlpha=.3;shape(g,true,api,u);g.restore();
   g.save();g.translate(x,y-alt);g.rotate(a);shape(g,false,api,u);g.restore();
 }
@@ -202,9 +202,9 @@ EmpireXY.register({
   id:'kern-fahrzeuge',name:'Kern: Fahrzeuge und Luftwaffe',version:'1.0.0',core:true,order:5,
   description:'Panzerfabrik und Flughafen: Panzer vom Dampfpanzer bis zum Zukunftspanzer, Truppentransporter, Doppeldecker, Jäger, Bomber, Drohnen und Hubschrauber.',
   buildings:{
-    factory:{name:'Panzerfabrik',size:3,hp:1400,cost:{wood:250,stone:150,gold:100},time:45,minEpoch:6,sight:6,cat:2,ai:{minWorkers:22},techTitle:'Militärtechnik',
+    factory:{name:'Panzerfabrik',size:3,hp:1400,cost:{wood:250,stone:150,gold:100},time:45,minEpoch:6,sight:6,cat:2,ai:{minWorkers:20,prio:true},techTitle:'Militärtechnik',
       desc:'Baut Panzer und Truppentransporter. Forschung: Militärtechnik.',draw:drawFactory},
-    airfield:{name:'Flughafen',names:['','','','','','','','Flugfeld','Flughafen','Luftwaffenbasis'],size:4,hp:1600,cost:{wood:300,stone:200,gold:200},time:55,minEpoch:7,sight:7,cat:2,ai:{minWorkers:25},techTitle:'Luftfahrt',
+    airfield:{name:'Flughafen',names:['','','','','','','','Flugfeld','Flughafen','Luftwaffenbasis'],size:4,hp:1600,cost:{wood:300,stone:200,gold:200},time:55,minEpoch:7,sight:7,cat:2,ai:{minWorkers:22,prio:true},techTitle:'Luftfahrt',
       desc:'Startet Flugzeuge und Hubschrauber. Forschung: Luftfahrt.',draw:drawAirfield},
   },
   units:{
