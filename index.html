@@ -2686,6 +2686,7 @@ function makeNoise(scale){
 let ents,byId,nextId,block,gate,terr,vis,exp,proj,fx,players,gameT,sel,bases,diff,aiS,over,paused=false,started=false;
 let stats;
 const terrC=document.createElement('canvas'), terrMini=document.createElement('canvas'), fogC=document.createElement('canvas');
+const surfC=[document.createElement('canvas'),document.createElement('canvas')];   // Brandungssäume, im Bild sanft pulsierend
 fogC.width=W;fogC.height=H;const fogX=fogC.getContext('2d'),fogImg=fogX.createImageData(W,H);
 terrMini.width=W;terrMini.height=H;
 const cam={x:0,y:0,z:1};
@@ -2762,6 +2763,11 @@ function renderTerrain(){
   const PW=W*T,PH=H*T;terrC.width=PW;terrC.height=PH;const g=terrC.getContext('2d');
   const water=new Float32Array(W*H),deep=new Float32Array(W*H),worn=new Float32Array(W*H);
   for(let i=0;i<W*H;i++)water[i]=terr[i]===1?1:0;
+  // weichgezeichnetes Wasserfeld für runde, natürliche Uferlinien (statt Treppenstufen)
+  const wsm=new Float32Array(W*H);
+  {const tmp=new Float32Array(W*H),K=[1,4,6,4,1];
+   for(let y=0;y<H;y++)for(let x=0;x<W;x++){let s=0;for(let k=-2;k<=2;k++)s+=K[k+2]*water[idx(Math.min(W-1,Math.max(0,x+k)),y)];tmp[idx(x,y)]=s/16}
+   for(let y=0;y<H;y++)for(let x=0;x<W;x++){let s=0;for(let k=-2;k<=2;k++)s+=K[k+2]*tmp[idx(x,Math.min(H-1,Math.max(0,y+k)))];wsm[idx(x,y)]=s/16}}
   for(let y=0;y<H;y++)for(let x=0;x<W;x++){
     let s=0,n=0;for(let oy=-3;oy<=3;oy++)for(let ox=-3;ox<=3;ox++){const xx=Math.min(W-1,Math.max(0,x+ox)),yy=Math.min(H-1,Math.max(0,y+oy));s+=water[idx(xx,yy)];n++}
     deep[idx(x,y)]=s/n;
@@ -2774,6 +2780,7 @@ function renderTerrain(){
   const HS=2,RW=PW/HS|0,RH=PH/HS|0;               // compute at half resolution, upscale smoothly
   const half=document.createElement('canvas');half.width=RW;half.height=RH;const hg=half.getContext('2d');
   const img=hg.createImageData(RW,RH),D=img.data;
+  const sI=surfC.map(c=>{c.width=RW;c.height=RH;return c.getContext('2d').createImageData(RW,RH)});
   const GA=[78,114,48],GB=[110,146,60],GD=[58,92,40],GY=[146,146,78],SA=[200,182,124],SB=[172,152,102],DIRT=[136,112,74],WS=[70,156,164],WD=[22,66,104];
   const mi=terrMini.getContext('2d'),mimg=mi.createImageData(W,H);
   for(let py=0;py<RH;py++){
@@ -2788,15 +2795,23 @@ function renderTerrain(){
       // relief light from the top-left
       const rel=(nH(fx+.2,fy+.2)-nH(fx+.8,fy+.8))*3.2+(f-.5)*.08;
       c=[c[0]*(1+rel),c[1]*(1+rel),c[2]*(1+rel)];
-      const sand=sstep(.12,.4,w+(b-.5)*.12);
+      // Ufer aus dem weichen Feld, mit Rauschen ausgefranst
+      const ws=samp(wsm,fx,fy)+(b-.5)*.10+(f-.5)*.05;
+      const sand=sstep(.10,.34,ws);
       if(sand>0)c=mixC(c,mixC(SA,SB,b),sand);
-      const wa=sstep(.46,.53,w+(f-.5)*.04);
+      const wet=sstep(.30,.44,ws);if(wet>0)c=mixC(c,mixC(c,[112,98,70],.55),wet);   // nasser, dunkler Sand am Wasser
+      const wa=sstep(.43,.49,ws);
       if(wa>0){const dp=sstep(.35,.95,samp(deep,fx,fy));let wc=mixC(WS,WD,dp);wc=mixC(wc,[wc[0]+20,wc[1]+24,wc[2]+26],(b-.5)*.7);
-        const foam=Math.max(0,1-Math.abs(w-.56)/.05)*.45;wc=mixC(wc,[226,238,232],foam);c=mixC(c,wc,wa)}
+        const shal=1-sstep(.46,.62,ws);wc=mixC(wc,[118,150,128],shal*.55);   // Flachwasser: Grund schimmert durch
+        const foam=Math.max(0,1-Math.abs(ws-.475)/.022)*sstep(.35,.7,f)*.5;wc=mixC(wc,[214,226,220],foam*.5);c=mixC(c,wc,wa);
+        // zwei Säume: Spülsaum direkt am Sand, auflaufende Welle etwas weiter draußen
+        const o=(py*RW+px)*4,br=sstep(.3,.75,f)*(.6+.4*a);
+        const s1=Math.max(0,1-Math.abs(ws-.468)/.018)*br,s2=Math.max(0,1-Math.abs(ws-.53)/.02)*br*.8;
+        for(const [I,v] of [[sI[0],s1],[sI[1],s2]])if(v>0){I.data[o]=232;I.data[o+1]=240;I.data[o+2]=236;I.data[o+3]=v*200}}
       const o=(py*RW+px)*4;D[o]=c[0];D[o+1]=c[1];D[o+2]=c[2];D[o+3]=255;
     }
   }
-  hg.putImageData(img,0,0);
+  hg.putImageData(img,0,0);surfC.forEach((c,i)=>c.getContext('2d').putImageData(sI[i],0,0));
   g.imageSmoothingEnabled=true;g.imageSmoothingQuality='high';g.drawImage(half,0,0,PW,PH);
   for(let y=0;y<H;y++)for(let x=0;x<W;x++){const p=((Math.min(RH-1,((y+.5)*T/HS)|0))*RW+Math.min(RW-1,((x+.5)*T/HS)|0))*4,o=(y*W+x)*4;mimg.data[o]=D[p];mimg.data[o+1]=D[p+1];mimg.data[o+2]=D[p+2];mimg.data[o+3]=255}
   mi.putImageData(mimg,0,0);
@@ -2850,12 +2865,7 @@ function renderTerrain(){
     const g=terrC.getContext('2d');let sd=77;const rr=()=>(sd=(sd*16807)%2147483647)/2147483647;
     for(let y=1;y<H-1;y++)for(let x=1;x<W-1;x++){if(terr[idx(x,y)]===1)continue;
       const nb=[[1,0],[-1,0],[0,1],[0,-1]].filter(([a,b])=>terr[idx(x+a,y+b)]===1);if(!nb.length)continue;
-      for(const [a,b] of nb){const ex=(x+.5+a*.45)*T,ey=(y+.5+b*.45)*T;g.fillStyle='rgba(70,62,46,.35)';g.beginPath();g.ellipse(ex,ey,b?T*.5:T*.12,a?T*.5:T*.12,0,0,7);g.fill()}
-      if(rr()<.18){// feuchte Pfütze mit Himmelsspiegelung und dunklem Schlammrand
-        const px=(x+.5-nb[0][0]*.15)*T+(rr()-.5)*T*.4,py=(y+.5-nb[0][1]*.15)*T+(rr()-.5)*T*.4,rw=3+rr()*4;
-        g.fillStyle='rgba(60,48,32,.5)';g.beginPath();g.ellipse(px,py,rw+1.5,rw*.55+1,0,0,7);g.fill();
-        g.fillStyle='rgba(120,145,160,.75)';g.beginPath();g.ellipse(px,py,rw,rw*.55,0,0,7);g.fill();
-        g.fillStyle='rgba(230,240,245,.4)';g.beginPath();g.ellipse(px-rw*.3,py-rw*.15,rw*.35,rw*.12,0,0,7);g.fill()}
+      rr();
       if(rr()<.55){const [a,b]=nb[0];for(let k=0;k<7;k++){const bx=(x+.5+a*.3)*T+(rr()-.5)*T*(b?1:.4),byy=(y+.5+b*.3)*T+(rr()-.5)*T*(a?1:.4),h=5+rr()*7;
         g.strokeStyle=rr()<.5?'#5e6a3a':'#7a7a46';g.lineWidth=.9;g.beginPath();g.moveTo(bx,byy);g.quadraticCurveTo(bx+1,byy-h*.6,bx+(rr()-.3)*3,byy-h);g.stroke();
         if(rr()<.25){g.fillStyle='#5a4128';g.fillRect(bx-.8+(rr()-.5)*2,byy-h-3,1.6,3.5)}}}}}
@@ -4353,22 +4363,24 @@ function render(){
   ctx.drawImage(terrC,Math.max(0,vx0),Math.max(0,vy0),Math.min(vw,W*T),Math.min(vh,H*T),Math.max(0,vx0),Math.max(0,vy0),Math.min(vw,W*T),Math.min(vh,H*T));
   const tx0=Math.floor(vx0/T)-2,ty0=Math.floor(vy0/T)-2,tx1=Math.ceil((vx0+vw)/T)+2,ty1=Math.ceil((vy0+vh)/T)+2;
   const now=performance.now()/1000;
+  {// Brandung: Spülsaum und auflaufende Welle wechseln sich langsam ab
+    const sx=Math.max(0,vx0)/2,sy=Math.max(0,vy0)/2,sw=Math.min(vw,W*T)/2,sh=Math.min(vh,H*T)/2,dl=1-WX.night*.5;
+    const p1=.55+.35*Math.sin(now*1.1),p2=Math.max(0,Math.sin(now*1.1-1.9))*.75;
+    const sm=ctx.imageSmoothingEnabled;ctx.imageSmoothingEnabled=true;
+    ctx.globalAlpha=p1*dl;ctx.drawImage(surfC[0],sx,sy,sw,sh,sx*2,sy*2,sw*2,sh*2);
+    ctx.globalAlpha=p2*dl;ctx.drawImage(surfC[1],sx,sy,sw,sh,sx*2,sy*2,sw*2,sh*2);ctx.globalAlpha=1;ctx.imageSmoothingEnabled=sm}
   ctx.lineCap='round';
+  const Wt=(x,y)=>!inb(x,y)||terr[idx(x,y)]===1;
   for(let ty=Math.max(0,ty0);ty<Math.min(H,ty1);ty++)for(let tx=Math.max(0,tx0);tx<Math.min(W,tx1);tx++){
-    if(terr[idx(tx,ty)]!==1)continue;const h=((tx*73856093)^(ty*19349663))>>>0,ph=(h%1000)/1000;
-    {// Lichtreflexe und Wellengang: weiche Bänder ziehen über das Wasser
-      const wv=Math.sin(now*.6+tx*.35-ty*.22)*.5+.5,wv2=Math.sin(now*.9-tx*.18+ty*.4)*.5+.5;
-      ctx.fillStyle=`rgba(190,215,225,${(.07*wv*wv*(1-WX.night)).toFixed(3)})`;ctx.fillRect(tx*T,ty*T,T,T);}
-    {const fo=.22+.18*Math.sin(now*1.6+tx*.9+ty*.7);ctx.strokeStyle=`rgba(235,245,240,${fo.toFixed(2)})`;ctx.lineWidth=2;const w=Math.sin(now*1.6+tx+ty)*1.5;
-      const L=(x,y)=>inb(x,y)&&terr[idx(x,y)]!==1;ctx.beginPath();
-      if(L(tx,ty-1)){ctx.moveTo(tx*T+2,ty*T+3+w);ctx.lineTo(tx*T+T-2,ty*T+3+w)}if(L(tx,ty+1)){ctx.moveTo(tx*T+2,ty*T+T-3-w);ctx.lineTo(tx*T+T-2,ty*T+T-3-w)}
-      if(L(tx-1,ty)){ctx.moveTo(tx*T+3+w,ty*T+2);ctx.lineTo(tx*T+3+w,ty*T+T-2)}if(L(tx+1,ty)){ctx.moveTo(tx*T+T-3-w,ty*T+2);ctx.lineTo(tx*T+T-3-w,ty*T+T-2)}ctx.stroke()}
-    {// Wellenkämme mit dunkler Rückseite, die mit der Strömung treiben
-      const dr=((now*6+ph*T)%T),cx=tx*T+dr,cy=ty*T+((h>>9)%T);ctx.lineWidth=1;
-      ctx.strokeStyle='rgba(20,40,55,.18)';ctx.beginPath();ctx.arc(cx,cy+1.2,5,Math.PI*1.15,Math.PI*1.85);ctx.stroke();
-      ctx.strokeStyle=`rgba(220,238,245,${(.28*(1-WX.night*.6)).toFixed(2)})`;ctx.beginPath();ctx.arc(cx,cy,5,Math.PI*1.2,Math.PI*1.8);ctx.stroke()}
-    const al=Math.pow(Math.max(0,Math.sin(now*1.3+ph*6.28)),6)*.55;if(al<.03)continue;
-    const sx=tx*T+(h%23),sy=ty*T+((h>>5)%27);ctx.strokeStyle=`rgba(225,245,250,${al})`;ctx.lineWidth=1.4;ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(sx+6,sy-1);ctx.stroke();
+    if(terr[idx(tx,ty)]!==1)continue;if(!(Wt(tx-1,ty)&&Wt(tx+1,ty)&&Wt(tx,ty-1)&&Wt(tx,ty+1)))continue;   // offene See: nichts auf Sand zeichnen
+    const h=((tx*73856093)^(ty*19349663))>>>0,ph=(h%1000)/1000;
+    {// flache Wellenkämme: kurze, leicht gebogene Lichtkanten mit Schattenkante, die ein- und ausblenden
+      for(let k=0;k<2;k++){const hh=k?h>>11:h,pk=((hh%1000)/1000),life=(now*.35+pk)%1,fa=Math.sin(life*Math.PI);
+        const cx=tx*T+((hh>>3)%T)+life*8,cy=ty*T+((hh>>7)%T),L=5+((hh>>5)%5);
+        ctx.lineWidth=.9;ctx.strokeStyle=`rgba(14,34,48,${(.16*fa).toFixed(3)})`;ctx.beginPath();ctx.moveTo(cx-L,cy+1.4);ctx.quadraticCurveTo(cx,cy+.4,cx+L,cy+1.4);ctx.stroke();
+        ctx.strokeStyle=`rgba(214,232,236,${(.22*fa*(1-WX.night*.6)).toFixed(3)})`;ctx.beginPath();ctx.moveTo(cx-L,cy+.4);ctx.quadraticCurveTo(cx,cy-.8,cx+L,cy+.4);ctx.stroke()}}
+    const al=Math.pow(Math.max(0,Math.sin(now*1.3+ph*6.28)),6)*.45;if(al<.03)continue;
+    const sx=tx*T+(h%23),sy=ty*T+((h>>5)%27);ctx.strokeStyle=`rgba(225,245,250,${al})`;ctx.lineWidth=1.2;ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(sx+5,sy-.6);ctx.stroke();
   }
   ctx.lineCap='butt';
   const list=[];
