@@ -1152,7 +1152,13 @@ function wallFace(g,x0,y0,x1,y1,col,style){
   else if(style==='stone'){let r=0;for(let y=y0+4;y<y1;y+=4,r++){g.moveTo(x0,y);g.lineTo(x1,y);for(let x=x0+(r%2?4:8);x<x1;x+=8){g.moveTo(x,y-4);g.lineTo(x,y)}}}
   g.stroke();
   if(style==='timber'){g.strokeStyle='#4a3424';g.lineWidth=1.6;g.beginPath();g.moveTo(x0,y0+.8);g.lineTo(x1,y0+.8);for(let x=x0+1;x<=x1;x+=9){g.moveTo(x,y0);g.lineTo(x,y1)}g.stroke()}
-  g.strokeStyle=OUT;g.lineWidth=1;g.strokeRect(x0+.5,y0+.5,x1-x0-1,y1-y0-1);
+  // Materialdetail: einzelne Steine/Bohlen in leicht variierendem Ton, Holzmaserung, Sockelschmutz
+  {let sd=((x0*31+y0*17+x1)|0)>>>0;const rn=()=>((sd=(sd*1664525+1013904223)>>>0)/4294967296);
+    if(style==='stone'||style==='brick'||style==='mud'){const bh=style==='stone'?4:3,bw=style==='stone'?8:6;let r=0;
+      for(let y=y0;y<y1;y+=bh,r++)for(let x=x0-(r%2?bw/2:0);x<x1;x+=bw){const v=rn();if(v<.45)continue;g.fillStyle=v<.7?'rgba(0,0,0,.09)':'rgba(255,245,225,.09)';g.fillRect(Math.max(x0,x)+.4,y+.4,Math.min(bw,x1-x)-.8,bh-.8)}}
+    if(style==='logs'||style==='timber'||style==='plank'){g.strokeStyle='rgba(40,25,12,.22)';g.lineWidth=.5;g.beginPath();for(let k=0;k<(x1-x0)/3;k++){const yy=y0+rn()*(y1-y0),xx=x0+rn()*(x1-x0);g.moveTo(xx,yy);g.quadraticCurveTo(xx+3,yy+(rn()-.5),xx+6+rn()*4,yy)}g.stroke()}
+    const sg=g.createLinearGradient(0,y1-5,0,y1);sg.addColorStop(0,'rgba(60,45,25,0)');sg.addColorStop(1,'rgba(60,45,25,.35)');g.fillStyle=sg;g.fillRect(x0,y1-5,x1-x0,5)}
+  g.strokeStyle='rgba(20,16,10,.35)';g.lineWidth=.8;g.strokeRect(x0+.5,y0+.5,x1-x0-1,y1-y0-1);
 }
 function hipRoof(g,x0,y0,x1,y1,col,style,inset){
   const ym=(y0+y1)/2,i=inset!==undefined?inset:Math.min((x1-x0)*.3,(y1-y0)*.55);
