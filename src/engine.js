@@ -27,6 +27,7 @@ const bname=(D,ep)=>{const n=D.names||[];for(let i=Math.min(ep,n.length-1);i>=0;
 const uname=(U,ep)=>{const n=U.names||[];for(let i=Math.min(ep,n.length-1);i>=0;i--)if(n[i])return n[i];return U.label};
 const PCOL=['#4a8ae8','#d4473c'];
 const PCOL_DK=['#2b5aa8','#8f2a23'];
+const FORMS=['keine','Schildwall','Keil','Schützenlinie'];
 const SLOTKEYS=['Q','W','E','R','T','A','S','D','F','G','Y','X','C','V','B','U','I','O','M','J','K','L'];
 
 const UNITS=XY.units, BLD=XY.buildings, RESDEF=XY.nodes, TECHS=XY.techs;
@@ -218,7 +219,7 @@ function weatherTick(){
   if(gameT>=WX.until){const r=rng(),ep=players[0].epoch,old=WX.kind;WX.kind=r<.55?'sun':r<.82||ep>6?'rain':'snow';WX.until=gameT+90+rng()*150;
     WX.speed=WX.kind==='rain'?.8:WX.kind==='snow'?.9:1;if(started&&old!==WX.kind)toast(WXN[WX.kind]+'.')}
 }
-function uStat(u){const d=UNITS[u.type],pl=players[u.owner],f=pl.fx,t=CLS(u.type),e=pl.epoch,m=1+.17*e;return{hp:Math.round(d.hp*m*(1+(f.hp[t]||0))),atk:d.atk*m*(1+(f.atk[t]||0)),range:d.range+(f.range[t]||0),rate:d.rate,speed:d.speed*(1+.03*e)*(1+(f.speed[t]||0))*(d.naval?1:WX.speed)*(u.rallyUntil>gameT?1.2:1),sight:Math.max(2,d.sight-WX.night*2)}}
+function uStat(u){const d=UNITS[u.type],pl=players[u.owner],f=pl.fx,t=CLS(u.type),e=pl.epoch,m=1+.17*e;return{hp:Math.round(d.hp*m*(1+(f.hp[t]||0))),atk:d.atk*m*(1+(f.atk[t]||0)),range:(d.range+(f.range[t]||0))*(u.form===3?1.4:1),rate:d.rate,speed:d.speed*(1+.03*e)*(1+(f.speed[t]||0))*(d.naval?1:WX.speed)*(u.rallyUntil>gameT?1.2:1)*(u.form===1?.5:u.form===3?.02:1),sight:Math.max(2,d.sight-WX.night*2)}}
 function spawnUnit(p,type,x,y){
   const d=UNITS[type];
   const u=addEnt({kind:'unit',type,owner:p,x,y,r:d.r,hp:0,cd:0,ang:p?Math.PI*.75:-Math.PI*.25,order:{t:'idle'},path:null,pathCD:0,carry:0,ct:null,scan:rng()*.5,anim:rng()*6});
@@ -235,6 +236,7 @@ function placeBld(p,type,x,y,done){
 function canPlace(p,type,x,y){
   const d=BLD[type];
   if(x<1||y<1||x+d.size>W-1||y+d.size>H-1)return false;
+  if(d.monument&&ents.some(e=>e.type===type&&!e.dead&&(e.mep??players[e.owner].epoch)===players[p].epoch))return false;
   if(d.water){const i=idx(x,y);if(terr[i]!==1||block[i]!==-1||(p===0&&!exp[i]))return false;for(const e of ents)if(e.type==='bridge'&&!e.dead&&e.x===x&&e.y===y)return false;return true}
   for(let yy=y;yy<y+d.size;yy++)for(let xx=x;xx<x+d.size;xx++){
     const i=idx(xx,yy);if(block[i]!==0||terr[i]===1)return false;
@@ -451,7 +453,7 @@ function enemyNear(u,radius,wantBld){
 // ================= combat =================
 function damage(t,dmg,src){
   if(t.dead)return;
-  if(src&&src.buffUntil>gameT)dmg*=1.2;if(src&&src.templeT>gameT)dmg*=1.1;if(src&&src.type==='hero'&&t.kind==='unit'&&t.hp>0&&t.hp<=dmg)src.kills=(src.kills||0)+1;
+  if(src&&src.buffUntil>gameT)dmg*=1.2;if(src&&src.templeT>gameT)dmg*=1.1;if(src&&src.form===2)dmg*=1.3;if(t.form===1)dmg*=.7;else if(t.form===2)dmg*=1.2;if(src&&src.owner!=null&&players[src.owner]&&players[src.owner].monAtk)dmg*=1+players[src.owner].monAtk;if(src&&src.type==='hero'&&t.kind==='unit'&&t.hp>0&&t.hp<=dmg)src.kills=(src.kills||0)+1;
   t.hp-=dmg;t.hitT=gameT;t.revealT=gameT+6;if(src)src.revealT=gameT+6;if(visibleEnt(t))sfx(dmg>20?'boom':src&&src.kind==='unit'&&uStat(src).range<1.5&&!['siege'].includes(CLS(src.type))?'sword':'hit');
   fx.push({x:center(t).x+(rng()-.5)*.4,y:center(t).y+(rng()-.5)*.4,t:0,k:'hit'});
   if(t.owner===0&&gameT-lastAlarm>20&&src){lastAlarm=gameT;toast('Wir werden angegriffen!','warn');ping=center(t);pingT=3}
@@ -610,7 +612,7 @@ function updBld(b,dt){
       if(best){b.cd=D.rate;const c=center(b);proj.push({x:c.x,y:c.y-.6,tid:best.id,dmg:D.atk*(1+.14*pl.epoch)*(1+pl.fx.bldAtk),src:b.id,k:'arrow',ep:pl.epoch,sp:14,arc:bd})}
     }
   }
-  const q=b.queue[0];if(!q)return;const sdt=(b.sabotUntil>gameT?dt*.5:dt)*(players[b.owner].crowdMul||1);// sabotiert: halbe Produktion
+  const q=b.queue[0];if(!q)return;const sdt=(b.sabotUntil>gameT?dt*.5:dt)*(players[b.owner].crowdMul||1)*(players[b.owner].monProd||1);// sabotiert: halbe Produktion
   if(q.tech){
     q.t+=sdt;
     if(q.t>=q.total){b.queue.shift();applyTech(pl,q.tech);
@@ -1382,6 +1384,7 @@ function epochDress(g,re,x,by,hx,hy,pc){
 function drawUnit(g,u){
   const UD=UNITS[u.type],k=(UD.scale||1.32)*Math.sqrt((UD.r||.3)/.3),x=u.x*T,y=u.y*T;
   g.save();g.translate(x,y);g.scale(k,k);g.translate(-x,-y);drawUnitRaw(g,u);g.restore();
+  if(u.form){const yy=u.y*T+u.r*T*1.6,xx=u.x*T;g.fillStyle=['','#6fa0d8','#e07a4a','#8fd06a'][u.form];if(u.form===1)g.fillRect(xx-5,yy,10,3);else if(u.form===2){g.beginPath();g.moveTo(xx-5,yy+3);g.lineTo(xx,yy-2);g.lineTo(xx+5,yy+3);g.closePath();g.fill()}else{for(let i=-1;i<=1;i++)g.fillRect(xx+i*4-1,yy,2,3)}}
 }
 function drawUnitRaw(g,u){
   const UD=UNITS[u.type];
@@ -1645,6 +1648,7 @@ function getCommands(){
     }else{
       cmds[0]={label:'Angriff­bewegung',desc:'Zum Ziel marschieren und unterwegs jeden Feind angreifen. Danach Rechtsklick auf die Karte.',on:aMode,act:()=>{aMode=!aMode;uiDirty=true}};
       cmds[1]={label:'Stopp',desc:'Halten und Befehle verwerfen.',act:()=>{for(const u of sel)order(u,{t:'idle'})}};
+      {const cur=sel[0].form||0,nx=(cur+1)%4;cmds[8]={label:'Formation: '+FORMS[cur],desc:'Wechselt die Formation (F): Schildwall +30 % Abwehr, halbes Tempo. Keil +30 % Angriff, −20 % Abwehr. Schützenlinie (nur Fernkämpfer) +40 % Reichweite, steht fest. Nächste: '+FORMS[nx]+'.',act:()=>{for(const u of sel){let f=nx;if(f===3&&uStat(u).range<2)f=0;u.form=f;if(f===3)order(u,{t:'idle'})}toast('Formation: '+FORMS[nx]+'.');uiDirty=true}}}
     }
     cmds[13]={label:'Abwählen',desc:'Auswahl aufheben (Esc).',act:()=>select([])};
   }else if(first.kind==='bld'&&first.built){
@@ -2138,6 +2142,6 @@ function autoPlayer(){ // lets the player side be run by the same AI for soak te
   const a=aiS;aiS=window.__ai0||(window.__ai0={t:0,nextAttack:DIFF[diff].firstAttack,wave:DIFF[diff].wave,attacking:false});
   try{aiThink()}finally{window.__ai0=aiS;aiS=a;for(const e of ents)swap(e);players=save;players[0].i=0;players[1].i=1;bases=b}
 }
-window.__ex={start:(d,s)=>{newGame(d,s);started=true},step:n=>{for(let i=0;i<n&&!over;i++)step(DT)},get:()=>({t:gameT,over,players,ents})};
+window.__ex={start:(d,s)=>{newGame(d,s);started=true},step:n=>{for(let i=0;i<n&&!over;i++)step(DT)},select:a=>select(a),get:()=>({t:gameT,over,players,ents})};
 window.__spawn=(p,t,x,y)=>spawnUnit(p,t,x,y);window.__place=(p,t,x,y)=>placeBld(p,t,x,y,true);window.__can=(p,t,x,y)=>canPlace(p,t,x,y);window.__water=(x,y)=>terr[idx(x|0,y|0)]===1;window.__cam=(x,y)=>{cam.x=x*T;cam.y=y*T};window.__move=(u,x,y)=>cmdMove([u],x,y,false);window.__limit=m=>{timeLimit=m};window.__placeU=(p,t,x,y)=>placeBld(p,t,x,y,false);
 })();
