@@ -609,7 +609,7 @@ function updBld(b,dt){
       if(best){b.cd=D.rate;const c=center(b);proj.push({x:c.x,y:c.y-.6,tid:best.id,dmg:D.atk*(1+.14*pl.epoch)*(1+pl.fx.bldAtk),src:b.id,k:'arrow',ep:pl.epoch,sp:14,arc:bd})}
     }
   }
-  const q=b.queue[0];if(!q)return;const sdt=b.sabotUntil>gameT?dt*.5:dt;// sabotiert: halbe Produktion
+  const q=b.queue[0];if(!q)return;const sdt=(b.sabotUntil>gameT?dt*.5:dt)*(players[b.owner].crowdMul||1);// sabotiert: halbe Produktion
   if(q.tech){
     q.t+=sdt;
     if(q.t>=q.total){b.queue.shift();applyTech(pl,q.tech);
@@ -1766,7 +1766,7 @@ function updateTop(){
     const ir=incomeRate(pl,r),ie=$('#i-'+r);if(ie){const t=ir>0?'+'+ir+'/min':'';if(ie.textContent!==t)ie.textContent=t}}
   const gd=pl.goods,ge=$('#r-goods');if(ge&&gd){const L=[['wheat','Weizen'],['flour','Mehl'],['planks','Bretter'],['blocks','Quader'],['ore','Erz'],['tools','Werkzeug']].filter(([k])=>(gd[k]||0)>=1),on=L.length>0;ge.hidden=!on;if(on){const t=L.map(([k,n])=>n+' '+Math.floor(gd[k])).join(' · ');if(ge.textContent!==t){ge.textContent=t;ge.title='Waren aus deinen Produktionsketten. Werkzeug beschleunigt alle Arbeiter um '+Math.round(((pl.toolMul||1)-1)*100)+' %.'}}}
   const md=$('#r-mood');if(md){const m=Math.round(pl.mood??50),t=m+'';if(md.textContent!==t){md.textContent=t;md.style.color=m>=65?'var(--ok)':m<35?'var(--danger)':'';md.parentNode.title='Beliebtheit '+m+' von 100: '+(pl.moodWhy||'')+' Sammeltempo '+Math.round((pl.moodMul||1)*100)+' %.'}}
-  const p=$('#r-pop'),pv=pl.pop+'/'+pl.cap;if(p.textContent!==pv){p.textContent=pv;p.style.color=pl.pop>=pl.cap?'var(--danger)':''}
+  const p=$('#r-pop'),pv=pl.pop+'/'+pl.cap+' Einwohner';if(p.textContent!==pv){p.textContent=pv;p.style.color=pl.pop>=pl.cap?'var(--danger)':pl.pop>=pl.cap*.9?'var(--warn,#d9a43a)':'';p.title='Einwohner / Wohnraum. Ab 90 % Belegung: Beliebtheit −5 und Produktion −15 %. Baue Wohnhäuser.'}
   const tc=ents.find(e=>e.owner===0&&e.kind==='bld'&&e.queue.some(q=>q.ep));
   const en=pl.advancing&&tc?EPOCHS[pl.epoch]+' → '+EPOCHS[pl.epoch+1]:EPOCHS[pl.epoch];
   if($('#epochName').textContent!==en)$('#epochName').textContent=en;
