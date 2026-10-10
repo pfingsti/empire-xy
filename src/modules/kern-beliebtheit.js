@@ -40,6 +40,7 @@ EmpireXY.register({
         const food=pl.res.food;if(food>=400){m+=12;why.push('volle Speicher +12')}else if(food>=150){m+=5;why.push('genug Nahrung +5')}else if(food<40){m-=18;why.push('Hunger −18')}
         if(pl.cap>0&&pl.pop>=pl.cap){m-=10;why.push('Wohnungsnot −10')}else if(pl.cap>0&&pl.pop>=pl.cap*.9){m-=5;why.push('enge Häuser −5')}
         pl.crowdMul=pl.cap>0&&pl.pop>=pl.cap*.9?.85:1;
+        if(pl.heroDeadUntil>api.time){m-=15;why.push('Held gefallen −15')}
         const blds=api.ents.filter(e=>e.kind==='bld'&&e.owner===pl.i&&e.built&&!e.dead);
         if(blds.some(b=>b.type==='wonder')){m+=15;why.push('Weltwunder +15')}
         for(const t of ['market','temple']){const n=Math.min(2,blds.filter(b=>b.type===t).length);if(n){const v=n*(t==='market'?10:8);m+=v;why.push((t==='market'?'Märkte':'Tempel')+' +'+v)}}

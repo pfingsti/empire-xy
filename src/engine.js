@@ -218,7 +218,7 @@ function weatherTick(){
   if(gameT>=WX.until){const r=rng(),ep=players[0].epoch,old=WX.kind;WX.kind=r<.55?'sun':r<.82||ep>6?'rain':'snow';WX.until=gameT+90+rng()*150;
     WX.speed=WX.kind==='rain'?.8:WX.kind==='snow'?.9:1;if(started&&old!==WX.kind)toast(WXN[WX.kind]+'.')}
 }
-function uStat(u){const d=UNITS[u.type],pl=players[u.owner],f=pl.fx,t=CLS(u.type),e=pl.epoch,m=1+.17*e;return{hp:Math.round(d.hp*m*(1+(f.hp[t]||0))),atk:d.atk*m*(1+(f.atk[t]||0)),range:d.range+(f.range[t]||0),rate:d.rate,speed:d.speed*(1+.03*e)*(1+(f.speed[t]||0))*(d.naval?1:WX.speed),sight:Math.max(2,d.sight-WX.night*2)}}
+function uStat(u){const d=UNITS[u.type],pl=players[u.owner],f=pl.fx,t=CLS(u.type),e=pl.epoch,m=1+.17*e;return{hp:Math.round(d.hp*m*(1+(f.hp[t]||0))),atk:d.atk*m*(1+(f.atk[t]||0)),range:d.range+(f.range[t]||0),rate:d.rate,speed:d.speed*(1+.03*e)*(1+(f.speed[t]||0))*(d.naval?1:WX.speed)*(u.rallyUntil>gameT?1.2:1),sight:Math.max(2,d.sight-WX.night*2)}}
 function spawnUnit(p,type,x,y){
   const d=UNITS[type];
   const u=addEnt({kind:'unit',type,owner:p,x,y,r:d.r,hp:0,cd:0,ang:p?Math.PI*.75:-Math.PI*.25,order:{t:'idle'},path:null,pathCD:0,carry:0,ct:null,scan:rng()*.5,anim:rng()*6});
@@ -451,6 +451,7 @@ function enemyNear(u,radius,wantBld){
 // ================= combat =================
 function damage(t,dmg,src){
   if(t.dead)return;
+  if(src&&src.buffUntil>gameT)dmg*=1.2;if(src&&src.templeT>gameT)dmg*=1.1;if(src&&src.type==='hero'&&t.kind==='unit'&&t.hp>0&&t.hp<=dmg)src.kills=(src.kills||0)+1;
   t.hp-=dmg;t.hitT=gameT;t.revealT=gameT+6;if(src)src.revealT=gameT+6;if(visibleEnt(t))sfx(dmg>20?'boom':src&&src.kind==='unit'&&uStat(src).range<1.5&&!['siege'].includes(CLS(src.type))?'sword':'hit');
   fx.push({x:center(t).x+(rng()-.5)*.4,y:center(t).y+(rng()-.5)*.4,t:0,k:'hit'});
   if(t.owner===0&&gameT-lastAlarm>20&&src){lastAlarm=gameT;toast('Wir werden angegriffen!','warn');ping=center(t);pingT=3}
