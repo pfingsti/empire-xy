@@ -42,11 +42,11 @@ EmpireXY.register({
         const pl=api.players[h.owner];pl.heroId=h.id;
         // Stufen: 3 Siege → Stufe 2 (mehr Leben), 8 Siege → Stufe 3 (Sammelruf: Truppen in der Nähe laufen schneller)
         const lv=(h.kills||0)>=8?3:(h.kills||0)>=3?2:1;
-        if(lv>(h.lvl||1)){h.lvl=lv;h.maxhp=Math.round(h.maxhp*1.25);h.hp=h.maxhp;api.fx(h.x,h.y,'hit');if(h.owner===0)api.toast('Held erreicht Stufe '+lv+(lv===3?': Sammelruf freigeschaltet.':': mehr Lebenskraft.'),'good')}
+        if(lv>(h.lvl||1)){h.lvl=lv;h.maxhp=Math.round(h.maxhp*1.25);h.hp=h.maxhp;api.fx(h.x,h.y,'hit');if(h.owner===api.me)api.toast('Held erreicht Stufe '+lv+(lv===3?': Sammelruf freigeschaltet.':': mehr Lebenskraft.'),'good')}
         // Schlachtruf: sobald Feinde nah sind, +20 % Schaden für eigene Truppen im Umkreis, 30 s, alle 90 s
         if(api.time>(h.cryReady||0)&&api.ents.some(e=>e.kind==='unit'&&!e.dead&&e.owner!==h.owner&&!api.players[e.owner].ally&&Math.hypot(e.x-h.x,e.y-h.y)<5)){
           h.cryReady=api.time+90;for(const e of api.ents)if(e.kind==='unit'&&!e.dead&&e.owner===h.owner&&Math.hypot(e.x-h.x,e.y-h.y)<6)e.buffUntil=api.time+30;
-          if(h.owner===0)api.toast('Schlachtruf! +20 % Kampfkraft für 30 Sekunden.','good')}
+          if(h.owner===api.me)api.toast('Schlachtruf! +20 % Kampfkraft für 30 Sekunden.','good')}
         if(h.lvl===3)for(const e of api.ents)if(e.kind==='unit'&&!e.dead&&e.owner===h.owner&&e.moving&&Math.hypot(e.x-h.x,e.y-h.y)<5&&e!==h)e.rallyUntil=api.time+1;
         for(const e of api.ents)if(e.kind==='unit'&&!e.dead&&e.owner===h.owner&&e!==h&&e.hp<e.maxhp&&Math.hypot(e.x-h.x,e.y-h.y)<4)api.heal(e,3*dt);
       }

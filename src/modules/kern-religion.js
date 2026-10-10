@@ -42,7 +42,7 @@ EmpireXY.register({
           if(!t){u.convT=0;u.convId=0;continue}if(t.id!==u.convId)u.convT=0;
           u.convId=t.id;u.convT=(u.convT||0)+dt;
           if(u.convT>=6){u.convT=0;u.convId=0;const was=t.owner;t.owner=u.owner;api.order(t,{t:'idle'});api.fx(t.x,t.y,'hit');
-            if(u.owner===0)api.toast('Ein Feind ist zu uns übergelaufen!','good');else if(was===0)api.toast('Eine unserer Einheiten wurde bekehrt!','warn')}
+            if(u.owner===api.me)api.toast('Ein Feind ist zu uns übergelaufen!','good');else if(was===api.me)api.toast('Eine unserer Einheiten wurde bekehrt!','warn')}
         }else if(u.type==='fishboat'){
           if(u.moving)continue;
           const dock=ents.find(e=>e.kind==='bld'&&e.type==='dock'&&e.built&&!e.dead&&e.owner===u.owner&&D(api.center(e),u)<12);

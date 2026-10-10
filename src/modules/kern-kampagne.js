@@ -338,7 +338,7 @@ EmpireXY.register({
   hooks:{
     start(api){lastApi=api;C=pending;pending=null;const old=document.getElementById('campEnd');if(old)old.remove();
       if(C)setupMission(api);else hud.hidden=true},
-    tick(api,dt){if(!C||C.ended)return;lastApi=api;if((C._t=(C._t||0)+dt)<.5)return;C._t=0;raidTick(api);checkMission(api);if(C&&!C.ended)renderHud(api)},
+    tick(api,dt){if(!C||C.ended||api.mp)return;lastApi=api;if((C._t=(C._t||0)+dt)<.5)return;C._t=0;raidTick(api);checkMission(api);if(C&&!C.ended)renderHud(api)},
     end(api,win){onEnd(api,win)},
     save(data){if(C&&!C.ended){const {_t,...rest}=C;data.kampagne=rest}},
     load(api,d){C=d.kampagne&&CAMPAIGNS[d.kampagne.ci]?{...d.kampagne}:null;if(C){renderHud(api);hud.hidden=false}else hud.hidden=true},

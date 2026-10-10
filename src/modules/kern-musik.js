@@ -54,8 +54,8 @@ EmpireXY.register({
       const ents=api.ents;
       // Musik
       if(started&&musicOn()&&ensure()){if(ac.state==='suspended')ac.resume();schedule();
-        const home=ents.filter(e=>e.kind==='bld'&&e.owner===0&&!e.dead&&e.type==='tc');
-        const war=ents.some(e=>e.kind==='unit'&&!e.dead&&e.owner!==0&&api.isMil(e)&&home.some(h=>Math.hypot(e.x-h.x,e.y-h.y)<15));setWar(war?1:0)}
+        const home=ents.filter(e=>e.kind==='bld'&&e.owner===api.me&&!e.dead&&e.type==='tc');
+        const war=ents.some(e=>e.kind==='unit'&&!e.dead&&e.owner!==api.me&&e.owner>=0&&api.isMil(e)&&home.some(h=>Math.hypot(e.x-h.x,e.y-h.y)<15));setWar(war?1:0)}
       else if(ac&&master)master.gain.value=0;
       if(ac&&master&&musicOn())master.gain.value=.10;
       // Ölkessel
@@ -63,7 +63,7 @@ EmpireXY.register({
         let hit=false;for(const e of ents)if(e.kind==='unit'&&!e.dead&&e.owner!==b.owner&&Math.hypot(e.x-b.x-.5,e.y-b.y-.5)<1.6){api.damage(e,20,b);hit=true}
         if(hit){b.oilCd=3;api.fx(b.x+.5,b.y+.5,'boom')}}
       // Piraten: alle 4 bis 6 Minuten erscheint ein Piratenschiff auf dem Wasser
-      const P=api.players[1];if(!P)return;P.pirT=(P.pirT??(api.time+240))-0;
+      const P=api.players[1];if(!P||api.mp)return;P.pirT=(P.pirT??(api.time+240))-0;
       if(api.time>P.pirT){P.pirT=api.time+240+Math.random()*120;
         for(let k=0;k<200;k++){const x=Math.floor(Math.random()*api.W),y=Math.floor(Math.random()*api.W);if(api.water&&api.water(x,y)){const u=api.spawnUnit(1,'pirate',x+.5,y+.5);if(u){u.pirate=1;u.loot={gold:150+Math.floor(Math.random()*150),food:100};api.toast('Piraten sind auf dem Wasser gesichtet worden!','warn')}break}}}
       for(const u of ents){if(!u.pirate||u.dead||u.owner===0)continue;

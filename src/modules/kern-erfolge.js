@@ -6,13 +6,13 @@ const ACH=[
   ['baumeister','Baumeister','Errichte 20 Gebäude.',p=>p.st.built>=20],
   ['forscher','Forscher','Erforsche 8 Stufen einer Technologielinie.',p=>{const c={};for(const k in p.techs){if(!p.techs[k])continue;const l=k.replace(/_\d+$/,'');c[l]=(c[l]||0)+1}return Object.values(c).some(n=>n>=8)}],
   ['haendler','Händler','Transportiere 100 Gold per Karawane.',p=>(p.carried||0)>=100],
-  ['wunder','Weltwunder','Vollende ein Weltwunder.',(p,a)=>a.ents.some(e=>e.type==='wonder'&&e.owner===0&&e.built&&!e.dead)],
+  ['wunder','Weltwunder','Vollende ein Weltwunder.',(p,a)=>a.ents.some(e=>e.type==='wonder'&&e.owner===(a.me|0)&&e.built&&!e.dead)],
   ['zeit','Zeitreisender','Erreiche die 10. Epoche.',p=>p.epoch>=9],
   ['heer','Heerführer','Bilde 100 Einheiten aus.',p=>p.st.trained>=100],
   ['sammler','Sammler','Sammle 10 000 Rohstoffe.',p=>p.st.gathered>=10000],
   ['reich','Schatzkammer','Besitze 2000 Gold auf einmal.',p=>p.res.gold>=2000],
   ['epoche5','Aufsteiger','Erreiche die 5. Epoche.',p=>p.epoch>=4],
-  ['festung','Festungsherr','Besitze 5 Türme gleichzeitig.',(p,a)=>a.ents.filter(e=>e.owner===0&&e.kind==='bld'&&e.built&&!e.dead&&/tower|sniper/.test(e.type)).length>=5],
+  ['festung','Festungsherr','Besitze 5 Türme gleichzeitig.',(p,a)=>a.ents.filter(e=>e.owner===(a.me|0)&&e.kind==='bld'&&e.built&&!e.dead&&/tower|sniper/.test(e.type)).length>=5],
 ];
 let got={};try{got=JSON.parse(localStorage.getItem('empire-xy.erfolge')||'{}')}catch(e){}
 const css=document.createElement('style');css.textContent=`#achBanner{position:fixed;top:56px;right:14px;z-index:60;background:linear-gradient(#f3d27a,#c99a2e);color:#2a1d05;border:2px solid #fff3c4;border-radius:8px;padding:8px 14px;font:600 14px sans-serif;box-shadow:0 4px 18px rgba(0,0,0,.5);transition:opacity .4s,transform .4s;pointer-events:none}
@@ -30,11 +30,11 @@ window.__ach={list:ACH.map(a=>a[0]),got:()=>got};
 // Tutorial
 const STEPS=[
   ['Wähle einen Arbeiter','Klicke mit links auf einen deiner Arbeiter neben dem Stadtzentrum.',a=>a.sel().some(e=>e.type==='worker')],
-  ['Schicke ihn zum Wald','Rechtsklick auf einen Baum: der Arbeiter fällt Holz.',a=>a.ents.some(e=>e.owner===0&&e.type==='worker'&&(e.ct==='wood'||(e.order&&e.order.rt==='wood')))],
-  ['Baue eine Hütte','Mit gewähltem Arbeiter unten im Befehlsfeld ein Haus wählen und auf die Karte setzen.',a=>a.ents.some(e=>e.owner===0&&e.type==='house')],
-  ['Rekrutiere einen Krieger','Wähle die Kaserne oder das Stadtzentrum und bilde eine Kampfeinheit aus.',a=>a.ents.some(e=>e.owner===0&&e.kind==='unit'&&e.type!=='worker'&&!e.dead)],
-  ['Forsche Technologie','Öffne den Technologiebaum (Taste N) und starte eine Forschung.',a=>Object.keys(a.players[0].techs).length>0||a.ents.some(e=>e.owner===0&&e.queue&&e.queue.some(q=>q.tech))],
-  ['Steige in die nächste Epoche auf','Wähle das Stadtzentrum und klicke auf den Epochen-Aufstieg.',a=>a.players[0].epoch>=1||a.players[0].advancing],
+  ['Schicke ihn zum Wald','Rechtsklick auf einen Baum: der Arbeiter fällt Holz.',a=>a.ents.some(e=>e.owner===(a.me|0)&&e.type==='worker'&&(e.ct==='wood'||(e.order&&e.order.rt==='wood')))],
+  ['Baue eine Hütte','Mit gewähltem Arbeiter unten im Befehlsfeld ein Haus wählen und auf die Karte setzen.',a=>a.ents.some(e=>e.owner===(a.me|0)&&e.type==='house')],
+  ['Rekrutiere einen Krieger','Wähle die Kaserne oder das Stadtzentrum und bilde eine Kampfeinheit aus.',a=>a.ents.some(e=>e.owner===(a.me|0)&&e.kind==='unit'&&e.type!=='worker'&&!e.dead)],
+  ['Forsche Technologie','Öffne den Technologiebaum (Taste N) und starte eine Forschung.',a=>Object.keys(a.players[a.me|0].techs).length>0||a.ents.some(e=>e.owner===(a.me|0)&&e.queue&&e.queue.some(q=>q.tech))],
+  ['Steige in die nächste Epoche auf','Wähle das Stadtzentrum und klicke auf den Epochen-Aufstieg.',a=>a.players[a.me|0].epoch>=1||a.players[a.me|0].advancing],
 ];
 const ARROW=[null,null,'#cmds','#cmds','#btnTech','#cmds'];
 let tut=-1,done=false;
@@ -55,8 +55,8 @@ EmpireXY.register({
   id:'kern-erfolge',name:'Kern: Errungenschaften und Tutorial',version:'1.0.0',core:true,
   description:'Zwölf Errungenschaften mit Goldbanner und ein geführtes Tutorial in sechs Schritten.',
   hooks:{
-    tick(api,dt){const p=api.players[0];if(!p)return;toastE=m=>api.toast(m,'good');
-      if(tut>=0&&!done&&STEPS[tut][2]({ents:api.ents,players:api.players,sel:()=>api.sel?api.sel():[]})){done=true;render()}
+    tick(api,dt){const p=api.players[api.me];if(!p)return;toastE=m=>api.toast(m,'good');
+      if(tut>=0&&!done&&STEPS[tut][2]({ents:api.ents,players:api.players,me:api.me,sel:()=>api.sel?api.sel():[]})){done=true;render()}
       if((api._achT=(api._achT||0)+dt)<1)return;api._achT=0;
       for(const a of ACH)if(!got[a[0]]&&a[3](p,api)){got[a[0]]=1;show(a);try{localStorage.setItem('empire-xy.erfolge',JSON.stringify(got))}catch(e){}}
     },
